@@ -293,19 +293,22 @@ public sealed class MicrosoftAuth(LauncherCore core)
     public static bool CanUseOffline(IEnumerable<Account> accounts) =>
         IsMainlandMachine || accounts.Any(IsVerifiedMinecraftPlayer);
 
+    public static bool CanUseExternal(IEnumerable<Account> accounts) =>
+        IsMainlandMachine || accounts.Any(IsVerifiedMinecraftPlayer);
+
     public const string ExternalLockedMessage =
         "Sign in with Microsoft and verify ownership of Minecraft Java Edition before using external accounts.";
 
     public static void EnsureExternalAllowed(IEnumerable<Account> accounts)
     {
-        if (!accounts.Any(IsVerifiedMinecraftPlayer))
+        if (!CanUseExternal(accounts))
             throw new InvalidOperationException(ExternalLockedMessage);
     }
 
     public static bool CanUseAccount(IEnumerable<Account> accounts, Account account) =>
         IsVerifiedMinecraftPlayer(account)
         || account.Type == "offline" && CanUseOffline(accounts)
-        || account.Type == "yggdrasil" && accounts.Any(IsVerifiedMinecraftPlayer);
+        || account.Type == "yggdrasil" && CanUseExternal(accounts);
 
     public static void EnsureAccountAllowed(IEnumerable<Account> accounts, Account account)
     {

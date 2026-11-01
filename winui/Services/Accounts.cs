@@ -286,7 +286,7 @@ public sealed partial class MainWindow
 
     void ExternalAccountForm(StackPanel container)
     {
-        var unlocked = store.Config.Accounts.Any(MicrosoftAuth.IsVerifiedMinecraftPlayer);
+        var unlocked = MicrosoftAuth.CanUseExternal(store.Config.Accounts);
         if (!unlocked)
             container.Children.Add(Text(MicrosoftAuth.ExternalLockedMessage, 12));
         container.Children.Add(Text("External sign-in (authlib-injector)", 16, true));

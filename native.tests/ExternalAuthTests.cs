@@ -157,8 +157,11 @@ static class ExternalAuthTests
                 CancellationToken.None
             );
 
-        await Reject(async () => await Login(), "Unlicensed login allowed");
-        Check(requests == 0, "Locked external login made network requests");
+        if (!MicrosoftAuth.IsMainlandMachine)
+        {
+            await Reject(async () => await Login(), "Unlicensed login allowed");
+            Check(requests == 0, "Locked external login made network requests");
+        }
         accounts.Add(owner);
         var account = await Login();
         Check(
@@ -253,13 +256,22 @@ static class ExternalAuthTests
             "Failed injector download left temporary files"
         );
         accounts.Clear();
-        Check(!MicrosoftAuth.CanUseAccount([account], account), "External account unlocked itself");
-        var previousRequests = requests;
-        await Reject(
-            async () => await external.Refresh(accounts, account, CancellationToken.None),
-            "Refresh accepted without ownership"
-        );
-        Check(requests == previousRequests, "Locked refresh contacted provider");
+        if (!MicrosoftAuth.IsMainlandMachine)
+        {
+            Check(
+                !MicrosoftAuth.CanUseAccount([account], account),
+                "External account unlocked itself"
+            );
+            var previousRequests = requests;
+            await Reject(
+                async () => await external.Refresh(accounts, account, CancellationToken.None),
+                "Refresh accepted without ownership"
+            );
+            Check(
+                requests == previousRequests,
+                "Locked refresh contacted provider"
+            );
+        }
         foreach (
             var input in new[]
             {

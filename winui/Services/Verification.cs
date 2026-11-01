@@ -2438,10 +2438,12 @@ public sealed partial class MainWindow
         );
         await RenderAsync();
         Check(
-            !Descendants(PageBody)
-                .OfType<ContentControl>()
-                .Single(e => e.Tag?.ToString() == "external-account-form")
-                .IsEnabled && !MicrosoftAuth.CanUseAccount(store.Config.Accounts, externalAccount),
+            (Descendants(PageBody)
+                    .OfType<ContentControl>()
+                    .Single(e => e.Tag?.ToString() == "external-account-form")
+                    .IsEnabled == false
+                && !MicrosoftAuth.CanUseAccount(store.Config.Accounts, externalAccount))
+                == !MicrosoftAuth.IsMainlandMachine,
             "removing the last verified Microsoft account locks external sign-in and selection"
         );
         Check(
