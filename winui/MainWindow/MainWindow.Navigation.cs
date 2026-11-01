@@ -97,8 +97,8 @@ public sealed partial class MainWindow
             "more",
             new[]
             {
-                ("系统状态", "\uE9F5", "stats"),
                 ("frpc", "\uE968", "frpc"),
+                ("系统状态", "\uE9F5", "stats"),
                 ("About", "\uE946", "about"),
             }
         );

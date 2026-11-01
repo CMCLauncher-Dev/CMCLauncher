@@ -26,7 +26,7 @@ public sealed partial class MainWindow
 
     CommunityFilterControls BuildCommunityFilters(string type, CommunitySearchFilters initial)
     {
-        var root = new StackPanel { Spacing = 12, Tag = "community-filters" };
+        var root = new StackPanel { Spacing = 6, Tag = "community-filters" };
         var basic = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
         var fields = new List<FrameworkElement>();
         var categories = new List<ComboBox>();
@@ -125,7 +125,12 @@ public sealed partial class MainWindow
             "community-filter-april-fools",
             initial.ShowAprilFools || GameRelease.IsAprilFoolsVersion(initial.GameVersion)
         );
-        var versionOptions = new Grid { ColumnSpacing = 12, Tag = "community-version-options" };
+        var versionOptions = new Grid
+        {
+            ColumnSpacing = 12,
+            Tag = "community-version-options",
+            VerticalAlignment = VerticalAlignment.Center,
+        };
         versionOptions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         versionOptions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         versionOptions.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -457,7 +462,7 @@ public sealed partial class MainWindow
         {
             Tag = "community-more-filters",
             HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Top,
+            VerticalAlignment = VerticalAlignment.Center,
             MinWidth = 0,
             Padding = new Thickness(0),
             Background = ComboSurfaceBrush,

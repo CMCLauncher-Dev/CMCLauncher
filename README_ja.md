@@ -1,20 +1,71 @@
+<div align="center">
+
+<img src="docs/assets/cmc-logo.png" alt="CMCLauncher logo" width="120" height="120" />
+
 # CMCLauncher
 
-<div align="center">
+**Minecraft Java の世界へ、Windows ネイティブの入り口。**
 
 [English](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md)
 
-このランチャーは、英語・簡体中文・日本語・ロシア語・フランス語・スペイン語・アラビア語のインターフェース翻訳を内蔵しており、**設定 → 全般 → 言語**で自動または手動で選択できます。README は英語・簡体中文・日本語で利用できます。
+<p>
+<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/com-in/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
+<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/com-in/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
+<a href="https://github.com/com-in/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/com-in/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
+<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-7654c4?style=flat-square" /></a>
+<br />
+<img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square" />
+<img alt=".NET 8" src="https://img.shields.io/badge/.NET-8-512bd4?style=flat-square" />
+<img alt="WinUI 3" src="https://img.shields.io/badge/WinUI-3-00a4ef?style=flat-square" />
+<a href="https://github.com/com-in/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/com-in/CMCLauncher?style=flat-square" /></a>
+</p>
+
+### [ダウンロード](https://github.com/com-in/CMCLauncher/releases) · [公式サイト](https://cmcl.ctfun.top/) · [問題を報告](https://github.com/com-in/CMCLauncher/issues)
 
 </div>
 
 Minecraft Java Edition 向けのネイティブ Windows ランチャーです。C#、.NET 8、WinUI 3 で構築されています。分離インスタンスの管理、ゲームバージョンとローダーのダウンロード、Modrinth / CurseForge コンテンツの導入、Java とアカウントの管理に対応しています。
 
-現在のバージョン：**1.0.1** · プラットフォーム：**Windows x64**
+このランチャーは、英語・簡体中文・日本語・ロシア語・フランス語・スペイン語・アラビア語のインターフェース翻訳を内蔵しており、**設定 → 全般 → 言語**で自動または手動で選択できます。README は英語・簡体中文・日本語で利用できます。
 
-[ダウンロード](https://github.com/com-in/CMCLauncher/releases) · [Web サイト](https://cmcl.ctfun.top/) · [問題の報告](https://github.com/com-in/CMCLauncher/issues)
+## プレビュー
 
-![CMCLauncher 英語ホーム画面](docs/assets/launcher-home.png)
+<div align="center">
+<img src="docs/assets/launcher-home.png" alt="CMCLauncher home" width="960" />
+</div>
+
+## 次のワールドに向けて
+
+<table>
+<tr>
+<td width="33%" valign="top">
+<h3>🧩 インスタンスを管理</h3>
+<p>分離したゲームフォルダー、ローカル読み込み、PCL / HMCL 互換。</p>
+</td>
+<td width="33%" valign="top">
+<h3>📦 Modpack とローダー</h3>
+<p>Fabric、Forge、NeoForge、Modrinth パックと対応 ZIP の読み込み。</p>
+</td>
+<td width="33%" valign="top">
+<h3>🔎 コミュニティを探す</h3>
+<p>Modrinth / CurseForge から Mod、リソースパック、シェーダーを検索。</p>
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top">
+<h3>🎨 自分らしい見た目</h3>
+<p>ライト／ダークテーマ、配色とフォントの調整、7 言語の UI。</p>
+</td>
+<td width="33%" valign="top">
+<h3>📈 システムの状態を確認</h3>
+<p>CPU、メモリ、GPU ごとのリアルタイムグラフと Java メモリの自動割り当て。</p>
+</td>
+<td width="33%" valign="top">
+<h3>🔄 更新と接続</h3>
+<p>検証付き更新、Beta チャンネル、Frp Client のバージョンと接続を管理。</p>
+</td>
+</tr>
+</table>
 
 ## クイックスタート
 

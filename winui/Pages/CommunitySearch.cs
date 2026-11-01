@@ -76,6 +76,7 @@ public sealed partial class MainWindow
         };
         var results = new StackPanel { Spacing = 10 };
         var heading = Text("", 12, true);
+        heading.Visibility = Visibility.Collapsed;
         var status = Text("", 12);
         var pageLabel = Text("", 12);
         pageLabel.VerticalAlignment = VerticalAlignment.Center;
@@ -270,6 +271,7 @@ public sealed partial class MainWindow
                             ? Ui("context.communitysearch.community_resources")
                             : Ui(string.IsNullOrWhiteSpace(term) ? "下载量排行" : "搜索结果")
                     ) + UiFormat(" · {0:N0} results", total);
+                heading.Visibility = Visibility.Visible;
                 status.Text = response.Warning == null ? "" : Ui(response.Warning);
                 status.Visibility =
                     response.Warning == null ? Visibility.Collapsed : Visibility.Visible;
@@ -422,11 +424,12 @@ public sealed partial class MainWindow
         searchRow.Children.Add(reset);
         searchRow.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         searchRow.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        searchRow.RowSpacing = 8;
+        searchRow.RowSpacing = 0;
         // 搜索框在窄窗口占满一行，按钮移到下一行，避免输入框被挤成零宽。
         searchRow.SizeChanged += (_, args) =>
         {
             var narrow = args.NewSize.Width < 440;
+            searchRow.RowSpacing = narrow ? 8 : 0;
             Grid.SetColumnSpan(query, narrow ? 3 : 1);
             Grid.SetRow(search, narrow ? 1 : 0);
             Grid.SetColumn(search, narrow ? 0 : 1);

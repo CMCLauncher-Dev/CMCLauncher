@@ -1,20 +1,71 @@
+<div align="center">
+
+<img src="docs/assets/cmc-logo.png" alt="CMCLauncher logo" width="120" height="120" />
+
 # CMCLauncher
 
-<div align="center">
+**A native Windows home for your Minecraft Java worlds.**
 
 [English](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md)
 
-This launcher ships with interface translations for English, Simplified Chinese, Japanese, Russian, French, Spanish, and Arabic, selected automatically or in **Settings → General → Language**. The README itself is available in English, Simplified Chinese, and Japanese.
+<p>
+<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/com-in/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
+<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/com-in/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
+<a href="https://github.com/com-in/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/com-in/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
+<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-7654c4?style=flat-square" /></a>
+<br />
+<img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square" />
+<img alt=".NET 8" src="https://img.shields.io/badge/.NET-8-512bd4?style=flat-square" />
+<img alt="WinUI 3" src="https://img.shields.io/badge/WinUI-3-00a4ef?style=flat-square" />
+<a href="https://github.com/com-in/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/com-in/CMCLauncher?style=flat-square" /></a>
+</p>
+
+### [Download](https://github.com/com-in/CMCLauncher/releases) · [Website](https://cmcl.ctfun.top/) · [Report an issue](https://github.com/com-in/CMCLauncher/issues)
 
 </div>
 
 A native Windows launcher for Minecraft Java Edition, built with C#, .NET 8, and WinUI 3. Manage isolated instances, download game versions and loaders, install Modrinth and CurseForge content, and manage Java and accounts.
 
-Current version: **1.0.1** · Platform: **Windows x64**
+This launcher ships with interface translations for English, Simplified Chinese, Japanese, Russian, French, Spanish, and Arabic, selected automatically or in **Settings → General → Language**. The README itself is available in English, Simplified Chinese, and Japanese.
 
-[Download](https://github.com/com-in/CMCLauncher/releases) · [Website](https://cmcl.ctfun.top/) · [Report an issue](https://github.com/com-in/CMCLauncher/issues)
+## Preview
 
-![CMCLauncher home screen in English](docs/assets/launcher-home.png)
+<div align="center">
+<img src="docs/assets/launcher-home.png" alt="CMCLauncher home" width="960" />
+</div>
+
+## Built for your next world
+
+<table>
+<tr>
+<td width="33%" valign="top">
+<h3>🧩 Instances, together</h3>
+<p>Isolated game folders, local imports, and PCL / HMCL compatibility.</p>
+</td>
+<td width="33%" valign="top">
+<h3>📦 Modpacks & loaders</h3>
+<p>Fabric, Forge, NeoForge, Modrinth packs, and supported ZIP imports.</p>
+</td>
+<td width="33%" valign="top">
+<h3>🔎 Community content</h3>
+<p>Discover Mods, resource packs, shaders, and more on Modrinth / CurseForge.</p>
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top">
+<h3>🎨 Make it yours</h3>
+<p>Light and dark themes, custom colors, fonts, and seven interface languages.</p>
+</td>
+<td width="33%" valign="top">
+<h3>📈 Know your system</h3>
+<p>Live CPU, memory, and per-GPU charts, plus automatic Java memory budgets.</p>
+</td>
+<td width="33%" valign="top">
+<h3>🔄 Keep moving</h3>
+<p>Verified launcher updates, an optional Beta channel, and Frp Client management.</p>
+</td>
+</tr>
+</table>
 
 ## Quick start
 
@@ -25,7 +76,7 @@ Current version: **1.0.1** · Platform: **Windows x64**
 
 External sign-in is available under **Settings → Accounts → External sign-in (authlib-injector)** after a Microsoft account has passed Minecraft Java profile verification. Enter your Yggdrasil server URL and that server's credentials, then select a player profile if prompted. The launcher stores encrypted session tokens, downloads and verifies authlib-injector when launching, and requires a verified Microsoft account to remain in the account list. Removing the last verified Microsoft account locks external accounts until Microsoft verification is restored.
 
-The release archive includes the .NET and Windows App SDK runtimes, so you do not need to install .NET separately. Java and game files are downloaded or imported separately. The launcher checks GitHub Releases on startup by default. In **Launcher settings → Launcher updates**, you can disable startup checks, check manually, and opt into Beta releases. Choose **Download and install update** to verify the package with GitHub’s SHA-256 digest, close the launcher, install the update, and restart. Active tasks and games must finish first. Accounts, instances, settings, and existing language/theme files are kept. The installation folder must be writable; replacement failures attempt to restore backed-up files, with diagnostics and backups under `%LOCALAPPDATA%/CMCLauncher/updates/`. If a release has no compatible package or SHA-256 digest, use **View release notes** to download manually. Turning Beta off affects future checks and never downgrades an installed version.
+The release archive includes the .NET and Windows App SDK runtimes, so you do not need to install .NET separately. Java and game files are downloaded or imported separately. The launcher checks GitHub Releases on startup by default. In **More → About → Launcher updates**, you can disable startup checks, check manually, and opt into Beta releases. Choose **Download and install update** to verify the package with GitHub’s SHA-256 digest, close the launcher, install the update, and restart. Active tasks and games must finish first. Accounts, instances, settings, and existing language/theme files are kept. The installation folder must be writable; replacement failures attempt to restore backed-up files, with diagnostics and backups under `%LOCALAPPDATA%/CMCLauncher/updates/`. If a release has no compatible package or SHA-256 digest, use **View release notes** to download manually. Turning Beta off affects future checks and never downgrades an installed version.
 
 ### Requirements
 

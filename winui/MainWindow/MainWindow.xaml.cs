@@ -211,6 +211,7 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) =>
         {
             updateLifetime.Cancel();
+            statsTimer?.Stop();
             RuntimeLog.Written -= RuntimeLogWritten;
             runtimeLogTimer.Stop();
             core.DebugLog -= RuntimeLog.Debug;

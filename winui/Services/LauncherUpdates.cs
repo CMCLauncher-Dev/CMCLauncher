@@ -19,9 +19,41 @@ public sealed partial class MainWindow
     {
         var panel = new StackPanel { Spacing = 12 };
         panel.Children.Add(Text("Launcher updates", 18, true));
-        panel.Children.Add(
-            Text(UiFormat("Current version: {0}", LauncherUpdates.CurrentVersion), 12)
+        launcherCheckButton = Action(
+            "Check for updates",
+            async (_, _) => await CheckLauncherUpdate(false)
         );
+        launcherInstallButton = Action(
+            "Download and install update",
+            async (_, _) => await InstallLauncherUpdate(),
+            true
+        );
+        var updateActions = Buttons(launcherCheckButton, launcherInstallButton);
+        panel.Children.Add(updateActions);
+        var versionRow = new Grid { ColumnSpacing = 12 };
+        versionRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        versionRow.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
+        );
+        var currentVersion = Text(
+            UiFormat("Current version: {0}", LauncherUpdates.CurrentVersion),
+            12
+        );
+        currentVersion.VerticalAlignment = VerticalAlignment.Center;
+        versionRow.Children.Add(currentVersion);
+        launcherUpdateStatus = Text("", 13);
+        launcherUpdateStatus.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(launcherUpdateStatus, 1);
+        versionRow.Children.Add(launcherUpdateStatus);
+        launcherReleaseLink = new HyperlinkButton
+        {
+            Content = Ui("View release notes"),
+            NavigateUri = new Uri(LauncherUpdates.ReleasesPage),
+            VerticalAlignment = VerticalAlignment.Center,
+            Padding = new Thickness(0),
+        };
+        updateActions.Children.Add(launcherReleaseLink);
+        panel.Children.Add(versionRow);
         var automatic = new ToggleSwitch
         {
             Header = Ui("Check for updates on startup"),
@@ -43,7 +75,6 @@ public sealed partial class MainWindow
                 await Error(ex);
             }
         };
-        panel.Children.Add(automatic);
         var beta = new ToggleSwitch
         {
             Header = Ui("Receive Beta releases"),
@@ -67,33 +98,23 @@ public sealed partial class MainWindow
                 await Error(ex);
             }
         };
-        panel.Children.Add(beta);
+        var switches = new Grid
+        {
+            ColumnSpacing = 32,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        switches.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        switches.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        switches.Children.Add(automatic);
+        Grid.SetColumn(beta, 1);
+        switches.Children.Add(beta);
+        panel.Children.Add(switches);
         panel.Children.Add(
             Text(
                 "Beta releases may be less stable. Turning this off does not downgrade the installed version.",
                 12
             )
         );
-        launcherUpdateStatus = Text("", 13);
-        panel.Children.Add(launcherUpdateStatus);
-        launcherCheckButton = Action(
-            "Check for updates",
-            async (_, _) => await CheckLauncherUpdate(false)
-        );
-        launcherInstallButton = Action(
-            "Download and install update",
-            async (_, _) => await InstallLauncherUpdate(),
-            true
-        );
-        // Stack vertically so translated labels also fit the minimum window width.
-        panel.Children.Add(launcherCheckButton);
-        panel.Children.Add(launcherInstallButton);
-        launcherReleaseLink = new HyperlinkButton
-        {
-            Content = Ui("View release notes"),
-            NavigateUri = new Uri(LauncherUpdates.ReleasesPage),
-        };
-        panel.Children.Add(launcherReleaseLink);
         RefreshLauncherUpdateControls();
         return Card(panel);
     }

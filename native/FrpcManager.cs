@@ -64,6 +64,31 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
                 .ToArray()
             : [];
 
+    public async Task Remove(string version, CancellationToken ct = default)
+    {
+        await gate.WaitAsync(ct);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (Running) throw new IOException("Stop Frp Client before deleting a client version.");
+            var target = Store.SafePath(Root, Version(version));
+            if (!Directory.Exists(target)) return;
+            // Validate every entry before recursive removal, including directory junctions.
+            void Validate(string directory)
+            {
+                foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+                {
+                    Store.SafePath(Root, Path.GetRelativePath(Root, entry));
+                    if (Directory.Exists(entry)) Validate(entry);
+                }
+            }
+            Validate(target);
+            ct.ThrowIfCancellationRequested();
+            Directory.Delete(target, true);
+        }
+        finally { gate.Release(); }
+    }
+
     public async Task<FrpcRelease> FindRelease(string version, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

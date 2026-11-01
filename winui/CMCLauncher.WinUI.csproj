@@ -270,12 +270,9 @@
       >$(GitShortCommit)</LauncherGitCommit>
       <LauncherGitCommit Condition="'$(LauncherGitCommit)' == ''">unknown</LauncherGitCommit>
     </PropertyGroup>
-    <!-- 完整版本号 = 主版本号 + 提交号（小版本识别号）。 -->
+    <!-- 发行版本与程序集及更新比较一致；Git 提交号单独展示。 -->
     <PropertyGroup>
-      <LauncherFullVersion>$(LauncherMajorVersion)</LauncherFullVersion>
-      <LauncherFullVersion
-        Condition="'$(LauncherGitCommit)' != '' and '$(LauncherGitCommit)' != 'unknown'"
-      >$(LauncherMajorVersion)-$(LauncherGitCommit)</LauncherFullVersion>
+      <LauncherFullVersion>$(Version)</LauncherFullVersion>
     </PropertyGroup>
     <!-- 逐行生成 C#，用 %3B 转义分号，避免 XML 属性换行规范化和 item 分号拆分导致代码损坏。 -->
     <ItemGroup>

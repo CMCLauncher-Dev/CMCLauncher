@@ -1,20 +1,71 @@
+<div align="center">
+
+<img src="docs/assets/cmc-logo.png" alt="CMCLauncher logo" width="120" height="120" />
+
 # CMCLauncher
 
-<div align="center">
+**你的 Minecraft Java 世界，从这里开始。**
 
 [English](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md)
 
-本启动器内置了英文、简体中文、日文、俄文、法文、西班牙文与阿拉伯文的界面翻译，可在**设置 → 常规 → 语言**中自动或手动选择；README 文档提供英文、简体中文与日文版本。
+<p>
+<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/com-in/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
+<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/com-in/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
+<a href="https://github.com/com-in/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/com-in/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
+<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-7654c4?style=flat-square" /></a>
+<br />
+<img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square" />
+<img alt=".NET 8" src="https://img.shields.io/badge/.NET-8-512bd4?style=flat-square" />
+<img alt="WinUI 3" src="https://img.shields.io/badge/WinUI-3-00a4ef?style=flat-square" />
+<a href="https://github.com/com-in/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/com-in/CMCLauncher?style=flat-square" /></a>
+</p>
+
+### [下载启动器](https://github.com/com-in/CMCLauncher/releases) · [访问官网](https://cmcl.ctfun.top/) · [反馈问题](https://github.com/com-in/CMCLauncher/issues)
 
 </div>
 
 一款用于 Minecraft Java 版的 Windows 原生启动器，基于 C#、.NET 8 与 WinUI 3 构建。支持管理隔离实例、下载游戏版本与加载器、安装 Modrinth 内容，以及管理 Java 与账号。
 
-当前版本：**1.0.1** · 平台：**Windows x64**
+本启动器内置了英文、简体中文、日文、俄文、法文、西班牙文与阿拉伯文的界面翻译，可在**设置 → 常规 → 语言**中自动或手动选择；README 文档提供英文、简体中文与日文版本。
 
-[下载](https://github.com/com-in/CMCLauncher/releases) · [官网](https://cmcl.ctfun.top/) · [反馈问题](https://github.com/com-in/CMCLauncher/issues)
+## 界面预览
 
-![CMCLauncher 英文主界面](docs/assets/launcher-home.png)
+<div align="center">
+<img src="docs/assets/launcher-home.png" alt="CMCLauncher home" width="960" />
+</div>
+
+## 为下一个世界准备就绪
+
+<table>
+<tr>
+<td width="33%" valign="top">
+<h3>🧩 实例，一处管理</h3>
+<p>独立游戏目录、本地导入，兼容 PCL / HMCL 实例格式。</p>
+</td>
+<td width="33%" valign="top">
+<h3>📦 整合包与加载器</h3>
+<p>支持 Fabric、Forge、NeoForge，以及 Modrinth 整合包和受支持的 ZIP 导入。</p>
+</td>
+<td width="33%" valign="top">
+<h3>🔎 发现社区内容</h3>
+<p>从 Modrinth / CurseForge 查找 Mod、资源包、光影等内容。</p>
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top">
+<h3>🎨 打造你的界面</h3>
+<p>深浅主题、自定义配色与字体，内置七种界面语言。</p>
+</td>
+<td width="33%" valign="top">
+<h3>📈 掌握系统状态</h3>
+<p>CPU、内存与各显卡实时图表，自动计算 Java 内存预算。</p>
+</td>
+<td width="33%" valign="top">
+<h3>🔄 更新与连接</h3>
+<p>校验启动器更新、可选 Beta 通道，以及 Frp Client 版本和连接管理。</p>
+</td>
+</tr>
+</table>
 
 ## 快速开始
 
@@ -25,7 +76,7 @@
 
 **设置 → 账号**下提供外部登录（authlib-injector）。在 Microsoft 账号通过 Minecraft Java 版档案验证后可用。填写你的 Yggdrasil 服务器 URL 与该服务器的凭据，如提示则选择一个玩家档案。启动器会存储加密的会话令牌，在启动时下载并校验 authlib-injector，并要求账号列表中存在已验证的 Microsoft 账号。移除最后一个已验证的 Microsoft 账号会锁定外部账号，直到恢复 Microsoft 验证。
 
-发布压缩包已包含 .NET 与 Windows App SDK 运行时，因此你无需单独安装 .NET。Java 与游戏文件需另行下载或导入。启动器默认在启动时检查 GitHub Releases。在 **启动器设置 → 启动器更新**中，你可以关闭启动检查、手动检查，并选择加入 Beta 版。选择 **下载并安装更新** 可使用 GitHub 的 SHA-256 摘要校验包、关闭启动器、安装更新并重新启动。进行中的任务与游戏必须先行结束。账号、实例、设置及现有的语言/主题文件会被保留。安装目录必须可写；替换失败时会尝试恢复备份的文件，诊断与备份位于 `%LOCALAPPDATA%/CMCLauncher/updates/`。若某个版本没有兼容的包或 SHA-256 摘要，请使用 **查看发行说明** 手动下载。关闭 Beta 会影响后续检查，且绝不会将已安装版本降级。
+发布压缩包已包含 .NET 与 Windows App SDK 运行时，因此你无需单独安装 .NET。Java 与游戏文件需另行下载或导入。启动器默认在启动时检查 GitHub Releases。在 **更多 → 关于 → 启动器更新**中，你可以关闭启动检查、手动检查，并选择加入 Beta 版。选择 **下载并安装更新** 可使用 GitHub 的 SHA-256 摘要校验包、关闭启动器、安装更新并重新启动。进行中的任务与游戏必须先行结束。账号、实例、设置及现有的语言/主题文件会被保留。安装目录必须可写；替换失败时会尝试恢复备份的文件，诊断与备份位于 `%LOCALAPPDATA%/CMCLauncher/updates/`。若某个版本没有兼容的包或 SHA-256 摘要，请使用 **查看发行说明** 手动下载。关闭 Beta 会影响后续检查，且绝不会将已安装版本降级。
 
 ### 运行要求
 

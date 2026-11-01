@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace CMCLauncher.WinUI;
@@ -55,6 +55,7 @@ public sealed partial class MainWindow
         downloadVersion.SelectionChanged += (_, _) =>
             frpcDownloadVersion = downloadVersion.SelectedItem as string;
         var status = Text("", 12);
+        status.Visibility = Visibility.Collapsed;
         void Populate()
         {
             var choice = frpcDownloadVersion;
@@ -68,6 +69,7 @@ public sealed partial class MainWindow
             var revision = ++requestRevision;
             try
             {
+                status.Visibility = Visibility.Visible;
                 status.Text = Ui("Fetching official releases…");
                 var page = refresh ? 1 : frpcReleasePage;
                 var result = await fetchFrpcReleases(page, cancellation.Token);
@@ -156,6 +158,21 @@ public sealed partial class MainWindow
                 }
             )
         );
+        var deleteVersion = Action("Delete downloaded version", async (sender, _) =>
+        {
+            if (installed.SelectedItem is not string version) return;
+            if (!await ConfirmPop((FrameworkElement)sender, Ui("Delete downloaded version?"), version, Ui("Remove"))) return;
+            await Run(async ct =>
+            {
+                await frpc.Remove(version, ct);
+                if (settings.FrpcVersion == version)
+                    settings.FrpcVersion = frpc.Installed().FirstOrDefault() ?? "";
+                await store.Save();
+            }, Ui("Delete downloaded version"));
+            Render();
+        });
+        deleteVersion.IsEnabled = versions.Length > 0 && !frpc.Running;
+        actions.Children.Add(deleteVersion);
         var fields = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
         fields.ColumnDefinitions.Add(new ColumnDefinition());
         fields.ColumnDefinitions.Add(new ColumnDefinition());
