@@ -21,7 +21,7 @@
     <Product>CMCLauncher</Product>
     <Title>CMCLauncher</Title>
     <RootNamespace>CMCLauncher.WinUI</RootNamespace>
-    <Version>1.0.1</Version>
+    <Version>1.0.2-beta</Version>
     <CurseForgeConfigurationFile
       Condition="'$(CurseForgeConfigurationFile)' == ''"
     >$(MSBuildProjectDirectory)/curseforge.local.json</CurseForgeConfigurationFile>

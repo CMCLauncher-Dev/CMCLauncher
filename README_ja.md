@@ -69,7 +69,7 @@ Minecraft Java Edition 向けのネイティブ Windows ランチャーです。
 
 ## クイックスタート
 
-1. [Releases](https://github.com/com-in/CMCLauncher/releases) から `CMCLauncher-1.0.1-win-x64.zip` をダウンロードし、アーカイブ全体を展開して `CMCLauncher.exe` を実行します。
+1. [Releases](https://github.com/com-in/CMCLauncher/releases) から `CMCLauncher-1.0.2-beta-win-x64.zip` をダウンロードし、アーカイブ全体を展開して `CMCLauncher.exe` を実行します。
 2. **設定 → Java** を開き、既存の Java インストールをスキャン／インポートするか、Temurin Java をダウンロードします。
 3. **設定 → アカウント** を開き、Microsoft デバイスコードサインインを選びます。ブラウザで認証を完了し、ランチャーがあなたの Minecraft Java プロフィールを検証するのを待ちます。
 4. ゲームバージョンをダウンロードするか、既存の `.minecraft` フォルダをインポートするか、統合パックをインポートします。ホームでバージョンとアカウントを選んで起動します。
@@ -203,7 +203,7 @@ dotnet build winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64
 
 ```powershell
 dotnet publish winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
-./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-1.0.1-win-x64.zip
+./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-1.0.2-beta-win-x64.zip
 ```
 
 パッケージングスクリプトはローカル設定、資格情報、キーファイルを除外し、アーカイブにランチャー実行ファイルが含まれていることを確認します。

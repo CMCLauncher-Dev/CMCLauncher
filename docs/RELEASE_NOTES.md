@@ -1,21 +1,23 @@
-# CMCLauncher 1.0.0
+# CMCLauncher 1.0.2-beta
+
+This is a prerelease for testing the recent interface, monitoring, and launch changes.
 
 ## Highlights
 
-- Browse Modrinth, CurseForge, or both from the community source filter. Search, pagination, project details, and installation follow the selected source; unsupported filters are disabled.
-- Add authenticated CurseForge downloads with author distribution checks, file integrity verification, and compatible required mod dependencies. Supported CurseForge modpack ZIPs can also be imported.
-- Fix modern NeoForge installer profile detection and duplicate Minecraft modules when launching renamed instances. Unify dependency preparation for downloads and launches, isolate native DLLs per process, and improve Java architecture matching.
-- Correct flattened profile export and reimport, serialize concurrent writes to shared downloads, and roll back incomplete installation directories after cancellation or final profile failures.
-- Improve early-exit handling, output draining, crash report selection, JVM fatal log collection, and access-token redaction.
-- Load appearance palettes from independent theme JSON files while preserving the native WinUI preset and embedded Fresh Green fallback. Refine version management and keep community filters on one row.
-- Reduce packaged dependencies, retain English and Simplified Chinese Windows resources, and upload CI ZIP artifacts without a second archive wrapper.
+- Refresh the About page with launcher identity, build information, update controls, and contributors. Unify the displayed release version with update comparisons.
+- Expand system status with responsive half-width CPU, memory, and per-GPU area charts. Cache graphics adapter information and offer continuous sampling after leaving the page.
+- Improve account management layout, show external sign-in directly, and add a LittleSkin server preset.
+- Refine community filter spacing and alignment, and add deletion of downloaded Frp Client versions with confirmation.
+- Improve README presentation with the project logo, badges, feature cards, and English, Chinese, and Japanese documentation.
+- Add a default-on high-performance GPU preference for the selected game Java executable, prefer javaw.exe when available, and retain previous Windows graphics preferences for restoration.
 
-## Validation
+## GPU preference limitation
 
-56 native test groups and 889 desktop UI checks passed. An isolated copy of MeowPack with NeoForge 21.1.252 on Minecraft 1.21.1 was launched twice, with each game window remaining open for 60 seconds. World loading and extended gameplay were outside this verification.
+The graphics option requests a Windows preference; it does not force hardware selection. Disabling it restores recorded previous settings and may still select a discrete GPU. Check the Minecraft F3 renderer or the OpenGL renderer line in the game log to confirm the GPU used. Game-level GPU selection across all hybrid systems is not verified.
 
-## Download
+## Downloads
 
-Download `CMCLauncher-1.0.0-win-x64.zip`, extract the entire archive, and run `CMCLauncher.exe`. The archive includes the .NET and Windows App SDK runtimes. Java, Minecraft files, and Frp Client are downloaded or imported separately.
+- `CMCLauncher-1.0.2-beta-win-x64.zip`: extract the complete archive and run `CMCLauncher.exe`.
+- `CMCLauncher-1.0.2-beta-win-x64.exe`: standalone self-extracting launcher.
 
-Release builds inject the application's Microsoft Client ID and CurseForge API credential through GitHub Actions secrets. Local builds need their own application configuration to use those integrations.
+The updater offers this version when **Receive Beta releases** is enabled. Java, game files, and Frp Client are downloaded separately.
