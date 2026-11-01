@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -248,10 +249,16 @@ public sealed class Store
         var createdLibrary = !System.IO.Directory.Exists(Library);
         System.IO.Directory.CreateDirectory(Library);
         var file = Path.Combine(Root, "settings.json");
-        Config = File.Exists(file)
-            ? JsonSerializer.Deserialize<Configuration>(File.ReadAllText(file), JsonOptions)
-                ?? throw new Exception("配置为空")
-            : new();
+        var firstRun = !File.Exists(file);
+        Config = firstRun
+            ? new()
+            : JsonSerializer.Deserialize<Configuration>(File.ReadAllText(file), JsonOptions)
+                ?? throw new Exception("配置为空");
+        if (firstRun)
+        {
+            // 首次启动：根据系统 UI 语言选择对应的界面语言。
+            Config.Settings.LauncherLanguage = InterfaceLanguageForSystem();
+        }
         if (createdLibrary)
             new MinecraftDirectoryManager(this).MarkCreated(Library);
     }
@@ -264,6 +271,24 @@ public sealed class Store
         return !System.IO.Directory.Exists(current) && System.IO.Directory.Exists(legacy)
             ? legacy
             : current;
+    }
+
+    // 首次启动时根据系统 UI 语言推断启动器界面语言；不支持的语言回退到英文。
+    static string InterfaceLanguageForSystem()
+    {
+        var name = CultureInfo.CurrentUICulture.Name;
+        if (name.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
+            return "zh_cn";
+        var language = name.Split('-')[0].ToLowerInvariant();
+        return language switch
+        {
+            "ja" => "ja_jp",
+            "fr" => "fr_fr",
+            "es" => "es_es",
+            "ru" => "ru_ru",
+            "ar" => "ar_sa",
+            _ => "en_us",
+        };
     }
 
     // 多个 UI 回调可能同时保存，用锁串行执行写入。
