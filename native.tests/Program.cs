@@ -228,13 +228,15 @@ internal static class Program
         await ThemeCatalogTests.Run(Path.Combine(root, "themes"));
         Pass("JSON theme discovery, mode overrides, embedded fallback and native preset isolation");
         await LauncherInstanceFormatTests.Run(Path.Combine(root, "launcher-instance-formats"));
-        Pass("PCL and HMCL instance layouts, isolation settings, metadata and local-only discovery");
-        await ForeignLauncherMigrationTests.Run(Path.Combine(root, "foreign-launchers"));
         Pass(
-            "Modrinth app and MultiMC/Prism instance discovery and copy-based migration"
+            "PCL and HMCL instance layouts, isolation settings, metadata and local-only discovery"
         );
+        await ForeignLauncherMigrationTests.Run(Path.Combine(root, "foreign-launchers"));
+        Pass("Modrinth app and MultiMC/Prism instance discovery and copy-based migration");
         await LauncherUpdateTests.Run(Path.Combine(root, "launcher-updates"));
-        Pass("launcher update versions, channels, pagination, hashes, cancellation and safe staging");
+        Pass(
+            "launcher update versions, channels, pagination, hashes, cancellation and safe staging"
+        );
         await LocalizationCatalogTests.Run(Path.Combine(root, "locales"));
         Pass(
             "JSON language packs, embedded fallback, templates, rules, overrides and additional languages"
@@ -581,14 +583,23 @@ internal static class Program
             "verified Minecraft profile does not depend on optional XUID or refresh-token claims"
         );
         Check(
-            !MicrosoftAuth.CanUseAccount([offline], offline)
+            MicrosoftAuth.CanUseAccount([offline], offline) == MicrosoftAuth.IsMainlandMachine
                 && MicrosoftAuth.CanUseAccount([offline, verifiedMicrosoft], offline),
             "offline identities require a verified Minecraft Java account"
         );
-        Throws(
-            () => MicrosoftAuth.EnsureAccountAllowed([offline], offline),
-            "offline launch accepted without a verified Minecraft account"
+        Check(
+            MicrosoftAuth.IsMainlandEnvironment("China Standard Time", "CN", 45)
+                && MicrosoftAuth.IsMainlandEnvironment("Asia/Shanghai", "US", 244)
+                && !MicrosoftAuth.IsMainlandEnvironment("China Standard Time", "HK", 104)
+                && !MicrosoftAuth.IsMainlandEnvironment("Taipei Standard Time", "TW", 237)
+                && !MicrosoftAuth.IsMainlandEnvironment("Eastern Standard Time", "CN", 45),
+            "mainland offline region classification"
         );
+        if (!MicrosoftAuth.IsMainlandMachine)
+            Throws(
+                () => MicrosoftAuth.EnsureAccountAllowed([offline], offline),
+                "offline launch accepted without a verified Minecraft account"
+            );
         Throws(
             () => MicrosoftAuth.EnsureAccountAllowed([unverifiedMicrosoft], unverifiedMicrosoft),
             "unverified imported account accepted"
@@ -1493,20 +1504,19 @@ internal static class Program
         }
         Pass("NeoForge module exclusions follow the actual vanilla client JAR");
         Check(
-            LauncherCore.SplitJvmArgs("").Count == 0
-                && LauncherCore.SplitJvmArgs("   ").Count == 0,
+            LauncherCore.SplitJvmArgs("").Count == 0 && LauncherCore.SplitJvmArgs("   ").Count == 0,
             "empty custom JVM arguments yield no tokens"
         );
         Check(
-            LauncherCore.SplitJvmArgs("-Dexample=1 -XX:+UseG1GC").SequenceEqual(
-                new[] { "-Dexample=1", "-XX:+UseG1GC" }
-            ),
+            LauncherCore
+                .SplitJvmArgs("-Dexample=1 -XX:+UseG1GC")
+                .SequenceEqual(new[] { "-Dexample=1", "-XX:+UseG1GC" }),
             "custom JVM arguments split on whitespace"
         );
         Check(
-            LauncherCore.SplitJvmArgs("-Dpath=\"C:\\My Folder\\a.jar\"").SequenceEqual(
-                new[] { "-Dpath=C:\\My Folder\\a.jar" }
-            ),
+            LauncherCore
+                .SplitJvmArgs("-Dpath=\"C:\\My Folder\\a.jar\"")
+                .SequenceEqual(new[] { "-Dpath=C:\\My Folder\\a.jar" }),
             "quoted values keep embedded spaces as a single token"
         );
         var customSettings = new Settings { CustomJvmArgs = "-Dexample=42" };

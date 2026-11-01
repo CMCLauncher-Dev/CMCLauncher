@@ -3,6 +3,8 @@
   "id": "lakecyan",
   "displayName": "Lake Cyan",
   "colors": {
+    "LightCommunityResourcesHeading": "#2B3537",
+    "DarkCommunityResourcesHeading": "#D8E2E4",
     "LightBg": "#EDF4F6",
     "DarkBg": "#172427",
     "DarkBgAlt": "#172427",

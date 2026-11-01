@@ -3,6 +3,8 @@
   "id": "craft",
   "displayName": "Fresh green",
   "colors": {
+    "LightCommunityResourcesHeading": "#41424D",
+    "DarkCommunityResourcesHeading": "#CBDCC5",
     "LightBg": "#F6F8F4",
     "DarkBg": "#181922",
     "DarkBgAlt": "#171820",

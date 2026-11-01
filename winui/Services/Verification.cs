@@ -2368,9 +2368,11 @@ public sealed partial class MainWindow
             Descendants(PageBody)
                 .OfType<TextBlock>()
                 .Any(t => t.Text == MicrosoftAuth.OfflineLockedMessage)
-                && !Descendants(PageBody)
+                == !MicrosoftAuth.IsMainlandMachine
+                && Descendants(PageBody)
                     .OfType<Button>()
-                    .Any(b => b.Content?.ToString() == "添加离线身份"),
+                    .Any(b => b.Content?.ToString() == "添加离线身份")
+                    == MicrosoftAuth.IsMainlandMachine,
             "offline identity creation is locked before profile verification"
         );
         var verified = new Account
@@ -2443,9 +2445,8 @@ public sealed partial class MainWindow
             "removing the last verified Microsoft account locks external sign-in and selection"
         );
         Check(
-            !Descendants(PageBody)
-                .OfType<Button>()
-                .Any(b => b.Content?.ToString() == "添加离线身份"),
+            Descendants(PageBody).OfType<Button>().Any(b => b.Content?.ToString() == "添加离线身份")
+                == MicrosoftAuth.IsMainlandMachine,
             "offline identity is locked again after removing the verified account"
         );
         page = "mods";

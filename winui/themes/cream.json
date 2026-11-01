@@ -3,6 +3,8 @@
   "id": "cream",
   "displayName": "Cream",
   "colors": {
+    "LightCommunityResourcesHeading": "#3A3327",
+    "DarkCommunityResourcesHeading": "#DDD0BE",
     "LightBg": "#FFF9EE",
     "DarkBg": "#211B14",
     "DarkBgAlt": "#1E1913",

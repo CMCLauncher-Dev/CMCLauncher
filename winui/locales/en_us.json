@@ -2,6 +2,8 @@
   "code": "en_us",
   "displayName": "English",
   "strings": {
+    "Update now": "Update now",
+    "Later": "Later",
     "Prefer high-performance GPU for games": "Prefer high-performance GPU for games",
     "Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.": "Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.",
     "Continuous sampling": "Continuous sampling",

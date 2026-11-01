@@ -82,7 +82,7 @@ The release archive includes the .NET and Windows App SDK runtimes, so you do no
 
 - Windows 10 version 2004 (build 19041) or later, x64.
 - A compatible Java runtime for the selected Minecraft version. The launcher checks and matches discovered Java installations at launch.
-- A Microsoft account with a Minecraft Java Edition profile for Microsoft sign-in. At least one Microsoft account must pass verification before offline identities can be used.
+- A Microsoft account with a Minecraft Java Edition profile for Microsoft sign-in. Offline identities are available on mainland China systems, detected from the system time zone and region without an IP lookup. Elsewhere they require a verified Microsoft account. External authentication always requires Microsoft verification.
 
 ## Features
 

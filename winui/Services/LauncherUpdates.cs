@@ -125,7 +125,7 @@ public sealed partial class MainWindow
             return;
         launcherUpdateStatus.Text =
             checkingLauncherUpdate ? Ui("Checking for updates…")
-            : launcherRelease is { } release ? UiFormat("Update available: {0}", release.Tag)
+            : launcherRelease is { } release ? UiFormat("Update available: {0}", release.Version)
             : Ui(launcherUpdateMessage);
         if (
             !checkingLauncherUpdate
@@ -181,12 +181,6 @@ public sealed partial class MainWindow
                     return;
                 launcherRelease = release;
                 launcherUpdateMessage = "You are up to date.";
-                if (background && release != null)
-                    ShowToast(
-                        UiFormat("Update available: {0}", release.Tag)
-                            + " · "
-                            + Ui("Launcher updates")
-                    );
                 break;
             }
         }
@@ -202,9 +196,75 @@ public sealed partial class MainWindow
             checkingLauncherUpdate = false;
             RefreshLauncherUpdateControls();
         }
+        if (
+            background
+            && launcherRelease is { } available
+            && !updateLifetime.IsCancellationRequested
+        )
+            await PromptStartupUpdate(available);
     }
 
-    async Task InstallLauncherUpdate()
+    async Task PromptStartupUpdate(LauncherRelease release)
+    {
+        try
+        {
+            // WinUI permits only one ContentDialog at a time. Wait for the window and any existing dialog.
+            while (dialogOpen || Content.XamlRoot == null)
+                await Task.Delay(200, updateLifetime.Token);
+            if (
+                !store.Config.Settings.CheckLauncherUpdates
+                || launcherRelease != release
+                || (release.IsBeta && !store.Config.Settings.ReceiveBetaUpdates)
+            )
+                return;
+            var canInstall = release.Asset is { Sha256.Length: 64 };
+            dialogOpen = true;
+            ContentDialogResult result;
+            try
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = Content.XamlRoot,
+                    RequestedTheme = lightTheme ? ElementTheme.Light : ElementTheme.Dark,
+                    Title = UiFormat("Update available: {0}", release.Version),
+                    Content = Ui(
+                        canInstall
+                            ? "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept."
+                            : "This release requires a manual download. Open its release notes."
+                    ),
+                    PrimaryButtonText = Ui(canInstall ? "Update now" : "View release notes"),
+                    CloseButtonText = Ui("Later"),
+                    DefaultButton = ContentDialogButton.Close,
+                    IsPrimaryButtonEnabled =
+                        !canInstall || (task == null && game is not { HasExited: false }),
+                };
+                result = await dialog.ShowAsync();
+            }
+            finally
+            {
+                dialogOpen = false;
+            }
+            if (result != ContentDialogResult.Primary || updateLifetime.IsCancellationRequested)
+                return;
+            if (canInstall)
+                await InstallLauncherUpdate(true);
+            else
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(release.Page.AbsoluteUri)
+                    {
+                        UseShellExecute = true,
+                    }
+                );
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (!updateLifetime.IsCancellationRequested)
+                await Error(ex);
+        }
+    }
+
+    async Task InstallLauncherUpdate(bool confirmed = false)
     {
         if (
             installingLauncherUpdate
@@ -217,29 +277,32 @@ public sealed partial class MainWindow
             throw new InvalidOperationException(
                 Ui("Finish active tasks and close the game before installing an update.")
             );
-        if (dialogOpen)
-            return;
-        dialogOpen = true;
-        try
+        if (!confirmed)
         {
-            var dialog = new ContentDialog
-            {
-                XamlRoot = Content.XamlRoot,
-                RequestedTheme = lightTheme ? ElementTheme.Light : ElementTheme.Dark,
-                Title = UiFormat("Install update {0}?", release.Tag),
-                Content = Ui(
-                    "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept."
-                ),
-                PrimaryButtonText = Ui("Download and install update"),
-                CloseButtonText = Ui("Cancel"),
-                DefaultButton = ContentDialogButton.Close,
-            };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+            if (dialogOpen)
                 return;
-        }
-        finally
-        {
-            dialogOpen = false;
+            dialogOpen = true;
+            try
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = Content.XamlRoot,
+                    RequestedTheme = lightTheme ? ElementTheme.Light : ElementTheme.Dark,
+                    Title = UiFormat("Install update {0}?", release.Version),
+                    Content = Ui(
+                        "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept."
+                    ),
+                    PrimaryButtonText = Ui("Download and install update"),
+                    CloseButtonText = Ui("Cancel"),
+                    DefaultButton = ContentDialogButton.Close,
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                    return;
+            }
+            finally
+            {
+                dialogOpen = false;
+            }
         }
         if (release.IsBeta && !store.Config.Settings.ReceiveBetaUpdates)
             return;

@@ -170,7 +170,7 @@ public sealed partial class MainWindow
         Grid.SetColumn(offlineCard, 1);
         otherAccounts.Children.Add(offlineCard);
         // 本地至少保留一个已验证的 Microsoft 账号，才显示离线身份入口。
-        if (store.Config.Accounts.Any(MicrosoftAuth.IsVerifiedMinecraftPlayer))
+        if (MicrosoftAuth.CanUseOffline(store.Config.Accounts))
         {
             var input = new TextBox
             {

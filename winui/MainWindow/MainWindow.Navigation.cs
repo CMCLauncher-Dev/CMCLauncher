@@ -135,7 +135,7 @@ public sealed partial class MainWindow
             {
                 var description = Text(Ui("Community resources"), 11, true);
                 description.Margin = new Thickness(11, 10, 0, 4);
-                description.Foreground = Brush(lightTheme ? "#41424D" : "#D1D1DC");
+                description.Foreground = Brush("CommunityResourcesHeading");
                 submenu.Children.Add(description);
             }
             var button = NavButton(

@@ -3,6 +3,8 @@
   "id": "orange",
   "displayName": "Amber",
   "colors": {
+    "LightCommunityResourcesHeading": "#3B2C20",
+    "DarkCommunityResourcesHeading": "#E0CDBC",
     "LightBg": "#FFF7EF",
     "DarkBg": "#201915",
     "DarkBgAlt": "#1E1713",

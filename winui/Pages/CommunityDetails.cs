@@ -214,8 +214,7 @@ public sealed partial class MainWindow
             if (project.Type != "modpack")
                 host.Children.Add(gameCategory);
             var filterStatus = Text("", 12);
-            filterStatus.Visibility =
-                project.Type == "modpack" ? Visibility.Collapsed : Visibility.Visible;
+            filterStatus.Visibility = Visibility.Collapsed;
             host.Children.Add(filterStatus);
             host.Children.Add(groups);
             var versionIds = versions.Select(v => v.Id).ToHashSet(StringComparer.Ordinal);
@@ -256,6 +255,7 @@ public sealed partial class MainWindow
                     if (generation != renderVersion || revision != filterRevision)
                         return;
                     filterStatus.Text = "";
+                    filterStatus.Visibility = Visibility.Collapsed;
                     await DrawVersions();
                 }
                 catch (Exception ex)
@@ -263,6 +263,7 @@ public sealed partial class MainWindow
                     if (generation == renderVersion && revision == filterRevision)
                     {
                         groups.Children.Clear();
+                        filterStatus.Visibility = Visibility.Visible;
                         filterStatus.Text =
                             Ui("Could not load Minecraft version categories: ")
                             + ex.Message

@@ -262,6 +262,37 @@ public sealed class MicrosoftAuth(LauncherCore core)
     public const string OfflineLockedMessage =
         "请先通过 Microsoft 登录并验证 Minecraft Java Edition 正版档案，才能使用离线身份。";
 
+    [DllImport("kernel32.dll")]
+    static extern int GetUserGeoID(int geoClass);
+
+    // Use system region information, not the launcher's selected UI language.
+    public static bool IsMainlandEnvironment(string zone, string region, int geoId) =>
+        zone is "Asia/Shanghai" or "Asia/Urumqi"
+        || zone == "China Standard Time" && (region == "CN" || geoId == 45)
+        || string.IsNullOrEmpty(zone) && (region == "CN" || geoId == 45);
+
+    public static bool IsMainlandMachine
+    {
+        get
+        {
+            try
+            {
+                return IsMainlandEnvironment(
+                    TimeZoneInfo.Local.Id,
+                    System.Globalization.RegionInfo.CurrentRegion.TwoLetterISORegionName,
+                    OperatingSystem.IsWindows() ? GetUserGeoID(16) : -1
+                );
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    public static bool CanUseOffline(IEnumerable<Account> accounts) =>
+        IsMainlandMachine || accounts.Any(IsVerifiedMinecraftPlayer);
+
     public const string ExternalLockedMessage =
         "Sign in with Microsoft and verify ownership of Minecraft Java Edition before using external accounts.";
 
@@ -273,7 +304,8 @@ public sealed class MicrosoftAuth(LauncherCore core)
 
     public static bool CanUseAccount(IEnumerable<Account> accounts, Account account) =>
         IsVerifiedMinecraftPlayer(account)
-        || account.Type is "offline" or "yggdrasil" && accounts.Any(IsVerifiedMinecraftPlayer);
+        || account.Type == "offline" && CanUseOffline(accounts)
+        || account.Type == "yggdrasil" && accounts.Any(IsVerifiedMinecraftPlayer);
 
     public static void EnsureAccountAllowed(IEnumerable<Account> accounts, Account account)
     {

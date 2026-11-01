@@ -3,6 +3,8 @@
   "id": "lavender",
   "displayName": "Lavender",
   "colors": {
+    "LightCommunityResourcesHeading": "#33283D",
+    "DarkCommunityResourcesHeading": "#D9CDE3",
     "LightBg": "#FEF7FF",
     "DarkBg": "#1E1724",
     "DarkBgAlt": "#1B1521",

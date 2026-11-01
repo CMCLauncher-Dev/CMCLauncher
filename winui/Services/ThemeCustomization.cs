@@ -205,6 +205,23 @@ public sealed partial class MainWindow
     // hex 可以来自 ThemeTokens，也可以是已有 UI 传入的同值字符串。
     Color PaletteColor(string hex)
     {
+        // Keep this navigation heading independent of other caption colors.
+        if (hex == "CommunityResourcesHeading")
+        {
+            var fallback = lightTheme ? ThemeTokens.LightTextCaption : ThemeTokens.DarkTextSub;
+            return store.Config.Settings.ColorPreset is "native" or "custom"
+                ? PaletteColor(fallback)
+                : RawColor(
+                    themeCatalog.Resolve(
+                        store.Config.Settings.ColorPreset,
+                        lightTheme
+                            ? "LightCommunityResourcesHeading"
+                            : "DarkCommunityResourcesHeading",
+                        lightTheme,
+                        fallback
+                    )
+                );
+        }
         if (store.Config.Settings.ColorPreset is not ("native" or "custom"))
         {
             var token = ThemeTokens.ColorNames.GetValueOrDefault(hex, "");

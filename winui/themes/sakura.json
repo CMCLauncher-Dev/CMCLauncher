@@ -3,6 +3,8 @@
   "id": "sakura",
   "displayName": "Sakura",
   "colors": {
+    "LightCommunityResourcesHeading": "#49343F",
+    "DarkCommunityResourcesHeading": "#E3CEDB",
     "LightBg": "#FFF7FA",
     "DarkBg": "#211A22",
     "DarkBgAlt": "#211A22",

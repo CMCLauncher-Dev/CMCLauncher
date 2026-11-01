@@ -3,6 +3,8 @@
   "id": "coalgray",
   "displayName": "Cool Gray",
   "colors": {
+    "LightCommunityResourcesHeading": "#2F2E32",
+    "DarkCommunityResourcesHeading": "#D6D4D8",
     "LightBg": "#EAE8EB",
     "DarkBg": "#1F1E21",
     "DarkBgAlt": "#1B1A1D",
