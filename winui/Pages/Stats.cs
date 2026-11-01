@@ -65,6 +65,10 @@ public sealed partial class MainWindow
             {
                 store.Config.Settings.ContinuousStatsSampling = continuous.IsOn;
                 await store.Save();
+                if (continuous.IsOn)
+                    statsTimer?.Start();
+                else
+                    statsTimer?.Stop();
             }
             catch (Exception ex)
             {
@@ -78,7 +82,7 @@ public sealed partial class MainWindow
                 Children =
                 {
                     continuous,
-                    Text("Continue sampling resource usage after leaving this page.", 12),
+                    Text("Sampling pause/resume switch; on keeps sampling after leaving this page.", 12),
                 },
             }
         );
@@ -238,6 +242,12 @@ public sealed partial class MainWindow
                 return;
             try
             {
+                if (!store.Config.Settings.ContinuousStatsSampling)
+                {
+                    if (gpuCharts.Count == 0)
+                        gpuModels.Text = Ui("Continuous sampling off");
+                    return;
+                }
                 var adapters = await ReadStatsGpuAdapters();
                 if (
                     (page != "stats" && !store.Config.Settings.ContinuousStatsSampling)
@@ -265,7 +275,7 @@ public sealed partial class MainWindow
         statsTimer.Tick += (_, _) =>
         {
             if (
-                (page != "stats" && !store.Config.Settings.ContinuousStatsSampling)
+                !store.Config.Settings.ContinuousStatsSampling
                 || statsTimer != ownerTimer
             )
             {
@@ -365,7 +375,8 @@ public sealed partial class MainWindow
                 sampling = false;
             }
         };
-        statsTimer.Start();
+        if (store.Config.Settings.ContinuousStatsSampling)
+            statsTimer.Start();
     }
 
     // Bounded history; redraw only the small chart, including when its card changes width.
