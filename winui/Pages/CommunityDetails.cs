@@ -377,6 +377,77 @@ public sealed partial class MainWindow
                                 hint.Opacity = .65;
                                 labels.Children.Add(hint);
                             }
+                            var dependencies = new StackPanel
+                            {
+                                Spacing = 4,
+                                Visibility = Visibility.Collapsed,
+                            };
+                            var dependencyButton = Action(
+                                "Show dependencies",
+                                async (sender, _) =>
+                                {
+                                    if (dependencies.Visibility == Visibility.Visible)
+                                    {
+                                        dependencies.Visibility = Visibility.Collapsed;
+                                        return;
+                                    }
+                                    dependencies.Visibility = Visibility.Visible;
+                                    dependencies.Children.Clear();
+                                    dependencies.Children.Add(Text("Loading dependencies…", 12));
+                                    using var dependencyRequest = new CancellationTokenSource(
+                                        resourceDetailTimeout
+                                    );
+                                    try
+                                    {
+                                        var items =
+                                            project.Source == "curseforge"
+                                                ? await curseforge.Dependencies(
+                                                    project.Id,
+                                                    version.Id,
+                                                    dependencyRequest.Token
+                                                )
+                                                : await modrinth.Dependencies(
+                                                    project.Id,
+                                                    version.Id,
+                                                    dependencyRequest.Token
+                                                );
+                                        if (generation != renderVersion)
+                                            return;
+                                        dependencies.Children.Clear();
+                                        if (items.Count == 0)
+                                            dependencies.Children.Add(
+                                                Text("No dependencies declared.", 12)
+                                            );
+                                        foreach (var item in items)
+                                            dependencies.Children.Add(
+                                                Text(
+                                                    item.Name
+                                                        + " · "
+                                                        + Ui(item.Relation)
+                                                        + (
+                                                            item.Version.Length > 0
+                                                                ? " · " + item.Version
+                                                                : ""
+                                                        ),
+                                                    12
+                                                )
+                                            );
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        dependencies.Children.Clear();
+                                        dependencies.Children.Add(
+                                            Text(
+                                                Ui("Could not load dependencies: ") + ex.Message,
+                                                12
+                                            )
+                                        );
+                                    }
+                                }
+                            );
+                            dependencyButton.Tag = "resource-dependencies";
+                            labels.Children.Add(dependencyButton);
+                            labels.Children.Add(dependencies);
                             var install = Action(
                                 project.Type == "modpack" ? "安装整合包"
                                     : reason == null ? "安装"

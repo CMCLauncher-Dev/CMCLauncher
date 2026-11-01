@@ -854,6 +854,18 @@
     "Memory usage": "内存占用",
     "Launcher process": "启动器进程",
     "Graphics": "显卡",
-    "Not available": "暂不可用"
+    "Not available": "暂不可用",
+    "Show dependencies": "显示前置",
+    "Loading dependencies…": "正在加载前置…",
+    "No dependencies declared.": "此版本未声明前置。",
+    "Could not load dependencies: ": "加载前置失败：",
+    "required": "必需",
+    "optional": "可选",
+    "incompatible": "不兼容",
+    "embedded": "内嵌",
+    "tool": "工具",
+    "include": "包含",
+    "unknown": "未知",
+    "Unknown dependency": "未知前置"
   }
 }

@@ -1,5 +1,7 @@
 namespace CMCLauncher;
 
+public sealed record CommunityDependency(string Name, string Relation, string Version);
+
 public sealed class CommunityService(
     ModrinthService modrinth,
     CurseForgeCommunityService curseforge
@@ -14,6 +16,15 @@ public sealed class CommunityService(
         CurseForgeCommunityService.IsProject(id)
             ? curseforge.ProjectVersions(id, ct)
             : modrinth.ProjectVersions(id, ct);
+
+    public Task<List<CommunityDependency>> Dependencies(
+        string project,
+        string version,
+        CancellationToken ct
+    ) =>
+        CurseForgeCommunityService.IsProject(project)
+            ? curseforge.Dependencies(project, version, ct)
+            : modrinth.Dependencies(project, version, ct);
 
     // Alternate sources, then continue with the longer list. Counts keep page jumps stable.
     internal static (int A, int B) Counts(int n, int a, int b)

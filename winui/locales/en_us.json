@@ -95,7 +95,7 @@
     "Continuous sampling": "Continuous sampling",
     "Continue sampling resource usage after leaving this page.": "Continue sampling resource usage after leaving this page.",
     "Recent 60 samples · 0–100%": "Recent 60 samples · 0–100%",
-    "Reading graphics adapters\u2026": "Reading graphics adapters…",
+    "Reading graphics adapters…": "Reading graphics adapters…",
     "Integrated graphics": "Integrated graphics",
     "Dedicated graphics": "Dedicated graphics",
     "Virtual display adapter": "Virtual display adapter",
@@ -109,7 +109,7 @@
     "Game memory budget": "Game memory budget",
     "Library summary": "Library summary",
     "Game storage": "Game storage",
-    "{0} instances \u00b7 {1} Java runtimes \u00b7 {2} accounts": "{0} instances · {1} Java runtimes · {2} accounts",
+    "{0} instances · {1} Java runtimes · {2} accounts": "{0} instances · {1} Java runtimes · {2} accounts",
     "{0:N1} GB free / {1:N1} GB total": "{0:N1} GB free / {1:N1} GB total",
     "Delete downloaded version": "Delete downloaded version",
     "Delete downloaded version?": "Delete downloaded version?",
@@ -854,7 +854,19 @@
     "Memory usage": "Memory usage",
     "Launcher process": "Launcher process",
     "Graphics": "Graphics",
-    "Not available": "Not available"
+    "Not available": "Not available",
+    "Show dependencies": "Show dependencies",
+    "Loading dependencies…": "Loading dependencies…",
+    "No dependencies declared.": "No dependencies declared.",
+    "Could not load dependencies: ": "Could not load dependencies: ",
+    "required": "Required",
+    "optional": "Optional",
+    "incompatible": "Incompatible",
+    "embedded": "Embedded",
+    "tool": "Tool",
+    "include": "Include",
+    "unknown": "Unknown",
+    "Unknown dependency": "Unknown dependency"
   },
   "prefixes": [
     {

@@ -250,6 +250,39 @@ public sealed class ModrinthService(LauncherCore core, Store store)
             .ToList();
     }
 
+    public async Task<List<CommunityDependency>> Dependencies(
+        string project,
+        string versionId,
+        CancellationToken ct
+    )
+    {
+        var version = await ExactVersion(project, versionId, ct);
+        var result = new List<CommunityDependency>();
+        // Only inspect this version's declarations; viewing dependencies never downloads files.
+        foreach (var dep in version["dependencies"].Items().Take(100))
+        {
+            var id = dep.S("project_id");
+            var exact = dep.S("version_id");
+            var number = "";
+            if (exact.Length > 0)
+            {
+                var target = await core.Json(
+                    "https://api.modrinth.com/v2/version/" + Uri.EscapeDataString(exact),
+                    ct
+                );
+                id = target.S("project_id");
+                number = target.S("version_number");
+            }
+            var name = dep.S("file_name");
+            if (id.Length > 0)
+                name = (await ProjectDetails(id, ct)).Name;
+            result.Add(
+                new(name.Length > 0 ? name : "Unknown dependency", dep.S("dependency_type"), number)
+            );
+        }
+        return result;
+    }
+
     // 版本 ID 来自页面选择，仍要核对所属项目，不能把其他项目的文件装进当前请求。
     async Task<JsonNode> ExactVersion(string project, string versionId, CancellationToken ct)
     {

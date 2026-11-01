@@ -408,6 +408,32 @@ public sealed class CurseForgeCommunityService : IDisposable
         }
     }
 
+    public async Task<List<CommunityDependency>> Dependencies(
+        string project,
+        string version,
+        CancellationToken ct
+    )
+    {
+        var file = await File(Number(project), Number(version), ct);
+        var result = new List<CommunityDependency>();
+        foreach (var dep in file["dependencies"].Items().Take(100))
+        {
+            var metadata = await Project(dep.Int("modId"), ct);
+            var relation = dep.Int("relationType") switch
+            {
+                1 => "embedded",
+                2 => "optional",
+                3 => "required",
+                4 => "tool",
+                5 => "incompatible",
+                6 => "include",
+                _ => "unknown",
+            };
+            result.Add(new(metadata.S("name"), relation, ""));
+        }
+        return result;
+    }
+
     public async Task InstallContent(
         Instance instance,
         string project,

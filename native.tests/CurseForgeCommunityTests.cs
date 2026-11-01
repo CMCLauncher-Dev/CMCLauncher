@@ -148,6 +148,9 @@ static class CurseForgeCommunityTests
                     ["fileName"] = "fixture.jar",
                     ["displayName"] = "Fixture file",
                     ["releaseType"] = 1,
+                    ["dependencies"] = new JsonArray(
+                        new JsonObject { ["modId"] = 7, ["relationType"] = 3 }
+                    ),
                     ["fileLength"] = 3,
                     ["downloadUrl"] = "https://edge.forgecdn.net/files/1/2/fixture.jar",
                     ["gameVersions"] = new JsonArray("1.21.1", "NeoForge"),
@@ -202,6 +205,17 @@ static class CurseForgeCommunityTests
                 && details.Body.Contains("Second & third")
                 && !details.Body.Contains('<'),
             "Project attribution or description lost"
+        );
+        var dependencies = await service.Dependencies("curseforge:7", "curseforge:9", default);
+        Check(
+            dependencies.Count == 1
+                && dependencies[0].Name.Length > 0
+                && dependencies[0].Relation == "required",
+            "Dependency display preserves project names and required relationships"
+        );
+        Check(
+            !calls.Any(uri => uri.Host == "edge.forgecdn.net"),
+            "Viewing dependencies must not download files"
         );
         var versions = await service.ProjectVersions("curseforge:7", default);
         Check(
