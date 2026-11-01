@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#2459ed" />
+    <meta name="theme-color" content="#f6f6f3" />
     <meta
       name="description"
-      content="CMCLauncher brings Minecraft Java instances, modpacks, community content, and everyday tools together in a native Windows app."
+      content="CMCLauncher is a native Windows launcher for Minecraft Java Edition."
     />
-    <title>CMCLauncher — Minecraft, without the clutter.</title>
+    <title>CMCLauncher</title>
     <link rel="icon" href="assets/cmc-logo.png" type="image/png" />
     <link rel="stylesheet" href="styles.css" />
     <script src="app.js" defer></script>
@@ -16,253 +16,78 @@
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
-      <a class="brand" href="#" aria-label="CMCLauncher home"
-        ><img src="assets/cmc-logo.png" width="36" height="36" alt="" />CMCLauncher</a
-      >
-      <button class="menu-toggle" aria-controls="main-nav" aria-expanded="false" type="button">
-        Menu <span aria-hidden="true">＋</span>
+      <a class="brand" href="#main"
+        ><img src="assets/cmc-logo.png" alt="" width="30" height="30" />CMCLauncher</a
+      ><button class="menu-toggle" type="button" aria-controls="main-nav" aria-expanded="false">
+        Menu
       </button>
       <nav id="main-nav" aria-label="Main navigation">
-        <a href="#features">Features</a><a href="#inside">Inside the launcher</a
-        ><a href="#faq">FAQ</a
-        ><a href="https://github.com/com-in/CMCLauncher"
-          >GitHub <span aria-hidden="true">↗</span></a
-        >
+        <a href="#features">Features</a
+        ><a href="https://github.com/com-in/CMCLauncher">GitHub ↗</a>
       </nav>
-      <a class="nav-download" href="#download"
-        >Get the launcher <span aria-hidden="true">↓</span></a
-      >
     </header>
     <main id="main">
       <section class="hero">
-        <div class="hero-heading">
-          <p class="eyebrow"><span class="live-dot"></span> MINECRAFT JAVA EDITION · WINDOWS</p>
-          <h1>Minecraft.<br /><em>On your terms.</em></h1>
-          <p class="hero-description">
-            The survival save. The ambitious modpack. The server you call home. Keep them together
-            in a launcher that feels at home on Windows.
-          </p>
-          <div class="hero-actions">
-            <a class="button light" href="#download"
-              >Download CMCLauncher <span aria-hidden="true">↓</span></a
-            ><a class="hero-source" href="https://github.com/com-in/CMCLauncher"
-              >Explore the source <span aria-hidden="true">↗</span></a
-            >
-          </div>
-          <p class="hero-footnote">
-            Windows x64 <span>·</span> Native WinUI 3 <span>·</span> Open source
-          </p>
+        <p class="eyebrow">MINECRAFT JAVA · WINDOWS x64</p>
+        <h1>Your worlds.<br />One launcher.</h1>
+        <p class="description">Manage instances, discover modpacks, and get back to the game.</p>
+        <div class="actions">
+          <a class="download-button" href="https://github.com/com-in/CMCLauncher/releases/latest"
+            >Download for Windows <span aria-hidden="true">↓</span></a
+          ><a href="https://github.com/com-in/CMCLauncher/releases">All releases ↗</a>
         </div>
-        <figure class="product-preview">
-          <div class="preview-bar">
-            <span><i></i> A familiar place to start</span><span>CMCLauncher / Home</span>
-          </div>
-          <img
-            src="assets/launcher-home.png"
-            alt="CMCLauncher home screen showing game instances and quick access to launcher tools"
-            width="1262"
-            height="811"
-            fetchpriority="high"
-          />
-          <figcaption>Real app. Native controls. Your instances, one click away.</figcaption>
-        </figure>
+        <p class="requirements">Windows 10 2004 or later · Runtimes included</p>
       </section>
-      <div class="compatibility">
-        <p>ONE LAUNCHER. MANY WAYS TO PLAY.</p>
-        <div>
-          <span>Vanilla</span><span>Fabric</span><span>Quilt</span><span>Forge</span
-          ><span>NeoForge</span>
-        </div>
-      </div>
-      <section class="section features" id="features">
-        <div class="section-intro">
-          <p class="eyebrow">LESS SETUP, MORE PLAY</p>
-          <h2>Make room for<br />your next obsession.</h2>
+      <figure class="preview">
+        <img
+          src="assets/launcher-home.png"
+          width="1262"
+          height="811"
+          fetchpriority="high"
+          alt="CMCLauncher home screen with game instances and a launch button"
+        />
+      </figure>
+      <section class="features" id="features" aria-label="Features">
+        <article>
+          <h2>Keep things organized.</h2>
+          <p>Separate instances, existing installations, and your saves and mods in one place.</p>
+        </article>
+        <article>
+          <h2>Find something new.</h2>
+          <p>Browse Modrinth and CurseForge. Install content for your game version and loader.</p>
+        </article>
+        <article>
+          <h2>Feel at home.</h2>
+          <p>Native Windows controls, light and dark themes, and built-in Java management.</p>
+        </article>
+      </section>
+      <section class="faq" aria-label="Common questions">
+        <details>
+          <summary>Do I need .NET or Java?<span aria-hidden="true">+</span></summary>
           <p>
-            Start fresh or bring your existing collection. The details stay organized, so you can
-            get back to the game.
+            .NET and the Windows App SDK are included. Minecraft needs Java, which you can download
+            or select inside the launcher.
           </p>
-        </div>
-        <div class="feature-grid">
-          <article class="feature feature-main">
-            <div class="feature-top">
-              <span class="number">01 / YOUR COLLECTION</span><span aria-hidden="true">↗</span>
-            </div>
-            <h3>Different worlds.<br />Their own space.</h3>
-            <p>
-              Keep versions and modpacks in isolated instances. Import existing installations,
-              manage saves and mods, and keep your experiments separate from your everyday world.
-            </p>
-            <div class="instance-list" aria-label="Illustration of separate game instances">
-              <div>
-                <span class="block grass"></span
-                ><span>Weekend survival<small>Vanilla · Your everyday world</small></span
-                ><b>01</b>
-              </div>
-              <div>
-                <span class="block stone"></span
-                ><span>A little more Create<small>Modded · A new project</small></span
-                ><b>02</b>
-              </div>
-              <div>
-                <span class="block sand"></span
-                ><span>The next experiment<small>Separate files. Fresh start.</small></span
-                ><b>03</b>
-              </div>
-            </div>
-          </article>
-          <article class="feature">
-            <div class="feature-top">
-              <span class="number">02 / DISCOVERY</span><span aria-hidden="true">⌕</span>
-            </div>
-            <h3>Find your next<br />“just one more mod.”</h3>
-            <p>
-              Browse Modrinth and CurseForge. Filter by game version, loader, category, and source
-              before choosing what belongs in your instance.
-            </p>
-            <div class="chips">
-              <span>Mods</span><span>Modpacks</span><span>Shaders</span><span>Resource packs</span>
-            </div>
-          </article>
-          <article class="feature">
-            <div class="feature-top">
-              <span class="number">03 / YOUR SPACE</span><span aria-hidden="true">◐</span>
-            </div>
-            <h3>A familiar app.<br />A personal touch.</h3>
-            <p>
-              Native Windows controls, light and dark appearances, JSON theme presets, and
-              adjustable fonts and sizing. Make the launcher fit your desktop.
-            </p>
-            <div class="swatches" aria-label="Theme color examples">
-              <span></span><span></span><span></span><span></span><span></span>
-            </div>
-          </article>
-        </div>
-      </section>
-      <section class="inside section" id="inside">
-        <div class="inside-heading">
-          <p class="eyebrow">BEYOND THE PLAY BUTTON</p>
-          <h2>The little things,<br />already considered.</h2>
-        </div>
-        <div class="tool-list">
-          <article>
-            <span>01</span>
-            <div>
-              <h3>Java, without the guesswork</h3>
-              <p>
-                Scan installed runtimes, download Java, and automatically match the version your
-                game needs.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>02</span>
-            <div>
-              <h3>A closer look at your setup</h3>
-              <p>
-                See live CPU, memory, and GPU statistics. Detailed runtime logs help you investigate
-                when a launch goes wrong.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>03</span>
-            <div>
-              <h3>Files where you need them</h3>
-              <p>
-                Manage saves, mods, resource packs, shaders, and supported schematic folders from
-                your instance.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>04</span>
-            <div>
-              <h3>Tools for the way you play</h3>
-              <p>Manage frpc configurations and receive verified launcher updates.</p>
-            </div>
-          </article>
-        </div>
-      </section>
-      <section class="download-section" id="download">
-        <div>
-          <p class="eyebrow">READY WHEN YOU ARE</p>
-          <h2>Your next world<br />is waiting.</h2>
-          <p>Choose a release, get Java ready, and make yourself at home.</p>
-        </div>
-        <div class="download-panel">
-          <span class="release-label">FOR WINDOWS x64</span>
-          <h3>Get CMCLauncher</h3>
+        </details>
+        <details>
+          <summary>Can I use my existing games?<span aria-hidden="true">+</span></summary>
+          <p>Yes. Import existing Minecraft installations or supported modpack archives.</p>
+        </details>
+        <details>
+          <summary>Need help?<span aria-hidden="true">+</span></summary>
           <p>
-            Choose the portable ZIP or single executable from the release assets. The .NET and
-            Windows App SDK runtimes are included.
+            Visit <a href="https://github.com/com-in/CMCLauncher/issues">GitHub Issues</a> to report
+            a problem or request a feature.
           </p>
-          <a class="button light" href="https://github.com/com-in/CMCLauncher/releases/latest"
-            >Download stable release <span aria-hidden="true">↗</span></a
-          ><a class="all-releases" href="https://github.com/com-in/CMCLauncher/releases"
-            >Looking for a Beta? View all releases <span aria-hidden="true">→</span></a
-          >
-          <div class="requirements">
-            <span>Windows 10 2004 or later</span><span>Java is installed separately</span>
-          </div>
-        </div>
-      </section>
-      <section class="section faq" id="faq">
-        <div>
-          <p class="eyebrow">A FEW THINGS TO KNOW</p>
-          <h2>Before you jump in.</h2>
-        </div>
-        <div class="questions">
-          <details>
-            <summary>Do I need to install a runtime?<span aria-hidden="true">＋</span></summary>
-            <p>
-              The launcher includes .NET and the Windows App SDK. Minecraft still needs Java; you
-              can scan for an installed runtime or download one inside the launcher.
-            </p>
-          </details>
-          <details>
-            <summary>Can I bring my existing instances?<span aria-hidden="true">＋</span></summary>
-            <p>
-              Yes. Import existing Minecraft installations or supported modpack archives. Review the
-              import options to choose how each instance is stored.
-            </p>
-          </details>
-          <details>
-            <summary>How do accounts work?<span aria-hidden="true">＋</span></summary>
-            <p>
-              Microsoft sign-in verifies your Minecraft Java profile. Credentials are protected with
-              Windows DPAPI.
-            </p>
-          </details>
-          <details>
-            <summary>
-              Where can I get help or report a bug?<span aria-hidden="true">＋</span>
-            </summary>
-            <p>
-              Visit <a href="https://github.com/com-in/CMCLauncher/issues">GitHub Issues</a> with
-              your launcher version and the steps to reproduce the problem. Remove tokens and other
-              private information from any logs you share.
-            </p>
-          </details>
-        </div>
+        </details>
       </section>
     </main>
     <footer>
-      <div class="footer-main">
-        <a class="brand" href="#"
-          ><img src="assets/cmc-logo.png" width="32" height="32" alt="" />CMCLauncher</a
-        >
-        <p>A native Windows home for your Minecraft Java worlds.</p>
-        <div>
-          <a href="https://github.com/com-in/CMCLauncher">Source code ↗</a
-          ><a href="https://github.com/com-in/CMCLauncher/issues">Feedback ↗</a
-          ><a href="https://github.com/com-in/CMCLauncher/blob/main/LICENSE">GPL-3.0 ↗</a>
-        </div>
+      <div>
+        <span>CMCLauncher</span
+        ><a href="https://github.com/com-in/CMCLauncher/blob/main/LICENSE">GPL-3.0</a>
       </div>
-      <div class="footer-bottom">
-        <span>Made for the worlds you keep coming back to.</span
-        ><span>Not an official Minecraft product. Not affiliated with Mojang or Microsoft.</span>
-      </div>
+      <p>Not an official Minecraft product. Not affiliated with Mojang or Microsoft.</p>
     </footer>
   </body>
 </html>
