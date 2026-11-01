@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
@@ -63,17 +63,8 @@ public sealed partial class LauncherCore : IDisposable
     // 根据用户代理设置重新配置 HTTP 客户端（代理地址、SSL 验证、User-Agent）
     public void ConfigureNetwork()
     {
-        var proxy = store.Config.Settings.Proxy;
-        if (
-            proxy.Length > 0
-            && (
-                !Uri.TryCreate(proxy, UriKind.Absolute, out var uri)
-                || uri.Scheme is not ("http" or "https" or "socks5")
-            )
-        )
-            throw new Exception("代理地址应为 http://127.0.0.1:7890 等格式");
+        var selectedProxy = NetworkProxy.Create(store.Config.Settings) ?? new WebProxy();
         http.Dispose();
-        var selectedProxy = proxy.Length > 0 ? new WebProxy(proxy) : HttpClient.DefaultProxy;
         http = new HttpClient(
             new DiagnosticHandler(
                 this,
@@ -83,7 +74,8 @@ public sealed partial class LauncherCore : IDisposable
                     authority =>
                         Log?.Invoke(
                             "TLS connection rejected: compromised CA public key · " + authority
-                        )
+                        ),
+                    store.Config.Settings.ProxyDirectFallback
                 )
             ),
             disposeHandler: true
@@ -131,26 +123,46 @@ public sealed partial class LauncherCore : IDisposable
             var original = request.RequestUri!;
             var mirror = BmclUrl(original);
             if (
-                !owner.store.Config.Settings.UseBmclApi
-                || request.Method != HttpMethod.Get
+                request.Method != HttpMethod.Get
                 || request.Headers.Authorization != null
                 || mirror == original
             )
                 return await base.SendAsync(request, ct);
-            using var mirrored = new HttpRequestMessage(HttpMethod.Get, mirror);
-            foreach (var header in request.Headers)
-                mirrored.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            var policy = owner.store.Config.Settings.EffectiveGameDownloadSource;
+            var first = policy == "mirror" ? mirror : original;
+            var second = policy == "mirror" ? original : mirror;
+            HttpRequestMessage Copy(Uri uri)
+            {
+                var copy = new HttpRequestMessage(HttpMethod.Get, uri)
+                {
+                    Version = request.Version,
+                    VersionPolicy = request.VersionPolicy,
+                };
+                foreach (var header in request.Headers)
+                    copy.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                return copy;
+            }
+            using var primary = Copy(first);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            // Automatic mode limits waiting for official response headers. Body reads
+            // continue to use the caller's cancellation and existing file verification.
+            if (policy == "auto")
+                timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            else if (policy == "mirror")
+                timeout.CancelAfter(TimeSpan.FromSeconds(15));
             try
             {
-                var response = await base.SendAsync(mirrored, ct);
+                var response = await base.SendAsync(primary, timeout.Token);
                 if (response.IsSuccessStatusCode)
                     return response;
                 response.Dispose();
             }
             catch (HttpRequestException) { }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { }
             ct.ThrowIfCancellationRequested();
-            owner.DebugLog?.Invoke("BMCLAPI unavailable; retrying the official source.");
-            return await base.SendAsync(request, ct);
+            owner.DebugLog?.Invoke("Download source fallback: " + second.Host);
+            using var fallback = Copy(second);
+            return await base.SendAsync(fallback, ct);
         }
     }
 
@@ -191,7 +203,8 @@ public sealed partial class LauncherCore : IDisposable
     sealed class ReachableProxyHandler(
         IWebProxy proxy,
         bool ignoreSslErrors,
-        Action<string> blocked
+        Action<string> blocked,
+        bool directFallback = true
     ) : HttpMessageHandler
     {
         readonly HttpMessageInvoker proxied = new(
@@ -252,6 +265,10 @@ public sealed partial class LauncherCore : IDisposable
             {
                 probeLock.Release();
             }
+            if (!reachable && !directFallback)
+                throw new HttpRequestException(
+                    "The configured proxy is unreachable. Direct fallback is disabled."
+                );
             return await (reachable ? proxied : direct).SendAsync(request, ct);
         }
 

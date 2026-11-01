@@ -37,10 +37,25 @@ public sealed class Settings
     public List<string> IgnoredJavaPaths { get; set; } = [];
     public int MemoryMb { get; set; } = 4096;
     public int DownloadThreads { get; set; } = 16;
-    public bool UseBmclApi { get; set; }
+
+    // JSON values override this regional default, including an explicit opt-out.
+    public bool UseBmclApi { get; set; } = MicrosoftAuth.IsMainlandMachine;
+    public string GameDownloadSource { get; set; } = "";
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string EffectiveGameDownloadSource =>
+        GameDownloadSource is "mirror" or "auto" or "official" ? GameDownloadSource
+        : UseBmclApi ? "mirror"
+        : "official";
     public bool AutoMemory { get; set; } = true;
     public string MicrosoftClientId { get; set; } = "";
     public string Proxy { get; set; } = "";
+    public string ProxyMode { get; set; } = "auto";
+    public string ProxyUsername { get; set; } = "";
+    public string? ProxyPasswordProtected { get; set; }
+    public string ProxyBypassHosts { get; set; } = "";
+    public bool ProxyBypassLocal { get; set; }
+    public bool ProxyDirectFallback { get; set; } = true;
     public bool IgnoreSslErrors { get; set; }
     public string Theme { get; set; } = "dark";
     public string ColorPreset { get; set; } = "craft";

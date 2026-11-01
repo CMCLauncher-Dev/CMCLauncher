@@ -20,22 +20,25 @@ public sealed class ExternalAuth : IDisposable
 
     public ExternalAuth(Settings settings, HttpMessageHandler? handler = null)
     {
-        http = new HttpClient(
-            handler
-                ?? new HttpClientHandler
-                {
-                    AllowAutoRedirect = false,
-                    UseCookies = false,
-                    Proxy =
-                        settings.Proxy.Length == 0
-                            ? HttpClient.DefaultProxy
-                            : new WebProxy(settings.Proxy),
-                }
-        )
+        http = new HttpClient(handler ?? Transport(settings))
         {
             Timeout = TimeSpan.FromSeconds(30),
         };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("CMCLauncher/" + LauncherUpdates.CurrentVersion);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "CMCLauncher/" + LauncherUpdates.CurrentVersion
+        );
+    }
+
+    static HttpClientHandler Transport(Settings settings)
+    {
+        var proxy = NetworkProxy.Create(settings);
+        return new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false,
+            Proxy = proxy,
+            UseProxy = proxy != null,
+        };
     }
 
     public static Uri ServerUri(string input)

@@ -167,6 +167,14 @@
       Link="Core/Models.cs"
     />
     <Compile
+      Include="../native/NetworkProxy.cs"
+      Link="Core/NetworkProxy.cs"
+    />
+    <Compile
+      Include="../native/MinecraftPfp.cs"
+      Link="Core/MinecraftPfp.cs"
+    />
+    <Compile
       Include="../native/MinecraftDirectoryManager.cs"
       Link="Core/MinecraftDirectoryManager.cs"
     />

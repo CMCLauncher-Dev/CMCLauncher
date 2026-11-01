@@ -113,8 +113,8 @@ public sealed class LauncherUpdates(HttpClient client)
     public static HttpClient CreateClient(Settings settings)
     {
         var handler = new HttpClientHandler();
-        if (!string.IsNullOrWhiteSpace(settings.Proxy))
-            handler.Proxy = new WebProxy(settings.Proxy);
+        handler.Proxy = NetworkProxy.Create(settings);
+        handler.UseProxy = handler.Proxy != null;
         return new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(15) };
     }
 

@@ -612,10 +612,14 @@ internal static class Program
         var settings = new Store(Path.Combine(root, "settings"));
         await BmclTests.Run(Path.Combine(root, "bmcl"));
         Pass("BMCLAPI routing, official fallback, and settings persistence");
+        await NetworkProxyTests.Run(Path.Combine(root, "advanced-proxy"));
+        Pass("advanced proxy modes, encrypted authentication, host bypass and strict fallback");
         await MinecraftDirectoryTests.Run(Path.Combine(root, "minecraft-directories"));
         Pass(
             "multiple Minecraft directories, ownership checks, migration, cancellation and rollback"
         );
+        MinecraftPfpTests.Run();
+        Pass("MinecraftPFP skin sampling, overlays, transparency, legacy and HD skins");
         settings.Config.Settings.GameLanguage = "zh_cn";
         await settings.Save();
         Check(

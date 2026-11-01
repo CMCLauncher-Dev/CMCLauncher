@@ -9,6 +9,8 @@ namespace CMCLauncher.WinUI;
 // Keep native keyboard navigation and selection while anchoring the list below its field.
 public sealed class BelowComboBox : ComboBox
 {
+    bool popupRepositioned;
+
     public BelowComboBox()
     {
         DefaultStyleKey = typeof(ComboBox);
@@ -16,6 +18,7 @@ public sealed class BelowComboBox : ComboBox
         AddControlPalette();
         DropDownOpened += (_, _) =>
         {
+            popupRepositioned = false;
             SyncPopupTheme();
             AnchorPopup();
         };
@@ -171,7 +174,7 @@ public sealed class BelowComboBox : ComboBox
             .Y;
         var available = root.ActualHeight - bottom - 8;
         // 底部空间不足时先把输入框滚上来，排队后再按新的位置计算弹层高度。
-        if (available < 180)
+        if (available < 180 && IsDropDownOpen && !popupRepositioned)
         {
             for (
                 DependencyObject? parent = VisualTreeHelper.GetParent(this);
@@ -183,7 +186,14 @@ public sealed class BelowComboBox : ComboBox
                     continue;
                 var top = TransformToVisual(scroll).TransformPoint(new Point()).Y;
                 scroll.ChangeView(null, Math.Max(0, scroll.VerticalOffset + top - 72), null, true);
-                DispatcherQueue.TryEnqueue(AnchorPopup);
+                // A short window may not have enough scroll range. Retry once,
+                // rather than endlessly enqueuing layout work on the UI thread.
+                popupRepositioned = true;
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (IsLoaded && IsDropDownOpen)
+                        AnchorPopup();
+                });
                 break;
             }
         }

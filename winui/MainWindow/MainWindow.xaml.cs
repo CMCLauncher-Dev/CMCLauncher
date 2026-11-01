@@ -155,6 +155,7 @@ public sealed partial class MainWindow : Window
         curseforge = new(core, store, modrinth);
         community = new(modrinth, curseforge);
         auth = new MicrosoftAuth(core);
+        fetchPfpSkin = FindPfpSkin;
         fetchVersions = ct => core.VersionCatalog(ct);
         fetchDownloadLoaderBuilds = core.LoaderBuilds;
         fetchProject = community.ProjectDetails;
@@ -177,16 +178,25 @@ public sealed partial class MainWindow : Window
                 Interlocked.Add(ref work.Bytes, bytes);
         };
         taskViewTimer = DispatcherQueue.CreateTimer();
-        taskViewTimer.Interval = TimeSpan.FromMilliseconds(500);
+        taskViewTimer.Interval = TimeSpan.FromMilliseconds(200);
         taskViewTimer.Tick += (_, _) => RefreshTaskMetrics();
         taskViewTimer.Start();
         // 捕获回调所属任务，排队期间任务若已结束或更换，就丢弃这次进度。
         core.DownloadProgress += value =>
         {
             var activeTask = task;
+            var work = activeWork;
+            var phase = work == null ? 0 : Volatile.Read(ref work.Phase);
             DispatcherQueue.TryEnqueue(() =>
             {
-                if (activeTask != null && task == activeTask && !launching)
+                if (
+                    activeTask != null
+                    && task == activeTask
+                    && !launching
+                    && work == activeWork
+                    && work != null
+                    && phase == Volatile.Read(ref work.Phase)
+                )
                     UpdateDownloadProgress(value);
             });
         };
@@ -231,14 +241,28 @@ public sealed partial class MainWindow : Window
     internal void Report(string message)
     {
         var reportingTask = task;
-        DispatcherQueue.TryEnqueue(() =>
+        var reportingWork = activeWork;
+        var phase = reportingWork == null ? 0 : Interlocked.Increment(ref reportingWork.Phase);
+        void Apply()
         {
             AddLog(message);
-            if (reportingTask == null || reportingTask != task || activeWork == null)
+            if (
+                reportingTask == null
+                || reportingTask != task
+                || activeWork == null
+                || activeWork != reportingWork
+                || phase != Volatile.Read(ref activeWork.Phase)
+            )
                 return;
+            if (activeWork.Stage != message)
+                activeWork.Progress = null;
             activeWork.Stage = message;
             RefreshTaskMetrics();
-        });
+        }
+        if (DispatcherQueue.HasThreadAccess)
+            Apply();
+        else
+            DispatcherQueue.TryEnqueue(Apply);
     }
 
     internal void AddLog(string line) => RuntimeLog.Write("INFO", line);

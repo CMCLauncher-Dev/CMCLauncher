@@ -98,6 +98,7 @@ public sealed partial class MainWindow
             new[]
             {
                 ("frpc", "\uE968", "frpc"),
+                ("MinecraftPFP", "\uE91B", "minecraft-pfp"),
                 ("System status", "\uE9F5", "stats"),
                 ("About", "\uE946", "about"),
             }
@@ -447,6 +448,9 @@ public sealed partial class MainWindow
                     break;
                 case "frpc":
                     FrpcPage();
+                    break;
+                case "minecraft-pfp":
+                    await MinecraftPfpPage();
                     break;
                 case "instances":
                     Instances();

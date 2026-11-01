@@ -111,20 +111,95 @@ public sealed class SettingsPage : CMCPage
 
         var proxy = new TextBox
         {
-            Header = Ui("Download proxy (blank uses system proxy)"),
+            Header = Ui("Proxy address"),
             PlaceholderText = "http://127.0.0.1:7890",
             Text = settings.Proxy,
         };
-        var bmcl = new ToggleSwitch
+        var proxyMode = new BelowComboBox
         {
-            Header = Ui("Use BMCLAPI for game downloads"),
-            IsOn = settings.UseBmclApi,
-            OnContent = Ui("context.settingspage.on"),
-            OffContent = Ui("Off"),
+            Tag = "proxy-mode",
+            Header = Ui("Proxy mode"),
+            ItemsSource = new[] { Ui("System proxy"), Ui("No proxy"), Ui("Manual proxy") },
+            SelectedIndex = NetworkProxy.Mode(settings) switch
+            {
+                "direct" => 1,
+                "custom" => 2,
+                _ => 0,
+            },
         };
-        bmcl.Toggled += async (_, _) =>
+        proxy.IsEnabled = proxyMode.SelectedIndex == 2;
+        var proxyUser = new TextBox
         {
-            settings.UseBmclApi = bmcl.IsOn;
+            Header = Ui("Proxy username"),
+            Text = settings.ProxyUsername,
+        };
+        var proxyPassword = new PasswordBox { Header = Ui("Proxy password") };
+        try
+        {
+            proxyPassword.Password = NetworkProxy.ReadPassword(settings);
+        }
+        catch
+        {
+            AddLog("Proxy credentials could not be read. Re-enter the proxy password.");
+        }
+        var bypassHosts = new TextBox
+        {
+            Header = Ui("Bypass proxy for these hosts"),
+            Text = settings.ProxyBypassHosts,
+            PlaceholderText = "localhost; *.example.com; 192.168.*",
+            AcceptsReturn = true,
+            MinHeight = 70,
+            MaxHeight = 160,
+        };
+        var bypassLocal = new CheckBox
+        {
+            Content = Ui("Bypass proxy for local addresses"),
+            IsChecked = settings.ProxyBypassLocal,
+        };
+        var directFallback = new CheckBox
+        {
+            Content = Ui("Allow direct fallback for game downloads when the proxy is unreachable"),
+            IsChecked = settings.ProxyDirectFallback,
+        };
+        var applyProxy = new Button
+        {
+            Content = Ui("Apply proxy settings"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        var testProxy = new Button
+        {
+            Content = Ui("Apply and test connection"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        var bmcl = new BelowComboBox
+        {
+            Header = Ui("Game download source"),
+            Tag = "game-download-source",
+            ItemsSource = new[]
+            {
+                Ui("Prefer mirror sources"),
+                Ui("Prefer official sources; switch to mirrors if slow"),
+                Ui("Prefer official sources"),
+            },
+            SelectedIndex = settings.EffectiveGameDownloadSource switch
+            {
+                "mirror" => 0,
+                "auto" => 1,
+                _ => 2,
+            },
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        bmcl.SelectionChanged += async (_, _) =>
+        {
+            if (bmcl.SelectedIndex < 0)
+                return;
+            settings.GameDownloadSource = bmcl.SelectedIndex switch
+            {
+                0 => "mirror",
+                1 => "auto",
+                _ => "official",
+            };
+            settings.UseBmclApi = bmcl.SelectedIndex != 2;
             await PersistSettings();
         };
         var downloadMirror = new TextBox
@@ -327,6 +402,132 @@ public sealed class SettingsPage : CMCPage
         };
 
         var proxyHint = Text("", 12);
+        proxyHint.Tag = "proxy-validation-hint";
+        proxyHint.Visibility = Visibility.Collapsed;
+        var proxyField = new StackPanel { Spacing = 4, Tag = "proxy-input-group" };
+        proxyField.Children.Add(proxy);
+        proxyField.Children.Add(proxyHint);
+
+        Settings ProxySnapshot() =>
+            new Settings
+            {
+                Proxy = settings.Proxy,
+                ProxyMode = settings.ProxyMode,
+                ProxyUsername = settings.ProxyUsername,
+                ProxyPasswordProtected = settings.ProxyPasswordProtected,
+                ProxyBypassHosts = settings.ProxyBypassHosts,
+                ProxyBypassLocal = settings.ProxyBypassLocal,
+                ProxyDirectFallback = settings.ProxyDirectFallback,
+            };
+        void CopyProxy(Settings value)
+        {
+            settings.Proxy = value.Proxy;
+            settings.ProxyMode = value.ProxyMode;
+            settings.ProxyUsername = value.ProxyUsername;
+            settings.ProxyPasswordProtected = value.ProxyPasswordProtected;
+            settings.ProxyBypassHosts = value.ProxyBypassHosts;
+            settings.ProxyBypassLocal = value.ProxyBypassLocal;
+            settings.ProxyDirectFallback = value.ProxyDirectFallback;
+        }
+        async Task<bool> ApplyProxy(bool advanced)
+        {
+            var previous = ProxySnapshot();
+            var candidate = ProxySnapshot();
+            try
+            {
+                if (Window.activeWork != null)
+                    throw new InvalidOperationException(
+                        Ui("Finish active tasks before changing proxy settings.")
+                    );
+                candidate.ProxyMode = proxyMode.SelectedIndex switch
+                {
+                    1 => "direct",
+                    2 => "custom",
+                    _ => "system",
+                };
+                candidate.Proxy = proxy.Text.Trim();
+                if (advanced)
+                {
+                    candidate.ProxyUsername = proxyUser.Text.Trim();
+                    candidate.ProxyPasswordProtected =
+                        proxyPassword.Password.Length == 0
+                            ? null
+                            : NetworkProxy.ProtectPassword(proxyPassword.Password);
+                    candidate.ProxyBypassHosts = bypassHosts.Text.Trim();
+                    candidate.ProxyBypassLocal = bypassLocal.IsChecked == true;
+                    candidate.ProxyDirectFallback = directFallback.IsChecked == true;
+                }
+                _ = NetworkProxy.Create(candidate);
+                CopyProxy(candidate);
+                Core.ConfigureNetwork();
+                try
+                {
+                    await Store.Save();
+                }
+                catch
+                {
+                    CopyProxy(previous);
+                    Core.ConfigureNetwork();
+                    throw;
+                }
+                proxyHint.Text = "";
+                proxyHint.Visibility = Visibility.Collapsed;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                CopyProxy(previous);
+                proxyHint.Text = Ui(ex.Message);
+                proxyHint.Visibility = Visibility.Visible;
+                return false;
+            }
+        }
+        proxyMode.SelectionChanged += async (_, _) =>
+        {
+            proxy.IsEnabled = proxyMode.SelectedIndex == 2;
+            await ApplyProxy(false);
+        };
+        applyProxy.Click += async (_, _) =>
+        {
+            if (await ApplyProxy(true))
+                Window.ShowToast(Ui("Proxy settings saved"));
+        };
+        testProxy.Click += async (_, _) =>
+        {
+            if (!await ApplyProxy(true))
+                return;
+            testProxy.IsEnabled = false;
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                var selected = NetworkProxy.Create(settings);
+                using var transport = new System.Net.Http.HttpClientHandler
+                {
+                    Proxy = selected,
+                    UseProxy = selected != null,
+                };
+                using var client = new System.Net.Http.HttpClient(transport);
+                using var response = await client.GetAsync(
+                    "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+                    System.Net.Http.HttpCompletionOption.ResponseHeadersRead,
+                    timeout.Token
+                );
+                response.EnsureSuccessStatusCode();
+                Window.ShowToast(Ui("Connection test succeeded"));
+            }
+            catch (Exception ex)
+            {
+                proxyHint.Text =
+                    ex is OperationCanceledException
+                        ? Ui("Connection test timed out.")
+                        : Ui("Connection test failed.") + " " + ex.Message;
+                proxyHint.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                testProxy.IsEnabled = true;
+            }
+        };
         void Section(string title, params UIElement[] controls)
         {
             var content = new StackPanel { Spacing = 16 };
@@ -351,18 +552,32 @@ public sealed class SettingsPage : CMCPage
         );
         Section("Memory and Java", automaticMemory, memory, memoryHint, customJvmArgs, jvmHint);
         var advancedNetwork = new StackPanel { Spacing = 12 };
+        advancedNetwork.Children.Add(proxyUser);
+        advancedNetwork.Children.Add(proxyPassword);
+        advancedNetwork.Children.Add(bypassHosts);
+        advancedNetwork.Children.Add(bypassLocal);
+        advancedNetwork.Children.Add(directFallback);
+        advancedNetwork.Children.Add(applyProxy);
+        advancedNetwork.Children.Add(testProxy);
+        advancedNetwork.Children.Add(
+            Text(
+                "Authentication and bypass rules apply to manual proxy mode. Connection tests do not use direct fallback.",
+                12
+            )
+        );
         advancedNetwork.Children.Add(ignoreSslErrors);
         advancedNetwork.Children.Add(sslWarning);
         Section(
             "Downloads and network",
             downloadThreads,
             bmcl,
-            proxy,
-            proxyHint,
+            proxyMode,
+            proxyField,
             downloadMirror,
             new Expander
             {
                 Header = Ui("Advanced network options"),
+                Tag = "advanced-network-settings",
                 Content = advancedNetwork,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
@@ -443,28 +658,7 @@ public sealed class SettingsPage : CMCPage
             RefreshJvmHint();
         };
 
-        proxy.TextChanged += async (_, _) =>
-        {
-            var value = proxy.Text.Trim();
-            if (
-                value.Length > 0
-                && (
-                    !Uri.TryCreate(value, UriKind.Absolute, out var uri)
-                    || uri.Scheme is not ("http" or "https" or "socks5")
-                    || string.IsNullOrWhiteSpace(uri.Host)
-                )
-            )
-            {
-                proxyHint.Text = Ui(
-                    "Enter a valid HTTP, HTTPS, or SOCKS5 proxy address. The last valid setting remains active."
-                );
-                return;
-            }
-            proxyHint.Text = "";
-            settings.Proxy = value;
-            Core.ConfigureNetwork();
-            await PersistSettings();
-        };
+        proxy.TextChanged += async (_, _) => await ApplyProxy(false);
         downloadMirror.TextChanged += async (_, _) =>
         {
             var value = downloadMirror.Text.Trim().TrimEnd('/');

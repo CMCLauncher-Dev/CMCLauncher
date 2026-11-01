@@ -31,6 +31,7 @@ public sealed partial class MainWindow
         internal bool Launch;
         internal double? Progress;
         internal long Bytes;
+        internal int Phase;
         internal readonly Stopwatch Clock = Stopwatch.StartNew();
         internal TimeSpan? CompletedElapsed;
         internal long LastBytes;
@@ -173,10 +174,15 @@ public sealed partial class MainWindow
             {
                 var panel = new StackPanel { Spacing = 4 };
                 panel.Children.Add(Text(Ui(recent.Name) + " · " + Ui(recent.State), 14, true));
-                panel.Children.Add(Text(Ui(recent.Stage), 12));
-                panel.Children.Add(
-                    Text(UiFormat("Received {0}", ByteSize(Interlocked.Read(ref recent.Bytes))), 12)
-                );
+                if (recent.Stage != recent.State)
+                    panel.Children.Add(Text(Ui(recent.Stage), 12));
+                if (Interlocked.Read(ref recent.Bytes) > 0)
+                    panel.Children.Add(
+                        Text(
+                            UiFormat("Received {0}", ByteSize(Interlocked.Read(ref recent.Bytes))),
+                            12
+                        )
+                    );
                 panel.Children.Add(
                     Text(UiFormat("Elapsed {0}", FormatDuration(Elapsed(recent))), 12)
                 );
@@ -217,23 +223,32 @@ public sealed partial class MainWindow
             || taskProgress == null
         )
             return;
-        var label = (work.Launch ? Ui("Launch progress") : Ui("Current file progress"));
+        var label =
+            work.Launch ? Ui("Launch progress")
+            : bytes > 0 ? Ui("Current file progress")
+            : Ui("Progress");
         var progressText = work.Progress is double progressValue
             ? progressValue.ToString("0") + "%"
             : Ui(string.IsNullOrWhiteSpace(work.Stage) ? "Preparing" : work.Stage);
         taskStage.Text = Ui(work.Stage);
         taskProgress.IsIndeterminate = !work.Progress.HasValue;
         taskProgress.Value = work.Progress ?? 0;
+        taskMetrics.Visibility =
+            bytes > 0 || work.Progress.HasValue ? Visibility.Visible : Visibility.Collapsed;
         taskMetrics.Text =
-            work.Progress.HasValue || work.Bytes > 0
-                ? UiFormat(
-                    "{0}: {1}\nSpeed: {2}/s   ·   Received {3}",
-                    label,
-                    progressText,
-                    ByteSize(work.Speed),
-                    ByteSize(bytes)
-                )
-                : progressText;
+            bytes > 0
+                ? work.Progress.HasValue
+                    ? UiFormat(
+                        "{0}: {1}\nSpeed: {2}/s   ·   Received {3}",
+                        label,
+                        progressText,
+                        ByteSize(work.Speed),
+                        ByteSize(bytes)
+                    )
+                    : UiFormat("Speed: {0}/s · Received {1}", ByteSize(work.Speed), ByteSize(bytes))
+                : work.Progress.HasValue
+                    ? label + ": " + progressText
+                    : "";
         taskElapsed.Text = UiFormat("Elapsed: {0}", FormatDuration(Elapsed(work)));
     }
 
@@ -272,7 +287,7 @@ public sealed partial class MainWindow
         var work = new WorkItem
         {
             Name = name ?? PageTitle.Text,
-            Stage = launching ? "准备启动" : "正在准备…",
+            Stage = launching ? "准备启动" : "Processing…",
             Launch = launching,
         };
         task = cancellation;
@@ -291,11 +306,14 @@ public sealed partial class MainWindow
 
             await operation(cancellation.Token);
             work.State = "已完成";
+            work.Stage = work.State;
+            work.Progress = 100;
             AddLog(work.Name + "：操作完成");
         }
         catch (OperationCanceledException)
         {
             work.State = "已取消";
+            work.Stage = work.State;
             AddLog(work.Name + "：已取消");
             throw;
         }

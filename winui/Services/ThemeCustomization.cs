@@ -205,6 +205,9 @@ public sealed partial class MainWindow
     // hex 可以来自 ThemeTokens，也可以是已有 UI 传入的同值字符串。
     Color PaletteColor(string hex)
     {
+        // Validation is a semantic status color. Never remap it to a surface or border.
+        if (hex == "ValidationError")
+            return RawColor(lightTheme ? "#C42B1C" : "#FF99A4");
         // Keep this navigation heading independent of other caption colors.
         if (hex == "CommunityResourcesHeading")
         {

@@ -124,7 +124,8 @@ public sealed partial class MainWindow
         };
         var nameError = new TextBlock
         {
-            Foreground = Brush(lightTheme ? "#C42B1C" : "#FF99A4"),
+            Tag = "installation-name-error",
+            Foreground = Brush("ValidationError"),
             TextWrapping = TextWrapping.Wrap,
             FontSize = 12,
             Visibility = Visibility.Collapsed,
@@ -397,7 +398,7 @@ public sealed partial class MainWindow
                 if (viewVersion != renderVersion)
                     return;
                 versions.IsEnabled = cachedVersions.Any(v => v.Category == releaseCategory);
-                versionStatus.Foreground = Brush(lightTheme ? "#A33A32" : "#FF8A80");
+                versionStatus.Foreground = Brush("ValidationError");
                 versionStatus.Text =
                     (cachedVersions.Count > 0 ? Ui("The previous list was kept.") + " " : "")
                     + (
@@ -534,7 +535,11 @@ public sealed partial class MainWindow
             var scan = core.ScanForeignInstances(folder, ct, AddLog);
             if (scan.Instances.Count == 0)
             {
-                Report(Ui("未在该目录发现可迁移的实例，请选择 ModrinthApp 或 MultiMC/Prism 启动器根目录"));
+                Report(
+                    Ui(
+                        "未在该目录发现可迁移的实例，请选择 ModrinthApp 或 MultiMC/Prism 启动器根目录"
+                    )
+                );
                 return;
             }
             var (migrated, skipped) = await core.MigrateForeignInstances(
@@ -555,19 +560,14 @@ public sealed partial class MainWindow
                 throw;
             }
             var discarded = migrated.Count - (store.Config.Instances.Count - previous);
-            var manual = migrated.Count(
-                instance => instance.Loader is not ("vanilla" or "fabric")
-            );
+            var manual = migrated.Count(instance => instance.Loader is not ("vanilla" or "fabric"));
             var message = UiFormat("已迁移 {0} 个实例", migrated.Count);
             if (discarded > 0)
                 message += UiFormat("，{0} 个因同名被丢弃", discarded);
             if (skipped.Count > 0)
                 message += UiFormat("，{0} 个失败", skipped.Count);
             if (manual > 0)
-                message += UiFormat(
-                    "，其中 {0} 个需在下载游戏页安装对应加载器",
-                    manual
-                );
+                message += UiFormat("，其中 {0} 个需在下载游戏页安装对应加载器", manual);
             Report(message);
         });
         page = "instances";

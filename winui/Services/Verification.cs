@@ -186,6 +186,8 @@ public sealed partial class MainWindow
         await RenderAsync();
         await VerifyFeedbackAndSchematics(Check, directory);
         await VerifyFrpcPage(Check, directory);
+        await VerifyMinecraftPfp(Check, directory);
+        await VerifyProxySettings(Check, directory);
         await VerifyJsonLocalization(Check);
         await VerifyJsonThemes(Check);
         await VerifyVersionOverview(Check, directory);
@@ -355,8 +357,21 @@ public sealed partial class MainWindow
                 .GetDirectories(Path.Combine(AppContext.BaseDirectory, "languages"))
                 .Select(path => Path.GetFileName(path).ToLowerInvariant())
                 .OrderBy(name => name)
-                .SequenceEqual(new[] { "en-us", "zh-cn" }),
-            "WinUI resources include only the bundled English and Simplified Chinese languages"
+                .SequenceEqual(
+                    typeof(LocalizationCatalog)
+                        .Assembly.GetManifestResourceNames()
+                        .Where(name =>
+                            name.StartsWith("CMCLauncher.Locales.") && name.EndsWith(".json")
+                        )
+                        .Select(name =>
+                            name.Replace("CMCLauncher.Locales.", "")
+                                .Replace(".json", "")
+                                .Replace('_', '-')
+                                .ToLowerInvariant()
+                        )
+                        .OrderBy(name => name)
+                ),
+            "WinUI resources match the bundled launcher interface languages"
         );
         Check(
             !File.Exists(Path.ChangeExtension(Environment.ProcessPath, ".pdb")),
@@ -1500,6 +1515,34 @@ public sealed partial class MainWindow
                     ),
             "duplicate version name shows inline error and prevents installation"
         );
+        var nameValidation = Descendants(PageBody)
+            .OfType<TextBlock>()
+            .Single(t => t.Tag?.ToString() == "installation-name-error");
+        Check(
+            nameValidation.Foreground is Microsoft.UI.Xaml.Media.SolidColorBrush errorBrush
+                && errorBrush.Color == RawColor(lightTheme ? "#C42B1C" : "#FF99A4"),
+            "duplicate-name validation uses a readable error color instead of a border color"
+        );
+        var validationPreset = store.Config.Settings.ColorPreset;
+        var validationLight = lightTheme;
+        try
+        {
+            foreach (var preset in new[] { "native", "custom", "craft" })
+            foreach (var light in new[] { true, false })
+            {
+                store.Config.Settings.ColorPreset = preset;
+                lightTheme = light;
+                Check(
+                    PaletteColor("ValidationError") == RawColor(light ? "#C42B1C" : "#FF99A4"),
+                    preset + " validation status keeps its light/dark error color"
+                );
+            }
+        }
+        finally
+        {
+            store.Config.Settings.ColorPreset = validationPreset;
+            lightTheme = validationLight;
+        }
         installationName.Text = "1.21.1";
         await Task.Delay(30);
         fetchDownloadLoaderBuilds = async (_, type, ct) =>
@@ -1792,6 +1835,13 @@ public sealed partial class MainWindow
         page = "settings";
         store.Config.Settings.GameLanguage = "ja_jp";
         await RenderAsync();
+        // Advanced network settings now live inside a collapsed settings section.
+        ((FrameworkElement)Content).UpdateLayout();
+        var advancedNetwork = Descendants(PageBody)
+            .OfType<Expander>()
+            .Single(e => e.Header?.ToString() == Ui("Advanced network options"));
+        advancedNetwork.IsExpanded = true;
+        await Task.Delay(100);
         var automaticMemory = Descendants(PageBody)
             .OfType<ToggleSwitch>()
             .Single(c => c.Header?.ToString() == "游戏内存");
@@ -2438,12 +2488,13 @@ public sealed partial class MainWindow
         );
         await RenderAsync();
         Check(
-            (Descendants(PageBody)
+            (
+                Descendants(PageBody)
                     .OfType<ContentControl>()
                     .Single(e => e.Tag?.ToString() == "external-account-form")
                     .IsEnabled == false
-                && !MicrosoftAuth.CanUseAccount(store.Config.Accounts, externalAccount))
-                == !MicrosoftAuth.IsMainlandMachine,
+                && !MicrosoftAuth.CanUseAccount(store.Config.Accounts, externalAccount)
+            ) == !MicrosoftAuth.IsMainlandMachine,
             "removing the last verified Microsoft account locks external sign-in and selection"
         );
         Check(
