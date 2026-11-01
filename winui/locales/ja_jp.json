@@ -2,6 +2,8 @@
   "code": "ja_jp",
   "displayName": "日本語",
   "strings": {
+    "Use BMCLAPI for game downloads": "ゲームのダウンロードに BMCLAPI を使用",
+    "Download mirror provided by BMCLAPI · bangbang93": "ダウンロードミラー提供：BMCLAPI · bangbang93",
     "Update now": "今すぐ更新",
     "Later": "後で",
     "Prefer high-performance GPU for games": "ゲームで高性能 GPU を優先",

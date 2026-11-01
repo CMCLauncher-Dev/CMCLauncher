@@ -2,6 +2,8 @@
   "code": "en_us",
   "displayName": "English",
   "strings": {
+    "Use BMCLAPI for game downloads": "Use BMCLAPI for game downloads",
+    "Download mirror provided by BMCLAPI · bangbang93": "Download mirror provided by BMCLAPI · bangbang93",
     "Update now": "Update now",
     "Later": "Later",
     "Prefer high-performance GPU for games": "Prefer high-performance GPU for games",

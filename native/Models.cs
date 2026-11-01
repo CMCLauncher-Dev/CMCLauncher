@@ -37,6 +37,7 @@ public sealed class Settings
     public List<string> IgnoredJavaPaths { get; set; } = [];
     public int MemoryMb { get; set; } = 4096;
     public int DownloadThreads { get; set; } = 16;
+    public bool UseBmclApi { get; set; }
     public bool AutoMemory { get; set; } = true;
     public string MicrosoftClientId { get; set; } = "";
     public string Proxy { get; set; } = "";
@@ -55,7 +56,8 @@ public sealed class Settings
     public string CustomJvmArgs { get; set; } = "";
     public string PlayerPriority { get; set; } = "normal";
     public bool PreferHighPerformanceGpu { get; set; } = true;
-    public Dictionary<string, string?> ManagedGpuPreferences { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string?> ManagedGpuPreferences { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
     public string GameWindowTitle { get; set; } = "";
     public string MinecraftRoot { get; set; } = "";
     public string DownloadMirror { get; set; } = "";

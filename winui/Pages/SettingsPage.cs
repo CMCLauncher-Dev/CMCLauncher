@@ -115,6 +115,24 @@ public sealed class SettingsPage : CMCPage
             PlaceholderText = "http://127.0.0.1:7890",
             Text = settings.Proxy,
         };
+        var bmcl = new ToggleSwitch
+        {
+            Header = Ui("Use BMCLAPI for game downloads"),
+            IsOn = settings.UseBmclApi,
+            OnContent = Ui("context.settingspage.on"),
+            OffContent = Ui("Off"),
+        };
+        bmcl.Toggled += async (_, _) =>
+        {
+            settings.UseBmclApi = bmcl.IsOn;
+            await PersistSettings();
+        };
+        var bmclCredit = new HyperlinkButton
+        {
+            Content = Ui("Download mirror provided by BMCLAPI · bangbang93"),
+            NavigateUri = new Uri("https://bmclapidoc.bangbang93.com/"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
         var downloadMirror = new TextBox
         {
             Header = Ui("Update acceleration (blank auto-selects fastest)"),
@@ -221,9 +239,13 @@ public sealed class SettingsPage : CMCPage
             {
                 settings.PreferHighPerformanceGpu = highPerformanceGpu.IsOn;
                 await Store.Save();
-                if (!highPerformanceGpu.IsOn) await GameGpuPreference.Restore(Store);
+                if (!highPerformanceGpu.IsOn)
+                    await GameGpuPreference.Restore(Store);
             }
-            catch (Exception ex) { await Error(ex); }
+            catch (Exception ex)
+            {
+                await Error(ex);
+            }
         };
         var gamePriority = new BelowComboBox
         {
@@ -319,7 +341,10 @@ public sealed class SettingsPage : CMCPage
                 localizedGameLanguage,
                 launcherVisibility,
                 highPerformanceGpu,
-                Text("Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.", 12),
+                Text(
+                    "Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.",
+                    12
+                ),
                 gamePriority,
                 gameWindowTitle,
                 customJvmArgs,
@@ -329,6 +354,8 @@ public sealed class SettingsPage : CMCPage
                 memoryHint,
                 downloadThreads,
                 proxy,
+                bmcl,
+                bmclCredit,
                 downloadMirror,
                 ignoreSslErrors,
                 sslWarning,
@@ -394,9 +421,14 @@ public sealed class SettingsPage : CMCPage
         void RefreshJvmHint()
         {
             var tokens = LauncherCore.SplitJvmArgs(customJvmArgs.Text);
-            jvmHint.Text = tokens.Count > 0
-                ? UiFormat("Custom JVM arguments ({0}): {1}", tokens.Count, string.Join(" ", tokens))
-                : "";
+            jvmHint.Text =
+                tokens.Count > 0
+                    ? UiFormat(
+                        "Custom JVM arguments ({0}): {1}",
+                        tokens.Count,
+                        string.Join(" ", tokens)
+                    )
+                    : "";
         }
         customJvmArgs.TextChanged += async (_, _) =>
         {
@@ -451,6 +483,8 @@ public sealed class SettingsPage : CMCPage
             await PersistSettings();
         };
 
-        PageBody.Children.Add(Text(UiFormat("Current version: {0}", LauncherUpdates.CurrentVersion), 12));
+        PageBody.Children.Add(
+            Text(UiFormat("Current version: {0}", LauncherUpdates.CurrentVersion), 12)
+        );
     }
 }

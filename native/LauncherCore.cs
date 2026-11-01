@@ -91,6 +91,8 @@ public sealed partial class LauncherCore : IDisposable
         {
             Timeout = TimeSpan.FromMinutes(3),
         };
+        // Apply only to known public game endpoints; authentication and community APIs bypass it.
+        // The transport wrapper is installed below in DiagnosticHandler for both real and test clients.
         http.DefaultRequestHeaders.UserAgent.ParseAdd(
             "CMCLauncher/" + LauncherUpdates.CurrentVersion
         );
@@ -98,8 +100,62 @@ public sealed partial class LauncherCore : IDisposable
 
     public HttpClient Http => http;
 
-    sealed class DiagnosticHandler(LauncherCore owner, HttpMessageHandler inner)
+    public static Uri BmclUrl(Uri uri)
+    {
+        if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length != 0)
+            return uri;
+        var prefix = uri.Host.ToLowerInvariant() switch
+        {
+            "piston-meta.mojang.com"
+            or "launchermeta.mojang.com"
+            or "piston-data.mojang.com"
+            or "launcher.mojang.com" => "",
+            "resources.download.minecraft.net" => "/assets",
+            "libraries.minecraft.net" or "maven.minecraftforge.net" or "maven.fabricmc.net" =>
+                "/maven",
+            _ => null,
+        };
+        return prefix == null
+            ? uri
+            : new Uri("https://bmclapi2.bangbang93.com" + prefix + uri.PathAndQuery);
+    }
+
+    sealed class BmclHandler(LauncherCore owner, HttpMessageHandler inner)
         : DelegatingHandler(inner)
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken ct
+        )
+        {
+            var original = request.RequestUri!;
+            var mirror = BmclUrl(original);
+            if (
+                !owner.store.Config.Settings.UseBmclApi
+                || request.Method != HttpMethod.Get
+                || request.Headers.Authorization != null
+                || mirror == original
+            )
+                return await base.SendAsync(request, ct);
+            using var mirrored = new HttpRequestMessage(HttpMethod.Get, mirror);
+            foreach (var header in request.Headers)
+                mirrored.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            try
+            {
+                var response = await base.SendAsync(mirrored, ct);
+                if (response.IsSuccessStatusCode)
+                    return response;
+                response.Dispose();
+            }
+            catch (HttpRequestException) { }
+            ct.ThrowIfCancellationRequested();
+            owner.DebugLog?.Invoke("BMCLAPI unavailable; retrying the official source.");
+            return await base.SendAsync(request, ct);
+        }
+    }
+
+    sealed class DiagnosticHandler(LauncherCore owner, HttpMessageHandler inner)
+        : DelegatingHandler(new BmclHandler(owner, inner))
     {
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,

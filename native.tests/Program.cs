@@ -610,6 +610,8 @@ internal static class Program
             "external authentication ownership gate, profiles, sessions, and verified injector downloads"
         );
         var settings = new Store(Path.Combine(root, "settings"));
+        await BmclTests.Run(Path.Combine(root, "bmcl"));
+        Pass("BMCLAPI routing, official fallback, and settings persistence");
         settings.Config.Settings.GameLanguage = "zh_cn";
         await settings.Save();
         Check(
