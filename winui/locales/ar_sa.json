@@ -721,6 +721,18 @@
     "Memory usage": "استخدام الذاكرة",
     "Launcher process": "عملية المشغل",
     "Graphics": "الرسومات",
-    "Not available": "غير متوفر"
+    "Not available": "غير متوفر",
+    "Show dependencies": "عرض التبعيات",
+    "Loading dependencies…": "جارٍ تحميل التبعيات…",
+    "No dependencies declared.": "لم يتم إعلان أي تبعيات.",
+    "Could not load dependencies: ": "تعذّر تحميل التبعيات: ",
+    "required": "مطلوب",
+    "optional": "اختياري",
+    "incompatible": "غير متوافق",
+    "embedded": "مدمج",
+    "tool": "أداة",
+    "include": "تضمين",
+    "unknown": "غير معروف",
+    "Unknown dependency": "تبعية غير معروفة"
   }
 }

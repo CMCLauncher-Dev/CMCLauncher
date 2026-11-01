@@ -721,6 +721,18 @@
     "Memory usage": "Использование памяти",
     "Launcher process": "Процесс запуска",
     "Graphics": "Видеокарта",
-    "Not available": "Недоступно"
+    "Not available": "Недоступно",
+    "Show dependencies": "Показать зависимости",
+    "Loading dependencies…": "Загрузка зависимостей…",
+    "No dependencies declared.": "Зависимости не объявлены.",
+    "Could not load dependencies: ": "Не удалось загрузить зависимости: ",
+    "required": "Обязательно",
+    "optional": "Необязательно",
+    "incompatible": "Несовместимо",
+    "embedded": "Встроенный",
+    "tool": "Инструмент",
+    "include": "Включить",
+    "unknown": "Неизвестно",
+    "Unknown dependency": "Неизвестная зависимость"
   }
 }
