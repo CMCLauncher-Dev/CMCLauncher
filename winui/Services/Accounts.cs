@@ -169,7 +169,7 @@ public sealed partial class MainWindow
         offlineCard.VerticalAlignment = VerticalAlignment.Top;
         Grid.SetColumn(offlineCard, 1);
         otherAccounts.Children.Add(offlineCard);
-        // 本地至少保留一个已验证的 Microsoft 账号，才显示离线身份入口。
+        // 国内机器可直接创建离线身份；其他地区需先验证一个正版 Microsoft 账号。
         if (MicrosoftAuth.CanUseOffline(store.Config.Accounts))
         {
             var input = new TextBox
