@@ -40,6 +40,7 @@ public sealed partial class MainWindow
         var folder = new StackPanel { Spacing = 7 };
         folder.Children.Add(Text(Ui(".minecraft folder"), 13, true));
         folder.Children.Add(Text(store.MinecraftRoot, 12));
+        MinecraftDirectories(folder);
         folder.Children.Add(
             Text(
                 "Import PCL/HMCL folders, .minecraft, versions, or a single version folder. Existing files stay in place.",
@@ -192,7 +193,12 @@ public sealed partial class MainWindow
         var tileIndex = 0;
         if (instances.Count == 0)
             PageBody.Children.Add(
-                Text(Ui("No matching versions. Download a game or select an existing .minecraft folder."), 13)
+                Text(
+                    Ui(
+                        "No matching versions. Download a game or select an existing .minecraft folder."
+                    ),
+                    13
+                )
             );
         foreach (var group in instances.GroupBy(i => LoaderCategory(i.Loader)))
         {
@@ -617,6 +623,17 @@ public sealed partial class MainWindow
             var pending = scan.Instances;
             var failed = scan.Failed;
             var previousRoot = store.Config.Settings.MinecraftRoot;
+            var addedDirectory = !store.Config.MinecraftDirectories.Any(d =>
+                string.Equals(
+                    Path.GetFullPath(d.Path).TrimEnd('\\', '/'),
+                    Path.GetFullPath(root).TrimEnd('\\', '/'),
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+                ? new MinecraftDirectory { Path = Path.GetFullPath(root) }
+                : null;
+            if (addedDirectory != null)
+                store.Config.MinecraftDirectories.Add(addedDirectory);
             store.Config.Settings.MinecraftRoot = root;
             store.Config.Instances.AddRange(pending);
             try
@@ -626,13 +643,22 @@ public sealed partial class MainWindow
             catch
             {
                 store.Config.Settings.MinecraftRoot = previousRoot;
+                if (addedDirectory != null)
+                    store.Config.MinecraftDirectories.Remove(addedDirectory);
                 foreach (var instance in pending)
                     store.Config.Instances.Remove(instance);
                 throw;
             }
             Report(
                 UiFormat("Minecraft folder set, found {0} new versions", pending.Count)
-                    + (failed > 0 ? UiFormat("，{0} versions failed to read, see the log for details", failed) : "")
+                    + (
+                        failed > 0
+                            ? UiFormat(
+                                "，{0} versions failed to read, see the log for details",
+                                failed
+                            )
+                            : ""
+                    )
             );
         });
     }

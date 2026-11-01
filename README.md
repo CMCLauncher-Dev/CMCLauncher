@@ -262,3 +262,9 @@ Run tests relevant to your changes before submitting a pull request. Include scr
 CMCLauncher is licensed under the [GNU General Public License v3.0](LICENSE). Third-party dependencies retain their respective licenses.
 
 Minecraft, mods, and modpacks belong to their respective owners. CMCLauncher is not affiliated with Mojang Studios, Microsoft, or NetEase.
+
+### Multiple Minecraft directories
+
+Open the version library and expand **Manage Minecraft directories**. Create a new directory, register an existing installation, or select the default location for new installations. Existing instances keep their own game and dependency paths.
+
+Only directories created and recorded by CMCLauncher with a matching ownership marker can be migrated. Imported directories and older directories without ownership records remain usable but cannot be migrated. Close games and other launchers before migrating. Choose a destination that does not exist; the launcher copies and verifies the files, saves updated instance paths, and then removes the old directory. Cancellation or a failed configuration save preserves the source. If cleanup fails after a successful migration, the new location remains active and the launcher reports the remaining old files.

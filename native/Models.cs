@@ -195,6 +195,7 @@ public sealed class Configuration
     public Settings Settings { get; set; } = new();
     public List<Instance> Instances { get; set; } = [];
     public List<Account> Accounts { get; set; } = [];
+    public List<MinecraftDirectory> MinecraftDirectories { get; set; } = [];
     public string? SelectedAccount { get; set; }
     public string? SelectedInstanceId { get; set; }
 }
@@ -229,12 +230,15 @@ public sealed class Store
         Root =
             root
             ?? DefaultRoot(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+        var createdLibrary = !System.IO.Directory.Exists(Library);
         System.IO.Directory.CreateDirectory(Library);
         var file = Path.Combine(Root, "settings.json");
         Config = File.Exists(file)
             ? JsonSerializer.Deserialize<Configuration>(File.ReadAllText(file), JsonOptions)
                 ?? throw new Exception("配置为空")
             : new();
+        if (createdLibrary)
+            new MinecraftDirectoryManager(this).MarkCreated(Library);
     }
 
     internal static string DefaultRoot(string appData)

@@ -612,6 +612,10 @@ internal static class Program
         var settings = new Store(Path.Combine(root, "settings"));
         await BmclTests.Run(Path.Combine(root, "bmcl"));
         Pass("BMCLAPI routing, official fallback, and settings persistence");
+        await MinecraftDirectoryTests.Run(Path.Combine(root, "minecraft-directories"));
+        Pass(
+            "multiple Minecraft directories, ownership checks, migration, cancellation and rollback"
+        );
         settings.Config.Settings.GameLanguage = "zh_cn";
         await settings.Save();
         Check(

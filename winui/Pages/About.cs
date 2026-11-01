@@ -56,6 +56,17 @@ public sealed partial class MainWindow
             }
         );
         PageBody.Children.Add(Card(contributors));
+        var services = new StackPanel { Spacing = 8 };
+        services.Children.Add(Text("Download services", 18, true));
+        services.Children.Add(
+            new HyperlinkButton
+            {
+                Content = Ui("Download mirror provided by BMCLAPI · bangbang93"),
+                NavigateUri = new Uri("https://bmclapidoc.bangbang93.com/"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+            }
+        );
+        PageBody.Children.Add(Card(services));
     }
 
     string Labeled(string label, string value) => Ui(label) + "  " + value;

@@ -31,9 +31,9 @@
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <EnableMsixTooling Condition="'$(PublishSingleFile)' == 'true'">true</EnableMsixTooling>
     <!-- 构建时自动填写构建时间/版本/提交/发布标识，About 页读取展示。构建提交号由 _GenerateLauncherBuildInfo 在编译时读取 Git 填充。 -->
-    <LauncherBuildTime>$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'"))</LauncherBuildTime>
-    <LauncherGitCommit>
-    </LauncherGitCommit>
+    <LauncherBuildTime
+    >$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'"))</LauncherBuildTime>
+    <LauncherGitCommit />
     <!-- 主版本号 + 提交号构成小版本识别号；发布标识在构建阶段自动填写。 -->
     <LauncherMajorVersion>1.0</LauncherMajorVersion>
     <LauncherIsRelease Condition="'$(LauncherIsRelease)' == ''">true</LauncherIsRelease>
@@ -45,13 +45,34 @@
     >$(DefineConstants);SINGLE_FILE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../native/LauncherInstanceFormat.cs" Link="Core/LauncherInstanceFormat.cs" />
-    <Compile Include="../native/LocalInstanceDiscovery.cs" Link="Core/LocalInstanceDiscovery.cs" />
-    <Compile Include="../native/ForeignLauncherMigration.cs" Link="Core/ForeignLauncherMigration.cs" />
-    <Compile Include="../native/GameGpuPreference.cs" Link="Core/GameGpuPreference.cs" />
-    <Compile Include="../native/LauncherUpdates.cs" Link="Core/LauncherUpdates.cs" />
-    <Compile Include="../native/LauncherUpdateInstaller.cs" Link="Core/LauncherUpdateInstaller.cs" />
-    <EmbeddedResource Include="../native/LauncherUpdateWorker.ps1" LogicalName="CMCLauncher.UpdateWorker" />
+    <Compile
+      Include="../native/LauncherInstanceFormat.cs"
+      Link="Core/LauncherInstanceFormat.cs"
+    />
+    <Compile
+      Include="../native/LocalInstanceDiscovery.cs"
+      Link="Core/LocalInstanceDiscovery.cs"
+    />
+    <Compile
+      Include="../native/ForeignLauncherMigration.cs"
+      Link="Core/ForeignLauncherMigration.cs"
+    />
+    <Compile
+      Include="../native/GameGpuPreference.cs"
+      Link="Core/GameGpuPreference.cs"
+    />
+    <Compile
+      Include="../native/LauncherUpdates.cs"
+      Link="Core/LauncherUpdates.cs"
+    />
+    <Compile
+      Include="../native/LauncherUpdateInstaller.cs"
+      Link="Core/LauncherUpdateInstaller.cs"
+    />
+    <EmbeddedResource
+      Include="../native/LauncherUpdateWorker.ps1"
+      LogicalName="CMCLauncher.UpdateWorker"
+    />
   </ItemGroup>
   <!-- Partial trimming keeps the application and third-party libraries intact. -->
   <ItemGroup Condition="'$(PublishSingleFile)' != 'true'">
@@ -144,6 +165,10 @@
     <Compile
       Include="../native/Models.cs"
       Link="Core/Models.cs"
+    />
+    <Compile
+      Include="../native/MinecraftDirectoryManager.cs"
+      Link="Core/MinecraftDirectoryManager.cs"
     />
     <Compile
       Include="../native/LogTail.cs"
@@ -248,9 +273,7 @@
     </PropertyGroup>
     <MakeDir Directories="$(IntermediateOutputPath)" />
     <!-- 编译时读取当前 Git 提交号，构建信息页展示真实提交。git 不可用时回退到默认值。 -->
-    <PropertyGroup
-      Condition="'$(LauncherGitCommitOverride)' != ''"
-    >
+    <PropertyGroup Condition="'$(LauncherGitCommitOverride)' != ''">
       <LauncherGitCommit>$(LauncherGitCommitOverride)</LauncherGitCommit>
     </PropertyGroup>
     <Exec
@@ -266,9 +289,7 @@
       />
     </Exec>
     <PropertyGroup Condition="'$(LauncherGitCommit)' == ''">
-      <LauncherGitCommit
-        Condition="'$(GitShortCommit)' != ''"
-      >$(GitShortCommit)</LauncherGitCommit>
+      <LauncherGitCommit Condition="'$(GitShortCommit)' != ''">$(GitShortCommit)</LauncherGitCommit>
       <LauncherGitCommit Condition="'$(LauncherGitCommit)' == ''">unknown</LauncherGitCommit>
     </PropertyGroup>
     <!-- 发行版本与程序集及更新比较一致；Git 提交号单独展示。 -->
@@ -283,10 +304,18 @@
       <BuildInfoLine Include="     " />
       <BuildInfoLine Include="internal static partial class LauncherBuildInfo" />
       <BuildInfoLine Include="{" />
-      <BuildInfoLine Include="    public const string Version = &quot;$(LauncherFullVersion)&quot;%3B" />
-      <BuildInfoLine Include="    public const string BuildTime = &quot;$(LauncherBuildTime)&quot;%3B" />
-      <BuildInfoLine Include="    public const string GitCommit = &quot;$(LauncherGitCommit)&quot;%3B" />
-      <BuildInfoLine Include="    public const bool IsRelease = &quot;$(LauncherIsRelease)&quot; == &quot;true&quot;%3B" />
+      <BuildInfoLine
+        Include="    public const string Version = &quot;$(LauncherFullVersion)&quot;%3B"
+      />
+      <BuildInfoLine
+        Include="    public const string BuildTime = &quot;$(LauncherBuildTime)&quot;%3B"
+      />
+      <BuildInfoLine
+        Include="    public const string GitCommit = &quot;$(LauncherGitCommit)&quot;%3B"
+      />
+      <BuildInfoLine
+        Include="    public const bool IsRelease = &quot;$(LauncherIsRelease)&quot; == &quot;true&quot;%3B"
+      />
       <BuildInfoLine Include="}" />
       <BuildInfoLine Include="     " />
     </ItemGroup>

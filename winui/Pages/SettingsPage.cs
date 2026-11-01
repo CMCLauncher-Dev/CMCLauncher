@@ -127,12 +127,6 @@ public sealed class SettingsPage : CMCPage
             settings.UseBmclApi = bmcl.IsOn;
             await PersistSettings();
         };
-        var bmclCredit = new HyperlinkButton
-        {
-            Content = Ui("Download mirror provided by BMCLAPI · bangbang93"),
-            NavigateUri = new Uri("https://bmclapidoc.bangbang93.com/"),
-            HorizontalAlignment = HorizontalAlignment.Left,
-        };
         var downloadMirror = new TextBox
         {
             Header = Ui("Update acceleration (blank auto-selects fastest)"),
@@ -332,36 +326,48 @@ public sealed class SettingsPage : CMCPage
             }
         };
 
-        foreach (
-            var control in new UIElement[]
+        var proxyHint = Text("", 12);
+        void Section(string title, params UIElement[] controls)
+        {
+            var content = new StackPanel { Spacing = 16 };
+            content.Children.Add(Text(Ui(title), 18, true));
+            foreach (var control in controls)
+                content.Children.Add(control);
+            PageBody.Children.Add(Card(content));
+        }
+
+        Section("Language and interface", launcherLanguage, localizedWindow, projectIntro);
+        Section(
+            "Game launch",
+            localizedGameLanguage,
+            launcherVisibility,
+            gameWindowTitle,
+            highPerformanceGpu,
+            Text(
+                "Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.",
+                12
+            ),
+            gamePriority
+        );
+        Section("Memory and Java", automaticMemory, memory, memoryHint, customJvmArgs, jvmHint);
+        var advancedNetwork = new StackPanel { Spacing = 12 };
+        advancedNetwork.Children.Add(ignoreSslErrors);
+        advancedNetwork.Children.Add(sslWarning);
+        Section(
+            "Downloads and network",
+            downloadThreads,
+            bmcl,
+            proxy,
+            proxyHint,
+            downloadMirror,
+            new Expander
             {
-                launcherLanguage,
-                localizedWindow,
-                projectIntro,
-                localizedGameLanguage,
-                launcherVisibility,
-                highPerformanceGpu,
-                Text(
-                    "Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.",
-                    12
-                ),
-                gamePriority,
-                gameWindowTitle,
-                customJvmArgs,
-                jvmHint,
-                automaticMemory,
-                memory,
-                memoryHint,
-                downloadThreads,
-                proxy,
-                bmcl,
-                bmclCredit,
-                downloadMirror,
-                ignoreSslErrors,
-                sslWarning,
+                Header = Ui("Advanced network options"),
+                Content = advancedNetwork,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
             }
-        )
-            PageBody.Children.Add(control);
+        );
 
         async Task PersistSettings()
         {
@@ -437,8 +443,6 @@ public sealed class SettingsPage : CMCPage
             RefreshJvmHint();
         };
 
-        var proxyHint = Text("", 12);
-        PageBody.Children.Add(proxyHint);
         proxy.TextChanged += async (_, _) =>
         {
             var value = proxy.Text.Trim();
