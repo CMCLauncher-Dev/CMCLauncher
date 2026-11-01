@@ -86,16 +86,21 @@ public sealed partial class MainWindow
             await File.WriteAllBytesAsync(cache, result, timeout.Token);
             return result;
         }
-        catch
+        catch (Exception ex)
         {
+            RuntimeLog.Write("WARN", "Skin fetch failed for " + uuid + ": " + ex.Message);
             try
             {
                 return File.Exists(cache) && new FileInfo(cache).Length <= 1024 * 1024
                     ? await File.ReadAllBytesAsync(cache)
                     : null;
             }
-            catch
+            catch (Exception cacheEx)
             {
+                RuntimeLog.Write(
+                    "WARN",
+                    "Skin cache read failed for " + uuid + ": " + cacheEx.Message
+                );
                 return null;
             }
         }
