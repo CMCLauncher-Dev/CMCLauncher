@@ -2,6 +2,8 @@
   "code": "ja_jp",
   "displayName": "日本語",
   "strings": {
+    "Prefer high-performance GPU for games": "ゲームで高性能 GPU を優先",
+    "Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.": "次回起動時に選択された Java の Windows GPU 設定を変更します。実際の GPU 選択は Windows とドライバーに依存します。",
     "Continuous sampling": "継続サンプリング",
     "Continue sampling resource usage after leaving this page.": "このページを離れた後もリソース使用率のサンプリングを続けます。",
     "Recent 60 samples · 0–100%": "直近 60 回のサンプル · 0–100%",

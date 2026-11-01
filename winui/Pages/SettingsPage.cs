@@ -208,6 +208,23 @@ public sealed class SettingsPage : CMCPage
             await PersistSettings();
         };
 
+        var highPerformanceGpu = new ToggleSwitch
+        {
+            Header = Ui("Prefer high-performance GPU for games"),
+            IsOn = settings.PreferHighPerformanceGpu,
+            OnContent = Ui("context.settingspage.on"),
+            OffContent = Ui("Off"),
+        };
+        highPerformanceGpu.Toggled += async (_, _) =>
+        {
+            try
+            {
+                settings.PreferHighPerformanceGpu = highPerformanceGpu.IsOn;
+                await Store.Save();
+                if (!highPerformanceGpu.IsOn) await GameGpuPreference.Restore(Store);
+            }
+            catch (Exception ex) { await Error(ex); }
+        };
         var gamePriority = new BelowComboBox
         {
             Header = Ui("Game process priority"),
@@ -301,6 +318,8 @@ public sealed class SettingsPage : CMCPage
                 projectIntro,
                 localizedGameLanguage,
                 launcherVisibility,
+                highPerformanceGpu,
+                Text("Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.", 12),
                 gamePriority,
                 gameWindowTitle,
                 customJvmArgs,

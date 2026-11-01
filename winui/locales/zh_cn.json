@@ -2,6 +2,8 @@
   "code": "zh_cn",
   "displayName": "简体中文",
   "strings": {
+    "Prefer high-performance GPU for games": "默认使用高性能显卡启动游戏",
+    "Sets Windows graphics preference for the Java used at the next launch. Actual GPU selection depends on Windows and the driver.": "下次启动时为所选 Java 设置 Windows 高性能图形偏好，实际显卡选择取决于系统和驱动。",
     "Continuous sampling": "持续采样",
     "Continue sampling resource usage after leaving this page.": "离开此页面后持续采样占用",
     "Recent 60 samples · 0–100%": "最近 60 次采样 · 0–100%",

@@ -1,4 +1,4 @@
-﻿﻿﻿using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
@@ -91,7 +91,9 @@ public sealed partial class LauncherCore : IDisposable
         {
             Timeout = TimeSpan.FromMinutes(3),
         };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("CMCLauncher/" + LauncherUpdates.CurrentVersion);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "CMCLauncher/" + LauncherUpdates.CurrentVersion
+        );
     }
 
     public HttpClient Http => http;
@@ -1302,6 +1304,38 @@ public sealed partial class LauncherCore : IDisposable
             clientJar: jar,
             authenticationArguments: authenticationArguments
         );
+        // Like HMCL, prefer the GUI Java executable for the game, while keeping
+        // java.exe for runtime inspection and loader installers.
+        if (
+            OperatingSystem.IsWindows()
+            && Path.GetFileName(java).Equals("java.exe", StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            var javaw = Path.Combine(Path.GetDirectoryName(java)!, "javaw.exe");
+            if (File.Exists(javaw))
+                java = javaw;
+        }
+        try
+        {
+            if (store.Config.Settings.PreferHighPerformanceGpu)
+            {
+                await GameGpuPreference.Apply(store, java);
+                Log?.Invoke(
+                    "Windows GPU preference verified: high performance · " + Path.GetFullPath(java)
+                );
+            }
+            else if (store.Config.Settings.ManagedGpuPreferences.Count > 0)
+                await GameGpuPreference.Restore(store);
+        }
+        catch (Exception ex)
+            when (ex
+                    is IOException
+                        or UnauthorizedAccessException
+                        or System.Security.SecurityException
+            )
+        {
+            Log?.Invoke("Could not apply GPU preference: " + ex.Message);
+        }
         var start = new ProcessStartInfo(java)
         {
             WorkingDirectory = game,

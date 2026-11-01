@@ -54,6 +54,8 @@ public sealed class Settings
     public string GameLanguage { get; set; } = "auto";
     public string CustomJvmArgs { get; set; } = "";
     public string PlayerPriority { get; set; } = "normal";
+    public bool PreferHighPerformanceGpu { get; set; } = true;
+    public Dictionary<string, string?> ManagedGpuPreferences { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public string GameWindowTitle { get; set; } = "";
     public string MinecraftRoot { get; set; } = "";
     public string DownloadMirror { get; set; } = "";
