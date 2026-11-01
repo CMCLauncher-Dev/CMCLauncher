@@ -705,7 +705,51 @@ public sealed partial class LauncherCore : IDisposable
             return imported;
         }
         if (instance.Loader is "forge" or "neoforge" && instance.VersionId is { Length: > 0 })
-            return await Resolve(instance.VersionId, storage, ct);
+        {
+            var original = Store.SafePath(
+                storage,
+                $"versions/{instance.VersionId}/{instance.VersionId}.json"
+            );
+            if (File.Exists(original))
+                return await Resolve(instance.VersionId, storage, ct);
+            // The installer profile may have been removed after exporting the complete isolated profile.
+            // Use only this instance's directory; another instance can use a different loader build.
+            var game = store.GameDirectory(instance);
+            if (
+                string.Equals(
+                    Path.GetDirectoryName(game),
+                    Path.Combine(storage, "versions"),
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                var id = Path.GetFileName(game);
+                var local = Store.SafePath(game, id + ".json");
+                if (File.Exists(local))
+                {
+                    var isolatedProfile = await Resolve(id, storage, ct);
+                    var detected = IdentifyLoader(isolatedProfile);
+                    if (
+                        detected is { } loader
+                        && loader.Loader == instance.Loader
+                        && (
+                            string.IsNullOrEmpty(instance.LoaderVersion)
+                            || loader.Version == instance.LoaderVersion
+                        )
+                    )
+                    {
+                        instance.VersionId = id;
+                        await store.Save();
+                        return isolatedProfile;
+                    }
+                }
+            }
+            throw new FileNotFoundException(
+                "The installed loader profile is missing. Repair this version: "
+                    + instance.VersionId,
+                original
+            );
+        }
         if (instance.Loader is "forge" or "neoforge")
             throw new Exception("加载器尚未安装，请先在下载游戏中完成安装。");
         if (instance.Loader is not ("vanilla" or "fabric"))
@@ -1159,6 +1203,7 @@ public sealed partial class LauncherCore : IDisposable
         var id = Path.GetFileName(game);
         var profile = version.DeepClone();
         profile["id"] = id;
+        profile["clientVersion"] = instance.GameVersion;
         profile["jar"] = version.S("jar", instance.GameVersion);
         // This is a complete merged profile; retaining its parent merges arguments a second time on import.
         profile.AsObject().Remove("inheritsFrom");
