@@ -854,6 +854,18 @@
     "Memory usage": "メモリ使用率",
     "Launcher process": "ランチャープロセス",
     "Graphics": "グラフィックス",
-    "Not available": "利用不可"
+    "Not available": "利用不可",
+    "Show dependencies": "依存関係を表示",
+    "Loading dependencies…": "依存関係を読み込み中…",
+    "No dependencies declared.": "依存関係は宣言されていません。",
+    "Could not load dependencies: ": "依存関係を読み込めませんでした：",
+    "required": "必須",
+    "optional": "任意",
+    "incompatible": "非対応",
+    "embedded": "内蔵",
+    "tool": "ツール",
+    "include": "同梱",
+    "unknown": "不明",
+    "Unknown dependency": "不明な依存関係"
   }
 }

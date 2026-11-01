@@ -721,6 +721,18 @@
     "Memory usage": "Utilisation de la memoire",
     "Launcher process": "Processus du lanceur",
     "Graphics": "Graphiques",
-    "Not available": "Indisponible"
+    "Not available": "Indisponible",
+    "Show dependencies": "Afficher les dépendances",
+    "Loading dependencies…": "Chargement des dépendances…",
+    "No dependencies declared.": "Aucune dépendance déclarée.",
+    "Could not load dependencies: ": "Impossible de charger les dépendances : ",
+    "required": "Requis",
+    "optional": "Facultatif",
+    "incompatible": "Incompatible",
+    "embedded": "Intégré",
+    "tool": "Outil",
+    "include": "Inclure",
+    "unknown": "Inconnu",
+    "Unknown dependency": "Dépendance inconnue"
   }
 }
