@@ -107,11 +107,7 @@ public sealed partial class MainWindow
             directoryTools.Content = tools;
         };
         PageBody.Children.Add(directoryTools);
-        var query = new TextBox
-        {
-            PlaceholderText = Ui("Search version name, description, or Minecraft version"),
-            Text = instanceQuery,
-        };
+        var query = new TextBox { Text = instanceQuery };
         query.KeyDown += (_, e) =>
         {
             if (e.Key == Windows.System.VirtualKey.Enter)
@@ -184,7 +180,26 @@ public sealed partial class MainWindow
         search.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         search.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         search.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        search.Children.Add(query);
+        var queryHost = new Grid();
+        queryHost.Children.Add(query);
+        // TextBox's native placeholder clips instead of trimming in a narrow column.
+        var queryHint = Text("Search version name, description, or Minecraft version", 14);
+        queryHint.TextWrapping = TextWrapping.NoWrap;
+        queryHint.TextTrimming = TextTrimming.CharacterEllipsis;
+        queryHint.VerticalAlignment = VerticalAlignment.Center;
+        queryHint.Margin = new Thickness(12, 0, 12, 0);
+        queryHint.IsHitTestVisible = false;
+        queryHint.Opacity = .6;
+        queryHint.Visibility = query.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        query.TextChanged += (_, _) =>
+            queryHint.Visibility =
+                query.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
+            query,
+            Ui("Search version name, description, or Minecraft version")
+        );
+        queryHost.Children.Add(queryHint);
+        search.Children.Add(queryHost);
         var find = Action(
             "搜索",
             (_, _) =>
@@ -264,8 +279,17 @@ public sealed partial class MainWindow
                     13
                 )
             );
+        // Favorites have a dedicated, stable section before every sorted regular section.
+        var sectionOrder = instances
+            .Where(i => i.Favorite)
+            .OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+            .Concat(instances.Where(i => !i.Favorite));
         foreach (
-            var group in instances.GroupBy(i => instanceSort == 0 ? LoaderCategory(i.Loader) : "")
+            var group in sectionOrder.GroupBy(i =>
+                i.Favorite ? Ui("Favorites")
+                : instanceSort == 0 ? LoaderCategory(i.Loader)
+                : ""
+            )
         )
         {
             if (tileMode)
@@ -273,6 +297,32 @@ public sealed partial class MainWindow
                 tileGrid = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
                 tileGrid.ColumnDefinitions.Add(new ColumnDefinition());
                 tileGrid.ColumnDefinitions.Add(new ColumnDefinition());
+                var responsiveTiles = tileGrid;
+                responsiveTiles.SizeChanged += (_, e) =>
+                {
+                    var columns = Math.Max(1, (int)((e.NewSize.Width + 8) / 220));
+                    if (columns == responsiveTiles.ColumnDefinitions.Count)
+                        return;
+                    responsiveTiles.ColumnDefinitions.Clear();
+                    for (var column = 0; column < columns; column++)
+                        responsiveTiles.ColumnDefinitions.Add(new ColumnDefinition());
+                    responsiveTiles.RowDefinitions.Clear();
+                    for (var index = 0; index < responsiveTiles.Children.Count; index++)
+                    {
+                        if (index % columns == 0)
+                            responsiveTiles.RowDefinitions.Add(
+                                new RowDefinition { Height = GridLength.Auto }
+                            );
+                        Grid.SetRow(
+                            (FrameworkElement)responsiveTiles.Children[index],
+                            index / columns
+                        );
+                        Grid.SetColumn(
+                            (FrameworkElement)responsiveTiles.Children[index],
+                            index % columns
+                        );
+                    }
+                };
                 tileIndex = 0;
             }
             PageBody.Children.Add(
@@ -412,8 +462,55 @@ public sealed partial class MainWindow
                 }
                 Grid.SetColumn(actions, 2);
                 row.Children.Add(actions);
-                AdaptCard(row, identity, actions);
+                if (tileMode)
+                {
+                    var icon = (FrameworkElement)row.Children[0];
+                    row.Children.Clear();
+                    row.ColumnDefinitions.Clear();
+                    row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    row.RowDefinitions.Add(
+                        new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }
+                    );
+                    row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    row.RowSpacing = 10;
+                    row.MinHeight = 0;
+                    actions.HorizontalAlignment = HorizontalAlignment.Right;
+                    Grid.SetColumn(actions, 0);
+                    row.Children.Add(actions);
+                    icon.Width = 64;
+                    icon.Height = 64;
+                    icon.HorizontalAlignment = HorizontalAlignment.Center;
+                    icon.VerticalAlignment = VerticalAlignment.Center;
+                    Grid.SetRow(icon, 1);
+                    row.Children.Add(icon);
+                    Grid.SetColumn(identity, 0);
+                    Grid.SetRow(identity, 2);
+                    identity.HorizontalAlignment = HorizontalAlignment.Stretch;
+                    foreach (var text in identity.Children.OfType<TextBlock>())
+                    {
+                        text.TextAlignment = TextAlignment.Center;
+                        text.TextWrapping = TextWrapping.NoWrap;
+                        text.TextTrimming = TextTrimming.CharacterEllipsis;
+                    }
+                    row.Children.Add(identity);
+                    more.MinWidth = 30;
+                    more.Padding = new Thickness(4, 0, 4, 0);
+                }
+                else
+                    AdaptCard(row, identity, actions);
                 var card = CompactCard(row);
+                if (tileMode)
+                {
+                    // Width comes from the responsive grid; height follows it to keep a true square.
+                    card.SizeChanged += (_, e) =>
+                    {
+                        if (
+                            e.NewSize.Width > 0 && Math.Abs(card.Height - e.NewSize.Width) > .5
+                            || double.IsNaN(card.Height)
+                        )
+                            card.Height = e.NewSize.Width;
+                    };
+                }
                 card.Tag = "instance-card";
                 if (instance == selected)
                     card.BorderBrush = Brush(
