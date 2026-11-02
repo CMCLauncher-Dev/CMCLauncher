@@ -2,6 +2,8 @@
   "code": "zh_cn",
   "displayName": "简体中文",
   "strings": {
+    "Default (by loader)": "默认排序（按加载器）",
+    "Running": "运行中",
     "Prefer mirror sources": "尽量使用镜像源",
     "Game download source": "游戏下载源",
     "Prefer official sources": "尽量使用官方源",
@@ -865,6 +867,12 @@
     "tool": "工具",
     "include": "包含",
     "unknown": "未知",
-    "Unknown dependency": "未知前置"
+    "Unknown dependency": "未知前置",
+    "All directories": "全部目录",
+    "Recently played": "最近启动",
+    "Name": "名称",
+    "Current": "当前",
+    "Directory unavailable": "目录不可用",
+    "{0} versions": "{0} 个版本"
   }
 }

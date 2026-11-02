@@ -75,12 +75,36 @@
       </Style>
       <Style TargetType="TextBox">
         <Setter
+          Property="Padding"
+          Value="11,5,11,6"
+        />
+        <Setter
+          Property="MinHeight"
+          Value="32"
+        />
+        <Setter
           Property="ScrollViewer.VerticalScrollBarVisibility"
           Value="Hidden"
         />
         <Setter
           Property="ScrollViewer.HorizontalScrollBarVisibility"
           Value="Hidden"
+        />
+      </Style>
+      <Style TargetType="PasswordBox">
+        <Setter
+          Property="Padding"
+          Value="11,5,11,6"
+        />
+        <Setter
+          Property="MinHeight"
+          Value="32"
+        />
+      </Style>
+      <Style TargetType="NumberBox">
+        <Setter
+          Property="MinHeight"
+          Value="32"
         />
       </Style>
       <Style TargetType="NavigationViewItem">

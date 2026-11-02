@@ -246,7 +246,6 @@ public sealed class Store
         Root =
             root
             ?? DefaultRoot(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
-        var createdLibrary = !System.IO.Directory.Exists(Library);
         System.IO.Directory.CreateDirectory(Library);
         var file = Path.Combine(Root, "settings.json");
         var firstRun = !File.Exists(file);
@@ -259,18 +258,75 @@ public sealed class Store
             // 首次启动：根据系统 UI 语言选择对应的界面语言。
             Config.Settings.LauncherLanguage = InterfaceLanguageForSystem();
         }
-        if (createdLibrary)
-            new MinecraftDirectoryManager(this).MarkCreated(Library);
+        if (new MinecraftDirectoryManager(this).RegisterDefaultLibrary())
+            File.WriteAllText(file, JsonSerializer.Serialize(Config, JsonOptions));
     }
 
     internal static string DefaultRoot(string appData)
     {
         var current = Path.Combine(appData, "CMCLauncher.Native");
-        // 旧安装的配置保存了绝对路径，继续使用原目录，避免改名后丢失实例和账号。
         var legacy = Path.Combine(appData, "CraftLauncher.Native");
-        return !System.IO.Directory.Exists(current) && System.IO.Directory.Exists(legacy)
-            ? legacy
-            : current;
+        if (System.IO.Directory.Exists(current) || !System.IO.Directory.Exists(legacy))
+            return current;
+        if ((File.GetAttributes(legacy) & FileAttributes.ReparsePoint) != 0)
+            throw new IOException("The legacy launcher data directory must not be a link.");
+        var settings = Path.Combine(legacy, "settings.json");
+        var pending = Path.Combine(
+            legacy,
+            "settings-rename-" + Guid.NewGuid().ToString("N") + ".tmp"
+        );
+        // Rewrite only paths rooted in the old data directory; external games stay in place.
+        void Rewrite(JsonNode? node)
+        {
+            if (node is JsonObject obj)
+                foreach (var key in obj.Select(p => p.Key).ToArray())
+                {
+                    if (
+                        obj[key] is JsonValue value
+                        && value.TryGetValue<string>(out var text)
+                        && (
+                            text.Equals(legacy, StringComparison.OrdinalIgnoreCase)
+                            || text.StartsWith(
+                                legacy + Path.DirectorySeparatorChar,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        )
+                    )
+                        obj[key] = current + text[legacy.Length..];
+                    else
+                        Rewrite(obj[key]);
+                }
+            else if (node is JsonArray array)
+                foreach (var child in array)
+                    Rewrite(child);
+        }
+        if (File.Exists(settings))
+        {
+            var config = JsonNode.Parse(File.ReadAllText(settings));
+            Rewrite(config);
+            File.WriteAllText(pending, config!.ToJsonString(JsonOptions));
+        }
+        try
+        {
+            System.IO.Directory.Move(legacy, current);
+            try
+            {
+                var movedPending = Path.Combine(current, Path.GetFileName(pending));
+                if (File.Exists(movedPending))
+                    File.Move(movedPending, Path.Combine(current, "settings.json"), true);
+            }
+            catch
+            {
+                System.IO.Directory.Move(current, legacy);
+                throw;
+            }
+        }
+        finally
+        {
+            if (File.Exists(pending))
+                File.Delete(pending);
+        }
+        return current;
     }
 
     // 首次启动时根据系统 UI 语言推断启动器界面语言；不支持的语言回退到英文。

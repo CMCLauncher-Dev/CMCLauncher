@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -20,62 +20,93 @@ public sealed partial class MainWindow
     Func<ContentDialog, Task<ContentDialogResult>> showVersionDeletionDialog = async dialog =>
         await dialog.ShowAsync();
 
-    // 列表和平铺共用筛选结果，收藏优先，再按加载器分组展示。
+    string instanceDirectoryFilter = "";
+    int instanceSort;
+
+    // 两种布局使用相同筛选和排序，切换视图不会改变版本顺序。
     void Instances()
     {
         Header("切换版本", "");
-        PageBody.Children.Add(
-            Buttons(
-                Action(
-                    "下载游戏",
-                    (_, _) =>
-                    {
-                        page = "downloads";
-                        Render();
-                    }
-                ),
-                Action(Ui("Import modpack"), async (_, _) => await ImportPack())
-            )
+        var directoryPaths = store
+            .Config.Instances.Select(store.StorageDirectory)
+            .Append(store.MinecraftRoot)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order()
+            .ToList();
+        if (!directoryPaths.Contains(instanceDirectoryFilter, StringComparer.OrdinalIgnoreCase))
+            instanceDirectoryFilter = "";
+        var directories = new BelowComboBox
+        {
+            ItemsSource = new[] { Ui("All directories") }.Concat(directoryPaths).ToArray(),
+            SelectedIndex =
+                instanceDirectoryFilter.Length == 0
+                    ? 0
+                    : directoryPaths.FindIndex(p =>
+                        string.Equals(
+                            p,
+                            instanceDirectoryFilter,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    ) + 1,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        directories.SelectionChanged += (_, _) =>
+        {
+            if (directories.SelectedIndex < 0)
+                return;
+            instanceDirectoryFilter =
+                directories.SelectedIndex == 0 ? "" : directoryPaths[directories.SelectedIndex - 1];
+            Render();
+        };
+        var directoryRow = new Grid { ColumnSpacing = 8 };
+        directoryRow.ColumnDefinitions.Add(
+            new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
         );
-        var folder = new StackPanel { Spacing = 7 };
-        folder.Children.Add(Text(Ui(".minecraft folder"), 13, true));
-        folder.Children.Add(Text(store.MinecraftRoot, 12));
-        MinecraftDirectories(folder);
-        folder.Children.Add(
-            Text(
-                "Import PCL/HMCL folders, .minecraft, versions, or a single version folder. Existing files stay in place.",
-                12
-            )
+        directoryRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        directoryRow.Children.Add(directories);
+        var directoryActions = Buttons(
+            Action(
+                "下载游戏",
+                (_, _) =>
+                {
+                    page = "downloads";
+                    Render();
+                }
+            ),
+            Action("Import modpack", async (_, _) => await ImportPack())
         );
-        folder.Children.Add(
-            Buttons(
-                Action(Ui("Set folder"), async (_, _) => await ImportLocal()),
-                Action(
-                    Ui("Scan versions"),
-                    async (_, _) =>
-                    {
-                        await SetMinecraftFolder(store.MinecraftRoot);
-                        Render();
-                    }
-                ),
-                Action(Ui("Open folder"), (_, _) => OpenFolder(store.MinecraftRoot))
-            )
-        );
-        folder.Children.Add(
-            Text(Ui("从 Modrinth 应用或 MultiMC/Prism 启动器将实例迁移到启动器中。"), 12)
-        );
-        folder.Children.Add(
-            Buttons(
-                Action(
-                    Ui("迁移其它启动器"),
-                    async (_, _) =>
-                    {
-                        await MigrateForeignLauncher();
-                    }
+        Grid.SetColumn(directoryActions, 1);
+        directoryRow.Children.Add(directoryActions);
+        PageBody.Children.Add(directoryRow);
+        var directoryTools = new Expander
+        {
+            Header = Ui("Manage Minecraft directories"),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+        };
+        directoryTools.Expanding += (_, _) =>
+        {
+            if (directoryTools.Content != null)
+                return;
+            var tools = MinecraftDirectoriesBody();
+            tools.Children.Add(
+                Buttons(
+                    Action(
+                        "Scan versions",
+                        async (_, _) =>
+                        {
+                            await SetMinecraftFolder(store.MinecraftRoot);
+                            Render();
+                        }
+                    ),
+                    Action("Open folder", (_, _) => OpenFolder(store.MinecraftRoot)),
+                    Action("Set folder", async (_, _) => await ImportLocal()),
+                    Action("迁移其它启动器", async (_, _) => await MigrateForeignLauncher())
                 )
-            )
-        );
-        PageBody.Children.Add(CompactCard(folder));
+            );
+            directoryTools.Content = tools;
+        };
+        PageBody.Children.Add(directoryTools);
         var query = new TextBox
         {
             PlaceholderText = Ui("Search version name, description, or Minecraft version"),
@@ -169,12 +200,42 @@ public sealed partial class MainWindow
         Grid.SetColumn(layout, 3);
         search.Children.Add(layout);
         PageBody.Children.Add(search);
+        var sorting = new BelowComboBox
+        {
+            ItemsSource = new[]
+            {
+                Ui("Default (by loader)"),
+                Ui("Recently played"),
+                Ui("Name"),
+                Ui("Minecraft version"),
+            },
+            SelectedIndex = instanceSort,
+            Width = 190,
+        };
+        sorting.SelectionChanged += (_, _) =>
+        {
+            if (sorting.SelectedIndex < 0 || sorting.SelectedIndex == instanceSort)
+                return;
+            instanceSort = sorting.SelectedIndex;
+            Render();
+        };
+        search.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(sorting, 4);
+        search.Children.Add(sorting);
         var allFilter = instanceFilter is "全部实例" or "All versions";
         var favoriteFilter = instanceFilter is "收藏" or "Favorites";
         var loaderFilter = Ui(instanceFilter);
         var instances = store
             .Config.Instances.Where(i =>
                 (
+                    instanceDirectoryFilter.Length == 0
+                    || string.Equals(
+                        store.StorageDirectory(i),
+                        instanceDirectoryFilter,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                && (
                     allFilter
                     || (favoriteFilter ? i.Favorite : LoaderCategory(i.Loader) == loaderFilter)
                 )
@@ -187,6 +248,9 @@ public sealed partial class MainWindow
                 )
             )
             .OrderByDescending(i => i.Favorite)
+            .ThenByDescending(i => instanceSort == 1 ? i.LastPlayed : null)
+            .ThenBy(i => instanceSort == 3 ? i.GameVersion : "", StringComparer.OrdinalIgnoreCase)
+            .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var tileMode = store.Config.Settings.InstanceView == "tile";
         Grid? tileGrid = null;
@@ -200,7 +264,9 @@ public sealed partial class MainWindow
                     13
                 )
             );
-        foreach (var group in instances.GroupBy(i => LoaderCategory(i.Loader)))
+        foreach (
+            var group in instances.GroupBy(i => instanceSort == 0 ? LoaderCategory(i.Loader) : "")
+        )
         {
             if (tileMode)
             {
@@ -209,7 +275,13 @@ public sealed partial class MainWindow
                 tileGrid.ColumnDefinitions.Add(new ColumnDefinition());
                 tileIndex = 0;
             }
-            PageBody.Children.Add(Text($"{group.Key}  ·  {group.Count()}", 15, true));
+            PageBody.Children.Add(
+                Text(
+                    (group.Key.Length > 0 ? group.Key + " · " : "")
+                        + UiFormat("{0} versions", group.Count()),
+                    13
+                )
+            );
             foreach (var instance in group)
             {
                 var row = new Grid { ColumnSpacing = 12, MinHeight = 50 };
@@ -224,24 +296,41 @@ public sealed partial class MainWindow
                     Spacing = 3,
                     VerticalAlignment = VerticalAlignment.Center,
                 };
-                identity.Children.Add(Text(instance.Name, 14, true));
+                identity.Children.Add(
+                    Text(
+                        instance.Name + (instance == selected ? " · " + Ui("Current") : ""),
+                        14,
+                        true
+                    )
+                );
                 identity.Children.Add(
                     Text(
                         instance.Description.Length > 0
                             ? instance.Description
-                            : $"Minecraft {instance.GameVersion} · {LoaderCategory(instance.Loader)}",
+                            : $"Minecraft {instance.GameVersion} · {LoaderCategory(instance.Loader)} {instance.LoaderVersion}",
                         12
                     )
                 );
                 if (instance.Description.Length > 0)
                 {
                     var detail = Text(
-                        $"Minecraft {instance.GameVersion} · {LoaderCategory(instance.Loader)}",
+                        $"Minecraft {instance.GameVersion} · {LoaderCategory(instance.Loader)} {instance.LoaderVersion}",
                         11
                     );
                     detail.Opacity = .65;
                     identity.Children.Add(detail);
                 }
+                foreach (var line in identity.Children.OfType<TextBlock>())
+                {
+                    line.TextWrapping = TextWrapping.NoWrap;
+                    line.TextTrimming = TextTrimming.CharacterEllipsis;
+                }
+                if (store.Config.Instances.Count(i => i.Name == instance.Name) > 1)
+                    identity.Children.Add(Text(store.StorageDirectory(instance), 11));
+                if (runningInstanceId == instance.Id && game is { HasExited: false })
+                    identity.Children.Add(Text("Running", 11));
+                if (!Directory.Exists(store.GameDirectory(instance)))
+                    identity.Children.Add(Text("Directory unavailable", 11));
                 Grid.SetColumn(identity, 1);
                 row.Children.Add(identity);
                 var favorite = new Button
@@ -266,60 +355,50 @@ public sealed partial class MainWindow
                     favorite,
                     Ui(instance.Favorite ? "取消收藏" : "收藏版本")
                 );
-                var remove = new Button
+                var menu = new MenuFlyout();
+                var settingsItem = new MenuFlyoutItem { Text = Ui("Settings") };
+                settingsItem.Click += async (_, _) =>
                 {
-                    Content = new FontIcon { Glyph = "\uE74D", FontSize = 14 },
-                    Width = 30,
-                    Height = 28,
-                    Padding = new Thickness(0),
-                    MinWidth = 30,
+                    await SelectInstance(instance);
+                    page = "version-settings";
+                    kind = "overview";
+                    Render();
+                };
+                var openItem = new MenuFlyoutItem { Text = Ui("Open folder") };
+                openItem.Click += (_, _) => OpenFolder(store.GameDirectory(instance));
+                var more = new Button
+                {
+                    Content = "⋯",
+                    MinWidth = 32,
+                    Flyout = menu,
+                };
+                ToolTipService.SetToolTip(more, Ui("More"));
+                var deleteItem = new MenuFlyoutItem
+                {
+                    Text = Ui("Delete version"),
                     IsEnabled = task == null,
                 };
-                VersionDeleteButton(remove);
-                ToolTipService.SetToolTip(remove, Ui("Delete version"));
-                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
-                    remove,
-                    Ui("Delete version")
-                );
-                remove.Click += async (_, _) =>
+                deleteItem.Foreground = Brush("ValidationError");
+                deleteItem.Click += async (_, _) =>
                 {
                     try
                     {
-                        await ConfirmDeleteInstance(instance, remove);
+                        await ConfirmDeleteInstance(instance, more);
                     }
                     catch (Exception ex)
                     {
                         await Error(ex);
                     }
                 };
-                remove.AddHandler(
+                menu.Items.Add(settingsItem);
+                menu.Items.Add(openItem);
+                menu.Items.Add(new MenuFlyoutSeparator());
+                menu.Items.Add(deleteItem);
+                var actions = Buttons(favorite, more);
+                actions.AddHandler(
                     UIElement.TappedEvent,
                     new Microsoft.UI.Xaml.Input.TappedEventHandler((_, e) => e.Handled = true),
                     true
-                );
-                var actions = Buttons(
-                    favorite,
-                    Action(
-                        instance == selected ? "当前版本" : "选择",
-                        async (_, _) =>
-                        {
-                            await SelectInstance(instance);
-                            page = "home";
-                            Render();
-                        },
-                        instance == selected
-                    ),
-                    Action(
-                        "设置",
-                        async (_, _) =>
-                        {
-                            await SelectInstance(instance);
-                            page = "version-settings";
-                            kind = "overview";
-                            Render();
-                        }
-                    ),
-                    remove
                 );
                 foreach (
                     var button in actions
@@ -336,6 +415,10 @@ public sealed partial class MainWindow
                 AdaptCard(row, identity, actions);
                 var card = CompactCard(row);
                 card.Tag = "instance-card";
+                if (instance == selected)
+                    card.BorderBrush = Brush(
+                        lightTheme ? ThemeTokens.LightAccent : ThemeTokens.DarkAccent
+                    );
                 ToolTipService.SetToolTip(card, store.GameDirectory(instance));
                 card.Tapped += async (_, _) =>
                 {

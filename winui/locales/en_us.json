@@ -2,6 +2,8 @@
   "code": "en_us",
   "displayName": "English",
   "strings": {
+    "Default (by loader)": "Default (by loader)",
+    "Running": "Running",
     "Prefer mirror sources": "Prefer mirror sources",
     "Game download source": "Game download source",
     "Prefer official sources": "Prefer official sources",
@@ -865,7 +867,13 @@
     "tool": "Tool",
     "include": "Include",
     "unknown": "Unknown",
-    "Unknown dependency": "Unknown dependency"
+    "Unknown dependency": "Unknown dependency",
+    "All directories": "All directories",
+    "Recently played": "Recently played",
+    "Name": "Name",
+    "Current": "Current",
+    "Directory unavailable": "Directory unavailable",
+    "{0} versions": "{0} versions"
   },
   "prefixes": [
     {

@@ -155,7 +155,7 @@ The client keeps running while you navigate the launcher. **Stop Frp Client** te
 | `logs/launcher-yyyyMMdd.log` beside the executable | Launcher runtime logs |
 | `logs/` and `crash-reports/` inside an instance | Game logs and crash reports |
 
-Existing installations continue to use `%APPDATA%/CraftLauncher.Native/` when the new data directory does not exist, preserving accounts, settings, and instance paths.
+Existing installations automatically migrate the legacy data directory to `%APPDATA%/CMCLauncher.Native/` when the new directory does not exist. Internal paths are updated; accounts, settings, and external game directories are preserved.
 
 Credentials are encrypted with DPAPI for the current Windows user. Copying the configuration to another user or device may require signing in again. When backing up games, include saves and settings from their actual instance directories.
 

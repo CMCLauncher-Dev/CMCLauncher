@@ -9,7 +9,7 @@ public sealed class MinecraftDirectory
 }
 
 // Ownership needs both a local configuration record and a matching file. Existing
-// folders are never adopted simply because they contain Minecraft or launcher files.
+// custom folders are never adopted simply because they contain Minecraft or launcher files.
 public sealed class MinecraftDirectoryManager(Store store)
 {
     const string Marker = ".cmclauncher-directory";
@@ -45,6 +45,24 @@ public sealed class MinecraftDirectoryManager(Store store)
             if (!result.Any(r => Same(r.Path, path)))
                 result.Add(new() { Path = Full(path) });
         return result;
+    }
+
+    // The historical default library is inside our configuration directory and was
+    // created by Store before ownership markers existed. Custom roots stay external.
+    internal bool RegisterDefaultLibrary()
+    {
+        if (store.Config.MinecraftDirectories.Any(r => Same(r.Path, store.Library)))
+            return false;
+        try
+        {
+            NoLinks(store.Library);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        MarkCreated(store.Library);
+        return true;
     }
 
     internal MinecraftDirectory MarkCreated(string path)

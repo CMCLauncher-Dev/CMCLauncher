@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
@@ -207,9 +207,25 @@ internal static class Program
             "new installations use the renamed data directory"
         );
         Directory.CreateDirectory(legacyRoot);
+        await File.WriteAllTextAsync(
+            Path.Combine(legacyRoot, "settings.json"),
+            new JsonObject
+            {
+                ["directory"] = Path.Combine(legacyRoot, "library"),
+                ["external"] = Path.Combine(appData, "external-game"),
+            }.ToJsonString()
+        );
         Check(
-            Store.DefaultRoot(appData) == legacyRoot,
-            "existing installations keep their data directory"
+            Store.DefaultRoot(appData) == currentRoot && !Directory.Exists(legacyRoot),
+            "existing installations migrate to CMCLauncher naming"
+        );
+        var renamedConfig = JsonNode.Parse(
+            await File.ReadAllTextAsync(Path.Combine(currentRoot, "settings.json"))
+        )!;
+        Check(
+            renamedConfig.S("directory") == Path.Combine(currentRoot, "library")
+                && renamedConfig.S("external") == Path.Combine(appData, "external-game"),
+            "migration updates internal paths and preserves external directories"
         );
         Directory.CreateDirectory(currentRoot);
         Check(

@@ -35,6 +35,20 @@ static class MinecraftDirectoryTests
 
     public static async Task Run(string root)
     {
+        var legacyRoot = Path.Combine(root, "legacy-config");
+        Directory.CreateDirectory(Path.Combine(legacyRoot, "library"));
+        var legacy = new Store(legacyRoot);
+        var legacyManager = new MinecraftDirectoryManager(legacy);
+        Check(
+            legacyManager.CanMigrate(legacyManager.List().Single()),
+            "historical default library is recognized as launcher-created"
+        );
+        var reopenedLegacy = new Store(legacyRoot);
+        var reopenedManager = new MinecraftDirectoryManager(reopenedLegacy);
+        Check(
+            reopenedManager.CanMigrate(reopenedManager.List().Single()),
+            "default library ownership persists across restarts"
+        );
         var store = new Store(Path.Combine(root, "config"));
         var manager = new MinecraftDirectoryManager(store);
         var first = Path.Combine(root, "first", ".minecraft");

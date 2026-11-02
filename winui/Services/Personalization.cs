@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.UI.Xaml;
@@ -37,8 +37,10 @@ public sealed partial class MainWindow
     string LocalizedFontName(string family)
     {
         if (
-            store.Config.Settings.LauncherLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
-            && ChineseFontDisplayNames.TryGetValue(family.Trim(), out var chinese)
+            store.Config.Settings.LauncherLanguage.StartsWith(
+                "zh",
+                StringComparison.OrdinalIgnoreCase
+            ) && ChineseFontDisplayNames.TryGetValue(family.Trim(), out var chinese)
         )
             return chinese;
         return family;
@@ -47,7 +49,12 @@ public sealed partial class MainWindow
     // 把下拉框里的显示名反查回字体族名（用于存入 UiFontFamily）；未知名称原样返回。
     string FontFamilyForDisplay(string display)
     {
-        if (store.Config.Settings.LauncherLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
+        if (
+            store.Config.Settings.LauncherLanguage.StartsWith(
+                "zh",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
         {
             foreach (var pair in ChineseFontDisplayNames)
             {
@@ -120,6 +127,10 @@ public sealed partial class MainWindow
             if (element is TextBlock t)
                 originalAppearances.GetValue(t, _ => new() { FontSize = t.FontSize });
             else if (element is Control c)
+            {
+                // Lazy content may reach personalization before its theme template is applied.
+                // Read themed defaults before storing local size and padding overrides.
+                c.ApplyTemplate();
                 originalAppearances.GetValue(
                     c,
                     _ =>
@@ -132,6 +143,7 @@ public sealed partial class MainWindow
                             Padding = c.Padding,
                         }
                 );
+            }
         }
         foreach (var element in elements)
         {
@@ -167,7 +179,15 @@ public sealed partial class MainWindow
                 );
                 control.FontSize = original.FontSize * fontScale;
                 control.FontFamily = family;
-                if (control is Button or ComboBox or TextBox or NumberBox or ToggleSwitch)
+                if (
+                    control
+                    is Button
+                        or ComboBox
+                        or TextBox
+                        or PasswordBox
+                        or NumberBox
+                        or ToggleSwitch
+                )
                 {
                     var controlScale =
                         navigationButtons.Values.Contains(control) ? menuScale

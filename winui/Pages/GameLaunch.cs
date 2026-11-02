@@ -21,6 +21,7 @@ public sealed partial class MainWindow
     static extern bool SetWindowText(IntPtr hWnd, string text);
 
     Process? game;
+    string? runningInstanceId;
     bool launching;
     string? launcherExitBehavior;
     TextBlock? launchStatusText;
@@ -88,6 +89,7 @@ public sealed partial class MainWindow
                         progress
                     );
                     game = launchedGame;
+                    runningInstanceId = instance.Id;
                     // 用户取消启动导致的退出不弹崩溃报告，其他异常退出交给报告逻辑判断。
                     var cancelledByLauncher = false;
                     var monitoringDone = new TaskCompletionSource(
@@ -113,7 +115,10 @@ public sealed partial class MainWindow
                         {
                             await monitoringDone.Task;
                             if (ReferenceEquals(game, launchedGame))
+                            {
                                 game = null;
+                                runningInstanceId = null;
+                            }
                             launchedGame.Dispose();
                             ApplyLauncherVisibilityOnExit();
                         }
