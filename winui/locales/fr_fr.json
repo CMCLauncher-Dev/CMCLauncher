@@ -732,6 +732,14 @@
     "tool": "Outil",
     "include": "Inclure",
     "unknown": "Inconnu",
-    "Unknown dependency": "Dépendance inconnue"
+    "Unknown dependency": "Dépendance inconnue",
+    "Default (by loader)": "Par défaut (par chargeur)",
+    "Running": "En cours d'exécution",
+    "All directories": "Tous les dossiers",
+    "Recently played": "Récemment joués",
+    "Name": "Nom",
+    "Current": "Actuel",
+    "Directory unavailable": "Dossier indisponible",
+    "{0} versions": "{0} versions"
   }
 }

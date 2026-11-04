@@ -732,6 +732,14 @@
     "tool": "Инструмент",
     "include": "Включить",
     "unknown": "Неизвестно",
-    "Unknown dependency": "Неизвестная зависимость"
+    "Unknown dependency": "Неизвестная зависимость",
+    "Default (by loader)": "По умолчанию (по загрузчику)",
+    "Running": "Запущено",
+    "All directories": "Все папки",
+    "Recently played": "Недавние",
+    "Name": "Имя",
+    "Current": "Текущий",
+    "Directory unavailable": "Папка недоступна",
+    "{0} versions": "{0} версий"
   }
 }

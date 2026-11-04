@@ -865,6 +865,14 @@
     "tool": "ツール",
     "include": "同梱",
     "unknown": "不明",
-    "Unknown dependency": "不明な依存関係"
+    "Unknown dependency": "不明な依存関係",
+    "Default (by loader)": "デフォルト（ローダー別）",
+    "Running": "実行中",
+    "All directories": "すべてのディレクトリ",
+    "Recently played": "最近プレイ",
+    "Name": "名前",
+    "Current": "現在",
+    "Directory unavailable": "ディレクトリを利用できません",
+    "{0} versions": "{0} バージョン"
   }
 }
