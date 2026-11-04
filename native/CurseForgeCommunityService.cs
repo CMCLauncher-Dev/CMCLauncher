@@ -434,6 +434,47 @@ public sealed class CurseForgeCommunityService : IDisposable
         return result;
     }
 
+    public async Task<(string Project, string Version, string Name)?> FindTrackedModUpdate(
+        Instance instance,
+        string file,
+        CancellationToken ct
+    )
+    {
+        var recordsFile = Path.Combine(store.GameDirectory(instance), ".craft-mods-native.json");
+        if (!System.IO.File.Exists(recordsFile))
+            return null;
+        var records = JsonNode.Parse(await System.IO.File.ReadAllTextAsync(recordsFile, ct));
+        var record = records
+            .Items()
+            .FirstOrDefault(r => r.S("file") == file && IsProject(r.S("project")));
+        if (record == null)
+            return null;
+        var project = record.S("project");
+        var response = await Query(
+            $"mods/{Number(project)}/files?gameVersion={Uri.EscapeDataString(instance.GameVersion)}&modLoaderType={Loader(instance.Loader)}&pageSize=50",
+            ct
+        );
+        var candidate = response["data"]
+            .Items()
+            .Where(f =>
+                f.S("isAvailable") == "true"
+                && f.S("isEarlyAccessContent") != "true"
+                && f.S("isServerPack") != "true"
+                && f.Int("releaseType") == 1
+                && Version(f).GameVersions.Contains(instance.GameVersion)
+                && Version(f).Loaders.Contains(instance.Loader)
+            )
+            .OrderByDescending(f => f.S("fileDate"), StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (
+            candidate == null
+            || record.S("version").Length == 0
+            || candidate.Int("id") <= Number(record.S("version"))
+        )
+            return null;
+        return (project, Id(candidate.Int("id")), candidate.S("displayName"));
+    }
+
     public async Task InstallContent(
         Instance instance,
         string project,
@@ -559,7 +600,30 @@ public sealed class CurseForgeCommunityService : IDisposable
         {
             await Visit(Number(project), Number(version), true);
             ct.ThrowIfCancellationRequested();
+            var rootMetadata =
+                type == "mod" ? await File(Number(project), Number(version), ct) : null;
             ContentManager.Import(store.GameDirectory(instance), type, world, pending);
+            if (type == "mod")
+            {
+                var recordFile = Path.Combine(
+                    store.GameDirectory(instance),
+                    ".craft-mods-native.json"
+                );
+                var records = System.IO.File.Exists(recordFile)
+                    ? JsonNode
+                        .Parse(await System.IO.File.ReadAllTextAsync(recordFile, ct))!
+                        .AsArray()
+                    : new JsonArray();
+                records.Add(
+                    new JsonObject
+                    {
+                        ["project"] = project,
+                        ["version"] = version,
+                        ["file"] = FileName(rootMetadata!),
+                    }
+                );
+                await Store.AtomicJson(recordFile, records);
+            }
         }
         finally
         {

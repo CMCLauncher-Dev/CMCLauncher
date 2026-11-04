@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -28,6 +28,13 @@ public sealed partial class MainWindow
             if (
                 store.Config.Instances.Any(i =>
                     string.Equals(i.Name.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(
+                        Path.GetFullPath(store.StorageDirectory(i))
+                            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                        Path.GetFullPath(store.MinecraftRoot)
+                            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                        StringComparison.OrdinalIgnoreCase
+                    )
                 ) || Directory.Exists(Path.Combine(store.MinecraftRoot, "versions", name.Trim()))
             )
                 return Ui("A version with this name already exists. Choose another name.");

@@ -30,6 +30,7 @@ public sealed record VersionDeletionInspection(
 // settings.json 中的全局偏好；实例和账号另存在 Configuration 的列表里。
 public sealed class Settings
 {
+    public bool MinecraftDirectorySetupPending { get; set; }
     public string FrpcVersion { get; set; } = "";
     public string FrpcConfigPath { get; set; } = "";
     public bool DebugLogging { get; set; }
@@ -255,6 +256,7 @@ public sealed class Store
                 ?? throw new Exception("配置为空");
         if (firstRun)
         {
+            Config.Settings.MinecraftDirectorySetupPending = true;
             // 首次启动：根据系统 UI 语言选择对应的界面语言。
             Config.Settings.LauncherLanguage = InterfaceLanguageForSystem();
         }
@@ -568,6 +570,13 @@ public sealed class Store
         if (
             Config.Instances.Any(existing =>
                 string.Equals(existing.Name.Trim(), name, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(
+                    Path.GetFullPath(StorageDirectory(existing))
+                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    Path.GetFullPath(instance.ImportRoot ?? instance.StorageRoot ?? MinecraftRoot)
+                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase
+                )
             )
         )
             throw new Exception("已有同名游戏版本，请更换名称后再下载：" + name);

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using CMCLauncher;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -81,6 +81,7 @@ public sealed partial class MainWindow
         worldSection.Children.Add(
             Buttons(
                 Action("导入存档 ZIP", async (_, _) => await ImportWorld(instance)),
+                Action("World backups", async (_, _) => await ShowWorldBackups(instance)),
                 Action("打开存档文件夹", (_, _) => OpenFolder(Path.Combine(root, "saves")))
             )
         );
@@ -106,6 +107,10 @@ public sealed partial class MainWindow
             );
             panel.Children.Add(
                 Buttons(
+                    Action(
+                        "Back up world",
+                        async (_, _) => await BackupWorld(instance, name, folder)
+                    ),
                     Action("导出 ZIP", async (_, _) => await ExportWorld(name, folder)),
                     Action(
                         Ui("Delete world"),

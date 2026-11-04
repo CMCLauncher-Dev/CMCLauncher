@@ -432,6 +432,153 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         );
     }
 
+    public async Task<(string Project, string Version, string Name)?> FindModUpdate(
+        Instance instance,
+        string file,
+        CancellationToken ct
+    )
+    {
+        await using var stream = System.IO.File.OpenRead(file);
+        var hash = Convert
+            .ToHexString(await System.Security.Cryptography.SHA512.HashDataAsync(stream, ct))
+            .ToLowerInvariant();
+        JsonNode current;
+        try
+        {
+            current = await core.Json(
+                "https://api.modrinth.com/v2/version_file/" + hash + "?algorithm=sha512",
+                ct
+            );
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+        var project = current.S("project_id");
+        var latest = await ProjectVersion(project, instance.GameVersion, instance.Loader, ct);
+        if (
+            latest.S("id") == current.S("id")
+            || string.CompareOrdinal(latest.S("date_published"), current.S("date_published")) <= 0
+        )
+            return null;
+        return (project, latest.S("id"), latest.S("version_number"));
+    }
+
+    public async Task UpdateMod(
+        Instance instance,
+        string file,
+        string project,
+        string version,
+        CancellationToken ct,
+        Func<Instance, CancellationToken, Task>? install = null
+    )
+    {
+        var game = store.GameDirectory(instance);
+        var mods = ContentManager.Folder(game, "mod");
+        var original = ContentManager.Locate(game, "mod", null, file);
+        if (!System.IO.File.Exists(original))
+            throw new IOException("The mod file no longer exists.");
+        var stage = Store.SafePath(game, ".mod-update-" + Guid.NewGuid().ToString("N"));
+        var backup = Store.SafePath(
+            game,
+            "mod-backups/"
+                + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss")
+                + "-"
+                + Guid.NewGuid().ToString("N")
+        );
+        var record = Path.Combine(game, ".craft-mods-native.json");
+        Directory.CreateDirectory(Path.Combine(stage, "mods"));
+        try
+        {
+            foreach (var sourceFolder in new[] { mods, mods + ".craft-disabled" })
+            {
+                if (!Directory.Exists(sourceFolder))
+                    continue;
+                if ((System.IO.File.GetAttributes(sourceFolder) & FileAttributes.ReparsePoint) != 0)
+                    throw new IOException("Linked mod folders cannot be updated.");
+                var targetFolder = Path.Combine(stage, Path.GetFileName(sourceFolder));
+                Directory.CreateDirectory(targetFolder);
+                if (Directory.GetDirectories(sourceFolder).Length > 0)
+                    throw new IOException(
+                        "Move nested mod folders out before updating this instance."
+                    );
+                foreach (var source in Directory.GetFiles(sourceFolder))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if ((System.IO.File.GetAttributes(source) & FileAttributes.ReparsePoint) != 0)
+                        throw new IOException("Linked mod files cannot be updated.");
+                    if (!string.Equals(source, original, StringComparison.OrdinalIgnoreCase))
+                        await Task.Run(
+                            () =>
+                                System.IO.File.Copy(
+                                    source,
+                                    Path.Combine(targetFolder, Path.GetFileName(source))
+                                ),
+                            ct
+                        );
+                }
+            }
+            var records = System.IO.File.Exists(record)
+                ? JsonNode.Parse(await System.IO.File.ReadAllTextAsync(record, ct))!
+                : new JsonArray();
+            await Store.AtomicJson(
+                Path.Combine(stage, ".craft-mods-native.json"),
+                new JsonArray(
+                    records
+                        .Items()
+                        .Where(r => r.S("project") != project && r.S("file") != file)
+                        .Select(r => r.DeepClone())
+                        .ToArray()
+                )
+            );
+            var temporary = new Instance
+            {
+                GameVersion = instance.GameVersion,
+                Loader = instance.Loader,
+                Directory = stage,
+            };
+            if (install == null)
+                await InstallMod(temporary, project, ct, selectedVersionId: version);
+            else
+                await install(temporary, ct);
+            ct.ThrowIfCancellationRequested();
+            Directory.CreateDirectory(backup);
+            if (System.IO.File.Exists(record))
+                System.IO.File.Copy(record, Path.Combine(backup, ".craft-mods-native.json"));
+            Directory.Move(mods, Path.Combine(backup, "mods"));
+            try
+            {
+                Directory.Move(Path.Combine(stage, "mods"), mods);
+                await Store.AtomicJson(
+                    record,
+                    JsonNode.Parse(
+                        await System.IO.File.ReadAllTextAsync(
+                            Path.Combine(stage, ".craft-mods-native.json")
+                        )
+                    )!
+                );
+            }
+            catch
+            {
+                if (Directory.Exists(mods))
+                    Directory.Move(mods, Path.Combine(stage, "failed-mods"));
+                Directory.Move(Path.Combine(backup, "mods"), mods);
+                if (System.IO.File.Exists(Path.Combine(backup, ".craft-mods-native.json")))
+                    System.IO.File.Copy(
+                        Path.Combine(backup, ".craft-mods-native.json"),
+                        record,
+                        true
+                    );
+                throw;
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(stage))
+                Directory.Delete(stage, true);
+        }
+    }
+
     async Task<JsonNode> ProjectVersion(
         string project,
         string? gameVersion,

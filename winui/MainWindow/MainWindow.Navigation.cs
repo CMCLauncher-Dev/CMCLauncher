@@ -76,6 +76,7 @@ public sealed partial class MainWindow
                 ("数据包", "\uE8FD", "download-datapack"),
                 ("资源包", "\uE8B9", "download-resourcepack"),
                 ("光影包", "\uE706", "download-shader"),
+                ("Blueprints", "\uE8A5", "download-blueprint"),
             }
         );
         AddNavGroup(
@@ -279,7 +280,8 @@ public sealed partial class MainWindow
             or "download-mod"
             or "download-datapack"
             or "download-resourcepack"
-            or "download-shader" => "downloads",
+            or "download-shader"
+            or "download-blueprint" => "downloads",
             "settings" or "personalization" or "java" or "accounts" or "logs" => "settings",
             _ => "more",
         };
@@ -430,6 +432,9 @@ public sealed partial class MainWindow
                     break;
                 case "version-settings":
                     await VersionSettings();
+                    break;
+                case "download-blueprint":
+                    await BlueprintsPage();
                     break;
                 case "download-mod":
                 case "download-datapack":

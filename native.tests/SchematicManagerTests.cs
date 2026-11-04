@@ -82,6 +82,11 @@ internal static class SchematicManagerTests
         {
             var instance = Game(name);
             Mod(instance, "renamed-mod.jar", entry, metadata);
+            var candidate = SchematicManager.EnsureDirectory(store, instance, false);
+            Check(
+                candidate != null && !Directory.Exists(candidate),
+                "Instance filtering must detect support without creating folders: " + name
+            );
             var directory = SchematicManager.EnsureDirectory(store, instance);
             Check(
                 directory != null && Directory.Exists(directory),

@@ -189,6 +189,14 @@ internal static class Program
         Pass(
             "cold and warm process launch, native isolation, output drain, concurrent downloads and profile reimport"
         );
+        await BlueprintTests.Run(Path.Combine(root, "blueprint-downloads"));
+        Pass(
+            "Schematicraft search pagination, attribution, public download initialization and HTML rejection"
+        );
+        await WorldBackupTests.Run(Path.Combine(root, "world-backups"));
+        Pass("world backup roundtrip preserves source data and cancels without partial archives");
+        await ModUpdateTests.Run(Path.Combine(root, "mod-updates"));
+        Pass("mod update hash verification, staging rollback and preserved old files");
         await CurseForgeCommunityTests.Run(Path.Combine(root, "curseforge-community"));
         Pass(
             "CurseForge community filters, attribution, authenticated downloads and combined page boundaries"
@@ -946,6 +954,28 @@ internal static class Program
             () => downloadStore.EnsureUniqueInstanceName(new Instance { Name = "fixture" }),
             "existing Minecraft version directory accepted"
         );
+        var newInstallRoot = Path.Combine(root, "empty-minecraft");
+        Directory.CreateDirectory(newInstallRoot);
+        downloadStore.Config.Settings.MinecraftRoot = newInstallRoot;
+        downloadStore.EnsureUniqueInstanceName(new Instance { Name = isolatedInstance.Name });
+        downloadStore.EnsureUniqueInstanceName(new Instance { Name = "fixture" });
+        Throws(
+            () =>
+                downloadStore.EnsureUniqueInstanceName(
+                    new Instance
+                    {
+                        Name = isolatedInstance.Name,
+                        StorageRoot = downloadStore.Library,
+                    }
+                ),
+            "explicit destination must still reject a duplicate in the same root"
+        );
+        Directory.CreateDirectory(Path.Combine(newInstallRoot, "versions", "occupied"));
+        Throws(
+            () => downloadStore.EnsureUniqueInstanceName(new Instance { Name = "occupied" }),
+            "selected destination's occupied directory was ignored"
+        );
+        downloadStore.Config.Settings.MinecraftRoot = "";
         downloadStore.Config.Instances.Clear();
         downloadStore.PrepareIsolatedInstance(isolatedInstance);
         var isolatedPath = downloadStore.GameDirectory(isolatedInstance);

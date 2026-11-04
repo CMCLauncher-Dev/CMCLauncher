@@ -50,6 +50,16 @@ static class MinecraftDirectoryTests
             "default library ownership persists across restarts"
         );
         var store = new Store(Path.Combine(root, "config"));
+        Check(
+            store.Config.Settings.MinecraftDirectorySetupPending,
+            "new configurations request Minecraft directory setup"
+        );
+        store.Config.Settings.MinecraftDirectorySetupPending = false;
+        await store.Save();
+        Check(
+            !new Store(store.Root).Config.Settings.MinecraftDirectorySetupPending,
+            "completed first-run directory setup stays dismissed"
+        );
         var manager = new MinecraftDirectoryManager(store);
         var first = Path.Combine(root, "first", ".minecraft");
         var second = Path.Combine(root, "second", ".minecraft");

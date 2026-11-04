@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
@@ -69,10 +69,8 @@ public sealed partial class MainWindow
             dialogOpen = true;
             try
             {
-                if (
-                    await dialog.ShowAsync()
-                    == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary
-                )
+                var result = await dialog.ShowAsync();
+                if (result == ContentDialogResult.Primary)
                     await ExportCrashReport(report);
             }
             finally

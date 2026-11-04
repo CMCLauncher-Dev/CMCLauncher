@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -120,17 +120,16 @@ public sealed partial class MainWindow : Window
         AppWindow.Changed += (_, _) => UpdateTitleBarInset();
         // Frame 加载前先缓存正文，等它准备好后再执行首次导航。
         var startupUpdateChecked = false;
-        PageFrame.Loaded += (_, _) =>
+        PageFrame.Loaded += async (_, _) =>
         {
             pageFrameReady = true;
-            if (
-                !startupUpdateChecked
-                && args.Length == 0
-                && store.Config.Settings.CheckLauncherUpdates
-            )
+            if (!startupUpdateChecked && args.Length == 0)
             {
                 startupUpdateChecked = true;
-                _ = CheckLauncherUpdate(true);
+                if (store.Config.Settings.MinecraftDirectorySetupPending)
+                    await SetupMinecraftDirectory();
+                if (store.Config.Settings.CheckLauncherUpdates)
+                    _ = CheckLauncherUpdate(true);
             }
             if (pendingPageBody is { } initial)
             {

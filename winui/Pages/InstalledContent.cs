@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -215,6 +215,10 @@ public sealed partial class MainWindow
         var refresh = Action("刷新", (_, _) => Render());
         refresh.MinWidth = 52;
         actions.Children.Add(refresh);
+        if (contentType == "mod")
+            actions.Children.Add(
+                Action("Check mod updates", async (_, _) => await CheckModUpdates(instance))
+            );
         PageBody.Children.Add(actions);
         var loading = Text("正在加载内容，识别结果将逐步显示…", 12);
         var contentRows = new StackPanel { Spacing = 6 };

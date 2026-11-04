@@ -9,7 +9,7 @@ public static class SchematicManager
 {
     public static readonly string[] Extensions = [".litematic", ".schematic", ".schem", ".nbt"];
 
-    public static string? EnsureDirectory(Store store, Instance instance)
+    public static string? EnsureDirectory(Store store, Instance instance, bool create = true)
     {
         if (
             string.IsNullOrWhiteSpace(instance.Loader)
@@ -40,7 +40,8 @@ public static class SchematicManager
             }
             if (!ids.Any(SupportsSchematics))
                 continue;
-            Directory.CreateDirectory(directory);
+            if (create)
+                Directory.CreateDirectory(directory);
             return directory;
         }
         return null;

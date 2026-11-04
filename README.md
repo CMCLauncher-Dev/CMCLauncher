@@ -268,3 +268,11 @@ Minecraft, mods, and modpacks belong to their respective owners. CMCLauncher is 
 Open the version library and expand **Manage Minecraft directories**. Create a new directory, register an existing installation, or select the default location for new installations. Existing instances keep their own game and dependency paths.
 
 Only directories created and recorded by CMCLauncher with a matching ownership marker can be migrated. Imported directories and older directories without ownership records remain usable but cannot be migrated. Close games and other launchers before migrating. Choose a destination that does not exist; the launcher copies and verifies the files, saves updated instance paths, and then removes the old directory. Cancellation or a failed configuration save preserves the source. If cleanup fails after a successful migration, the new location remains active and the launcher reports the remaining old files.
+
+### Mod updates and world backups
+
+The Mod manager checks compatible Modrinth versions by file hash and tracked CurseForge installations. Disabled and unrecognized files are left unchanged. Updates are prepared in a separate directory; old files are retained under the instance's `mod-backups` folder. Close the game before updating.
+
+World management can create ZIP backups outside the game directory and restore them as new worlds without overwriting existing saves.
+
+Blueprint downloads support Schematicraft and MCS Blueprint Library (`mcschematic.top`) with source selection, preview images, search, pagination, file downloads, and installation into supported instances. MCS uses its public developer API.
