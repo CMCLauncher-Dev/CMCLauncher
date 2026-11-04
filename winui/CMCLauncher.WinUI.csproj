@@ -230,7 +230,22 @@
       Include="../native/ModrinthService.cs"
       Link="Core/ModrinthService.cs"
     />
-    <Compile Include="../native/BlueprintService.cs" Link="Core/BlueprintService.cs" />
+    <Compile
+      Include="../native/CmsBlueprints.cs"
+      Link="Core/CmsBlueprints.cs"
+    />
+    <Compile
+      Include="../native/CmsCache.cs"
+      Link="Core/CmsCache.cs"
+    />
+    <Compile
+      Include="../native/CmsHtml.cs"
+      Link="Core/CmsHtml.cs"
+    />
+    <Compile
+      Include="../native/BlueprintService.cs"
+      Link="Core/BlueprintService.cs"
+    />
     <Compile
       Include="../native/CommunityService.cs"
       Link="Core/CommunityService.cs"
@@ -397,4 +412,10 @@
       Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\organize-winui-languages.ps1&quot; -PublishDir ."
     />
   </Target>
+  <ItemGroup>
+    <PackageReference
+      Include="AngleSharp"
+      Version="1.9.1"
+    />
+  </ItemGroup>
 </Project>

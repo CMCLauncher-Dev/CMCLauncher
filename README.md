@@ -276,3 +276,17 @@ The Mod manager checks compatible Modrinth versions by file hash and tracked Cur
 World management can create ZIP backups outside the game directory and restore them as new worlds without overwriting existing saves.
 
 Blueprint downloads support Schematicraft and MCS Blueprint Library (`mcschematic.top`) with source selection, preview images, search, pagination, file downloads, and installation into supported instances. MCS uses its public developer API.
+
+### CMS Create blueprints
+
+Select CMS in Download → Blueprints to browse up to 12 popular builds. CMS is accessed through its existing HTML pages, not an invented API. Search runs only on Enter or Search; sorting is applied with the next explicit search. Paging is manual. Returning to the page retains its results.
+
+CMS requests share a single scheduler, defaulting to at least 1500 ms between starts. This is a conservative client setting, not a rate published by CMS. Recognized CSRF failures receive at most one session refresh and retry; other 403 responses and verification pages stop requests. A 429 response starts a shared cooldown using Retry-After, with no automatic retry.
+
+Parsed public lists are cached for 30 minutes (home) or 10 minutes (search), details for 30 minutes, and visible covers for 24 hours. The disk cache is capped at 128 MB; stale parsed results can be shown offline. The access notice is a modal with a three-second reading countdown. Request controls are not exposed on the page; internal throttling and cache limits remain active. Session cookies and CSRF tokens are held only in memory.
+
+Details and files are fetched only by user action. Downloads are limited to 8 MB, preserve original bytes and filenames, and reject empty files or HTML error pages. CMS blueprints are not restricted to the Create NBT structure. Installation uses the selected compatible instance only and never overwrites existing schematics; formats unsupported by instance management remain available as file-only downloads. CMS HTML changes can require parser maintenance; inline errors and a website link remain available on failure.
+
+CMS page routes and form fields were checked against the live site and [Create-Cchematics-Internet](https://github.com/wuliaoppx/Create-Cchematics-Internet). The C# integration uses AngleSharp DOM parsing and its own scheduler and cache.
+
+All blueprint providers share the same list cards and standalone detail page, including the preview, introduction, compatible-instance selector and download-file cards. Returning from details restores the corresponding cached list. Provider-specific request and access rules remain in their adapters.

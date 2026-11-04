@@ -25,6 +25,14 @@ static class BlueprintTests
             else if (path == "/search")
                 json =
                     "{\"results\":[{\"id\":\"abc\",\"title\":\"House\",\"thumbnailUrl\":\"https://images.example/house.png\",\"owner\":{\"username\":\"Builder\"}}],\"hasMore\":true,\"total\":20}";
+            else if (path == "/schematics/abc")
+                json =
+                    "{\"description\":\"Full Schematicraft description\",\"originalFilename\":\"house.litematic\",\"format\":\"Litematica\"}";
+            else if (path.EndsWith("/versions/3"))
+                json = "{\"originalFilename\":\"castle.schem\",\"sourceFormat\":\"world_edit\"}";
+            else if (path.StartsWith("/api/v1/blueprints/") && !path.EndsWith("/download"))
+                json =
+                    "{\"description\":\"Full MCS description\",\"contentMarkdown\":\"# About the build\"}";
             else if (path == "/schematics")
                 json = "[]";
             else if (path.EndsWith("/init"))
@@ -86,6 +94,12 @@ static class BlueprintTests
         catch (IOException) { }
         if (new FileInfo(path).Length != 4)
             throw new Exception("Rejected response modified downloaded file");
+        var details = await service.Details(page.Items.Single(), "schematicraft", default);
+        if (
+            details.Entry.Description != "Full Schematicraft description"
+            || details.Files.Single().Name != "house.litematic"
+        )
+            throw new Exception("Schematicraft details lost description or original format");
         handler.Html = false;
         var mcs = await service.Search("castle", 2, default, "mcschematic");
         if (
@@ -96,6 +110,12 @@ static class BlueprintTests
             || mcs.Items.Single().ImageUrl != "https://mcschematic.top/preview.png"
         )
             throw new Exception("MCS pagination, version, attribution or preview mapping failed");
+        var mcsDetails = await service.Details(mcs.Items.Single(), "mcschematic", default);
+        if (
+            mcsDetails.Files.Single().Name != "castle.schem"
+            || mcsDetails.Note != "# About the build"
+        )
+            throw new Exception("MCS details lost version metadata or introduction");
         await service.Download(mcs.Items.Single().Id, root, default, "mcschematic", 3);
         if (!handler.Calls.Last().AbsolutePath.EndsWith("/versions/3/download"))
             throw new Exception("MCS download used wrong blueprint version");

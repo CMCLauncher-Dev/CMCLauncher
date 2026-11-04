@@ -80,7 +80,7 @@ public sealed partial class MainWindow : Window
     public MainWindow(string[] args)
     {
         store = new Store(
-            args.Length == 2 && args[0] == "--verify-ui"
+            args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui")
                 ? Path.Combine(Path.GetFullPath(args[1]), "data")
                 : null
         );
@@ -146,7 +146,7 @@ public sealed partial class MainWindow : Window
         core = new LauncherCore(store);
         importedMetadataLoad = LoadImportedMetadata();
         InitializeFrpc(
-            args.Length == 2 && args[0] == "--verify-ui"
+            args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui")
                 ? Path.Combine(Path.GetFullPath(args[1]), "program", "frpc", "configs")
                 : null
         );
@@ -233,6 +233,7 @@ public sealed partial class MainWindow : Window
             task?.Cancel();
             core.Dispose();
             curseforge.Dispose();
+            cmsClient?.Dispose();
         };
     }
 

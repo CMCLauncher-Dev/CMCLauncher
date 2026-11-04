@@ -13,7 +13,10 @@
     >$(MSBuildProjectDirectory)/../winui/curseforge.local.json</CurseForgeConfigurationFile>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="LauncherUpdateWorker.ps1" LogicalName="CMCLauncher.UpdateWorker" />
+    <EmbeddedResource
+      Include="LauncherUpdateWorker.ps1"
+      LogicalName="CMCLauncher.UpdateWorker"
+    />
   </ItemGroup>
   <!-- 本地构建可嵌入公开 OAuth 客户端 ID，源文件不进入发行包。 -->
   <ItemGroup>
@@ -35,6 +38,12 @@
       Include="$(CurseForgeConfigurationFile)"
       LogicalName="CMCLauncher.CurseForgeApi"
       Condition="Exists('$(CurseForgeConfigurationFile)')"
+    />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference
+      Include="AngleSharp"
+      Version="1.9.1"
     />
   </ItemGroup>
 </Project>

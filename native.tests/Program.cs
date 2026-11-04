@@ -101,6 +101,38 @@ internal static class Program
                 return 1;
             }
         }
+        if (args.Length == 2 && args[0] == "--verify-cms-live")
+        {
+            try
+            {
+                using var client = new CmsBlueprints(
+                    Path.GetFullPath(args[1]),
+                    new Settings
+                    {
+                        Proxy = Environment.GetEnvironmentVariable("HTTPS_PROXY") ?? "",
+                        ProxyMode = string.IsNullOrEmpty(
+                            Environment.GetEnvironmentVariable("HTTPS_PROXY")
+                        )
+                            ? "system"
+                            : "custom",
+                    }
+                );
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(50));
+                var result = client
+                    .Search("", "download", 1, timeout.Token)
+                    .GetAwaiter()
+                    .GetResult();
+                Console.WriteLine(
+                    $"CMS public list: items={result.Items.Count}, page={result.Page}, pages={result.Pages}, stale={result.Stale}"
+                );
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+                return 1;
+            }
+        }
         root = Path.Combine(Path.GetTempPath(), "craft-native-test-" + Guid.NewGuid());
         Directory.CreateDirectory(root);
         try
@@ -188,6 +220,10 @@ internal static class Program
         await LaunchAuditTests.Run(Path.Combine(root, "launch-audit"));
         Pass(
             "cold and warm process launch, native isolation, output drain, concurrent downloads and profile reimport"
+        );
+        await CmsTests.Run(Path.Combine(root, "cms"));
+        Pass(
+            "CMS HTML parsing, request deduplication, throttling, CSRF limits, cooldown, stale cache and format-preserving downloads"
         );
         await BlueprintTests.Run(Path.Combine(root, "blueprint-downloads"));
         Pass(

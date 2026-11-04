@@ -11,7 +11,10 @@ public sealed record Blueprint(
     string Author,
     string Website,
     string ImageUrl = "",
-    int Version = 1
+    int Version = 1,
+    string Downloads = "",
+    string Versions = "",
+    string Size = ""
 );
 
 public sealed record BlueprintPage(IReadOnlyList<Blueprint> Items, bool HasNext, int? Total);
@@ -56,14 +59,17 @@ public sealed class BlueprintService(HttpClient http)
                         item.S("description"),
                         item["author"].S("displayName"),
                         "https://mcschematic.top/blueprints/" + Uri.EscapeDataString(item.S("id")),
-                        Uri.TryCreate(
+                        item.S("previewUrl").Length > 0
+                        && Uri.TryCreate(
                             new Uri("https://mcschematic.top"),
                             item.S("previewUrl"),
                             out var preview
                         )
                             ? preview.AbsoluteUri
                             : "",
-                        item["currentVersion"].Int("number")
+                        item["currentVersion"].Int("number"),
+                        Downloads: item["engagement"]?["downloadCount"]?.ToString() ?? "",
+                        Versions: item["sourceGameVersion"].S("release")
                     ))
                     .ToArray(),
                 page < result.Int("totalPages"),
@@ -86,11 +92,55 @@ public sealed class BlueprintService(HttpClient http)
                     item.S("description"),
                     item["owner"].S("username"),
                     "https://schematicraft.com/schematic/" + Uri.EscapeDataString(item.S("id")),
-                    item.S("thumbnailUrl")
+                    item.S("thumbnailUrl"),
+                    Downloads: item["downloads"]?.ToString() ?? ""
                 ))
                 .ToArray(),
             data is JsonArray ? items.Length == 16 : data.S("hasMore") == "true",
             data is JsonArray ? null : data.Int("total")
+        );
+    }
+
+    public async Task<CmsDetail> Details(Blueprint entry, string source, CancellationToken ct)
+    {
+        if (source == "mcschematic")
+        {
+            var data = await Json(
+                "https://mcschematic.top/api/v1/blueprints/" + Uri.EscapeDataString(entry.Id),
+                ct
+            );
+            var version = await Json(
+                $"https://mcschematic.top/api/v1/blueprints/{Uri.EscapeDataString(entry.Id)}/versions/{entry.Version}",
+                ct
+            );
+            var updated = entry with { Description = data.S("description", entry.Description) };
+            return new(
+                updated,
+                new[]
+                {
+                    new CmsFile(
+                        entry.Id,
+                        version.S("originalFilename", "Original file"),
+                        version.S("sourceFormat")
+                    ),
+                },
+                data.S("contentMarkdown")
+            );
+        }
+        if (source != "schematicraft")
+            throw new ArgumentException("Unknown blueprint source.");
+        var detail = await Json(Api + "/schematics/" + Uri.EscapeDataString(entry.Id), ct);
+        var name = detail.S(
+            "originalFilename",
+            detail.S("filename", detail.S("fileName", "Original file"))
+        );
+        return new(
+            entry with
+            {
+                Description = detail.S("description", entry.Description),
+            },
+            new[] { new CmsFile(entry.Id, name, detail.S("format")) },
+            ""
         );
     }
 

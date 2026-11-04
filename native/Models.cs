@@ -30,6 +30,7 @@ public sealed record VersionDeletionInspection(
 // settings.json 中的全局偏好；实例和账号另存在 Configuration 的列表里。
 public sealed class Settings
 {
+    public int CmsRequestIntervalMs { get; set; } = 1500;
     public bool MinecraftDirectorySetupPending { get; set; }
     public string FrpcVersion { get; set; } = "";
     public string FrpcConfigPath { get; set; } = "";

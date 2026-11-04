@@ -274,6 +274,7 @@ public sealed partial class MainWindow
         {
             "home" or "version-settings" or "instances" => "home",
             "resource-detail"
+            or "blueprint-detail"
             or "downloads"
             or "discover"
             or "packs"
@@ -286,7 +287,8 @@ public sealed partial class MainWindow
             _ => "more",
         };
         var rootKey = "root:" + activeGroup;
-        var pageKey = "page:" + (page == "resource-detail" ? resourceReturnPage : page);
+        var pageKey =
+            "page:" + (page is "resource-detail" or "blueprint-detail" ? resourceReturnPage : page);
         var keys = navigationButtons.Keys.ToList();
         double Offset(string? oldKey, string newKey) =>
             oldKey != null && keys.Contains(oldKey) && keys.Contains(newKey)
@@ -424,6 +426,9 @@ public sealed partial class MainWindow
         {
             switch (page)
             {
+                case "blueprint-detail":
+                    await BlueprintDetailPage();
+                    break;
                 case "resource-detail":
                     await ResourceDetail();
                     break;

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -306,12 +306,16 @@ public sealed partial class MainWindow
 
     internal void Header(string title, string subtitle)
     {
-        PageBackButton.Visibility = page is "version-settings" or "instances" or "resource-detail"
+        PageBackButton.Visibility = page
+            is "version-settings"
+                or "instances"
+                or "resource-detail"
+                or "blueprint-detail"
             ? Visibility.Visible
             : Visibility.Collapsed;
         ToolTipService.SetToolTip(
             PageBackButton,
-            Ui(page == "resource-detail" ? "返回列表" : "返回主页")
+            Ui(page is "resource-detail" or "blueprint-detail" ? "返回列表" : "返回主页")
         );
         PageTitle.Text = Ui(title);
         PageSubtitle.Text = Ui(subtitle);
@@ -331,7 +335,7 @@ public sealed partial class MainWindow
 
     void PageBack_Click(object sender, RoutedEventArgs e)
     {
-        if (page == "resource-detail")
+        if (page is "resource-detail" or "blueprint-detail")
             page = resourceReturnPage;
         else
         {

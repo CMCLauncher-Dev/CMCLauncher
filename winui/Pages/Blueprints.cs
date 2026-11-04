@@ -12,9 +12,14 @@ public sealed partial class MainWindow
     string blueprintQuery = "";
     string blueprintSource = "schematicraft";
     int blueprintPage = 1;
+    readonly Dictionary<(string Source, string Query, int Page), BlueprintPage> blueprintListCache =
+        new();
+
+    Func<HttpClient>? blueprintHttpOverride;
 
     HttpClient BlueprintHttp() =>
-        new(
+        blueprintHttpOverride?.Invoke()
+        ?? new(
             new HttpClientHandler
             {
                 AllowAutoRedirect = false,
@@ -34,17 +39,34 @@ public sealed partial class MainWindow
         var source = new BelowComboBox
         {
             Header = Ui("Download source"),
-            ItemsSource = new[] { "Schematicraft", Ui("MCS Blueprint Library") },
-            SelectedIndex = blueprintSource == "mcschematic" ? 1 : 0,
+            ItemsSource = new[]
+            {
+                "Schematicraft",
+                Ui("MCS Blueprint Library"),
+                Ui("CMS Blueprint Library"),
+            },
+            SelectedIndex =
+                blueprintSource == "cms" ? 2
+                : blueprintSource == "mcschematic" ? 1
+                : 0,
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
         source.SelectionChanged += async (_, _) =>
         {
             if (source.SelectedIndex < 0)
                 return;
-            blueprintSource = source.SelectedIndex == 1 ? "mcschematic" : "schematicraft";
+            var wasCms = blueprintSource == "cms";
+            blueprintSource =
+                source.SelectedIndex == 2 ? "cms"
+                : source.SelectedIndex == 1 ? "mcschematic"
+                : "schematicraft";
             blueprintPage = 1;
-            await load();
+            if (!wasCms && blueprintSource == "cms")
+                cmsNoticeAccepted = false;
+            if (wasCms || blueprintSource == "cms")
+                await RenderAsync();
+            else
+                await load();
         };
         PageBody.Children.Add(source);
         if (pageFrameReady)
@@ -103,6 +125,11 @@ public sealed partial class MainWindow
                 12
             )
         );
+        if (blueprintSource == "cms")
+        {
+            await CmsContent(() => target, supported.Length > 0);
+            return;
+        }
         var query = new TextBox
         {
             PlaceholderText = Ui("Search blueprints"),
@@ -191,101 +218,25 @@ public sealed partial class MainWindow
             try
             {
                 using var http = BlueprintHttp();
-                var result = await new BlueprintService(http).Search(
-                    blueprintQuery,
-                    blueprintPage,
-                    request.Token,
-                    selectedSource
-                );
+                var key = (selectedSource, blueprintQuery, blueprintPage);
+                if (!blueprintListCache.TryGetValue(key, out var result))
+                {
+                    result = await new BlueprintService(http).Search(
+                        blueprintQuery,
+                        blueprintPage,
+                        request.Token,
+                        selectedSource
+                    );
+                    if (blueprintListCache.Count >= 20)
+                        blueprintListCache.Remove(blueprintListCache.Keys.First());
+                    blueprintListCache[key] = result;
+                }
                 if (generation != renderVersion || current != revision)
                     return;
                 status.Text = result.Items.Count == 0 ? Ui("No blueprints found.") : "";
                 foreach (var entry in result.Items)
                 {
-                    var body = new StackPanel { Spacing = 6 };
-                    body.Children.Add(Text(entry.Title, 15, true));
-                    body.Children.Add(Text(entry.Author, 12));
-                    var description = Text(
-                        entry.Description.Replace('\r', ' ').Replace('\n', ' '),
-                        12
-                    );
-                    description.TextWrapping = TextWrapping.NoWrap;
-                    description.TextTrimming = TextTrimming.CharacterEllipsis;
-                    body.Children.Add(description);
-                    body.Children.Add(
-                        new HyperlinkButton
-                        {
-                            Content = Ui("View on website"),
-                            NavigateUri = new Uri(entry.Website),
-                        }
-                    );
-                    body.Children.Add(
-                        Buttons(
-                            Action(
-                                "Download file",
-                                async (_, _) =>
-                                    await DownloadBlueprint(entry, false, selectedSource)
-                            ),
-                            Action(
-                                "Install blueprint",
-                                async (_, _) =>
-                                    await DownloadBlueprint(entry, true, selectedSource, target)
-                            )
-                        )
-                    );
-                    if (
-                        supported.Length == 0
-                        && body.Children.LastOrDefault() is StackPanel buttons
-                    )
-                    {
-                        var installButton = buttons.Children.OfType<Button>().Last();
-                        installButton.IsEnabled = false;
-                        taskButtons.Remove(installButton);
-                        ToolTipService.SetToolTip(installButton, Ui("No compatible instances"));
-                    }
-                    var preview = new Grid
-                    {
-                        Width = 120,
-                        Height = 90,
-                        VerticalAlignment = VerticalAlignment.Top,
-                    };
-                    preview.Children.Add(
-                        new FontIcon
-                        {
-                            Glyph = "\uE8A5",
-                            FontSize = 28,
-                            Opacity = .5,
-                        }
-                    );
-                    if (
-                        Uri.TryCreate(entry.ImageUrl, UriKind.Absolute, out var imageUri)
-                        && imageUri.Scheme == "https"
-                        && imageUri.UserInfo.Length == 0
-                    )
-                    {
-                        var image = new Image
-                        {
-                            Source = new BitmapImage(imageUri) { DecodePixelWidth = 240 },
-                            Stretch = Stretch.Uniform,
-                            Width = 120,
-                            Height = 90,
-                        };
-                        image.ImageFailed += (_, _) => image.Visibility = Visibility.Collapsed;
-                        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
-                            image,
-                            entry.Title
-                        );
-                        preview.Children.Add(image);
-                    }
-                    var row = new Grid { ColumnSpacing = 12 };
-                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                    row.ColumnDefinitions.Add(
-                        new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
-                    );
-                    row.Children.Add(preview);
-                    Grid.SetColumn(body, 1);
-                    row.Children.Add(body);
-                    rows.Children.Add(CompactCard(row));
+                    rows.Children.Add(BlueprintListCard(entry, () => target, selectedSource));
                 }
                 pageLabel.Text = UiFormat("Page {0}", blueprintPage);
                 jump.Value = blueprintPage;
