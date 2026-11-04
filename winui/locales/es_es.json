@@ -732,6 +732,14 @@
     "tool": "Herramienta",
     "include": "Incluir",
     "unknown": "Desconocido",
-    "Unknown dependency": "Dependencia desconocida"
+    "Unknown dependency": "Dependencia desconocida",
+    "Default (by loader)": "Predeterminado (por cargador)",
+    "Running": "En ejecución",
+    "All directories": "Todas las carpetas",
+    "Recently played": "Jugados recientemente",
+    "Name": "Nombre",
+    "Current": "Actual",
+    "Directory unavailable": "Carpeta no disponible",
+    "{0} versions": "{0} versiones"
   }
 }

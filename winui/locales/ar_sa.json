@@ -732,6 +732,14 @@
     "tool": "أداة",
     "include": "تضمين",
     "unknown": "غير معروف",
-    "Unknown dependency": "تبعية غير معروفة"
+    "Unknown dependency": "تبعية غير معروفة",
+    "Default (by loader)": "الافتراضي (حسب المُحمّل)",
+    "Running": "قيد التشغيل",
+    "All directories": "كل المجلدات",
+    "Recently played": "أُجريت مؤخرًا",
+    "Name": "الاسم",
+    "Current": "الحالي",
+    "Directory unavailable": "المجلد غير متاح",
+    "{0} versions": "{0} إصدارات"
   }
 }

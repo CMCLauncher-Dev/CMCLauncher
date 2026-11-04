@@ -271,8 +271,9 @@ public sealed class Store
         var legacy = Path.Combine(appData, "CraftLauncher.Native");
         if (System.IO.Directory.Exists(current) || !System.IO.Directory.Exists(legacy))
             return current;
+        // 旧数据目录被符号链接指向外部时拒绝迁移，回退用当前目录，而不是让首次启动崩溃。
         if ((File.GetAttributes(legacy) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("The legacy launcher data directory must not be a link.");
+            return current;
         var settings = Path.Combine(legacy, "settings.json");
         var pending = Path.Combine(
             legacy,
