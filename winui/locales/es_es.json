@@ -498,7 +498,7 @@
     "Could not check for updates. Try again or open the release page.": "No se pudieron verificar las actualizaciones. Inténtalo de nuevo o abre la página de la versión.",
     "Finish active tasks and close the game before installing an update.": "Termina las tareas activas y cierra el juego antes de instalar una actualización.",
     "Install update {0}?": "¿Instalar la actualización {0}?",
-    "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept.": "El lanzador descargará y verificará la actualización, luego se cerrará y reiniciará. Tus cuentas, instancias y ajustes se conservarán.",
+    "The launcher will download and verify the update, then close and restart.": "El lanzador descargará y verificará la actualización, luego se cerrará y reiniciará.",
     "Download launcher update": "Descargar la actualización del lanzador",
     "The update package failed SHA-256 verification.": "El paquete de actualización no superó la verificación SHA-256.",
     "Unexpected update package size.": "Tamaño inesperado del paquete de actualización.",

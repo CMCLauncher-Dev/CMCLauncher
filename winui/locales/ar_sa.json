@@ -498,7 +498,7 @@
     "Could not check for updates. Try again or open the release page.": "تعذّر التحقق من التحديثات. أعد المحاولة أو افتح صفحة الإصدار.",
     "Finish active tasks and close the game before installing an update.": "أكمل المهام النشطة وأغلق اللعبة قبل تثبيت التحديث.",
     "Install update {0}?": "تثبيت التحديث {0}؟",
-    "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept.": "سيقوم المشغّل بتنزيل التحديث والتحقق منه، ثم سيُغلق ويعيد التشغيل. سيتم الاحتفاظ بحساباتك ومثيلاتك وإعداداتك.",
+    "The launcher will download and verify the update, then close and restart.": "سيقوم المشغّل بتنزيل التحديث والتحقق منه، ثم سيُغلق ويعيد التشغيل.",
     "Download launcher update": "تنزيل تحديث المشغّل",
     "The update package failed SHA-256 verification.": "فشل تحقق SHA-256 لحزمة التحديث.",
     "Unexpected update package size.": "حجم غير متوقع لحزمة التحديث.",

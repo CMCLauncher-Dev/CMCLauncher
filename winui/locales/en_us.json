@@ -288,7 +288,7 @@
     "Could not check for updates. Try again or open the release page.": "Could not check for updates. Try again or open the release page.",
     "Finish active tasks and close the game before installing an update.": "Finish active tasks and close the game before installing an update.",
     "Install update {0}?": "Install update {0}?",
-    "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept.": "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept.",
+    "The launcher will download and verify the update, then close and restart.": "The launcher will download and verify the update, then close and restart.",
     "Download launcher update": "Download launcher update",
     "The update package failed SHA-256 verification.": "The update package failed SHA-256 verification.",
     "Unexpected update package size.": "Unexpected update package size.",

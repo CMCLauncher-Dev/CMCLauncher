@@ -166,7 +166,7 @@
     "Could not check for updates. Try again or open the release page.": "更新を確認できませんでした。再試行するか、リリースページを開いてください。",
     "Finish active tasks and close the game before installing an update.": "実行中のタスクを完了し、ゲームを終了してから更新してください。",
     "Install update {0}?": "更新 {0} をインストールしますか？",
-    "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept.": "更新をダウンロードして検証した後、ランチャーを終了して再起動します。アカウント、インスタンス、設定は保持されます。",
+    "The launcher will download and verify the update, then close and restart.": "更新をダウンロードして検証した後、ランチャーを終了して再起動します。",
     "Download launcher update": "ランチャーの更新をダウンロード",
     "The update package failed SHA-256 verification.": "更新パッケージの SHA-256 検証に失敗しました。",
     "Unexpected update package size.": "更新パッケージのサイズがリリース情報と一致しません。",

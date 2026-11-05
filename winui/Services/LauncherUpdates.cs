@@ -229,7 +229,7 @@ public sealed partial class MainWindow
                     Title = UiFormat("Update available: {0}", release.Version),
                     Content = Ui(
                         canInstall
-                            ? "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept."
+                            ? "The launcher will download and verify the update, then close and restart."
                             : "This release requires a manual download. Open its release notes."
                     ),
                     PrimaryButtonText = Ui(canInstall ? "Update now" : "View release notes"),

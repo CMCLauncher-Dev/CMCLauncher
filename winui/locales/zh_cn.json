@@ -288,7 +288,7 @@
     "Could not check for updates. Try again or open the release page.": "检查更新失败，请重试或打开发行页面。",
     "Finish active tasks and close the game before installing an update.": "请先完成当前任务并关闭游戏，再安装更新。",
     "Install update {0}?": "安装更新 {0}？",
-    "The launcher will download and verify the update, then close and restart. Your accounts, instances, and settings will be kept.": "启动器将下载并校验更新，然后关闭并重新启动。账号、实例和设置将保留。",
+    "The launcher will download and verify the update, then close and restart.": "启动器将下载并校验更新，然后关闭并重新启动。",
     "Download launcher update": "下载启动器更新",
     "The update package failed SHA-256 verification.": "更新包 SHA-256 校验失败。",
     "Unexpected update package size.": "更新包大小与发行信息不一致。",
