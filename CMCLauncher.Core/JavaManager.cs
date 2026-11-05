@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
-using Microsoft.Win32;
 
 namespace CMCLauncher;
 
@@ -10,6 +9,8 @@ namespace CMCLauncher;
 // 候选路径来源：PATH 环境变量 → JAVA_HOME → 注册表 → 预置扫描目录 → 用户注册列表
 public static class JavaManager
 {
+    public static string JavaExecutable => OperatingSystem.IsWindows() ? "java.exe" : "java";
+
     internal static bool CompatibleArchitecture(string architecture) =>
         System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture switch
         {
@@ -84,7 +85,9 @@ public static class JavaManager
         if (Directory.Exists(path))
             path = Path.Combine(
                 path,
-                Directory.Exists(Path.Combine(path, "bin")) ? "bin/java.exe" : "java.exe"
+                Directory.Exists(Path.Combine(path, "bin"))
+                    ? "bin/" + JavaExecutable
+                    : JavaExecutable
             );
         if (Path.GetFileName(path).Equals("javaw.exe", StringComparison.OrdinalIgnoreCase))
             path = Path.Combine(Path.GetDirectoryName(path)!, "java.exe");
@@ -190,37 +193,19 @@ public static class JavaManager
             }
             catch { }
         }
-        foreach (var entry in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
+        foreach (
+            var entry in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(
+                Path.PathSeparator
+            )
+        )
             if (!string.IsNullOrWhiteSpace(entry))
-                Add(Path.Combine(entry.Trim().Trim('"'), "java.exe"));
+                Add(Path.Combine(entry.Trim().Trim('"'), JavaExecutable));
         Add(Environment.GetEnvironmentVariable("JAVA_HOME"));
         Add(store.Config.Settings.JavaPath);
         foreach (var java in store.Config.Settings.JavaInstallations)
             Add(java.Path);
-        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
-        foreach (var hive in new[] { RegistryHive.LocalMachine, RegistryHive.CurrentUser })
-        {
-            using var root = RegistryKey.OpenBaseKey(hive, view);
-            foreach (
-                var name in new[]
-                {
-                    @"SOFTWARE\JavaSoft\Java Runtime Environment",
-                    @"SOFTWARE\JavaSoft\Java Development Kit",
-                    @"SOFTWARE\JavaSoft\JDK",
-                    @"SOFTWARE\JavaSoft\JRE",
-                }
-            )
-            {
-                using var key = root.OpenSubKey(name);
-                if (key == null)
-                    continue;
-                foreach (var version in key.GetSubKeyNames())
-                {
-                    using var sub = key.OpenSubKey(version);
-                    Add(sub?.GetValue("JavaHome") as string);
-                }
-            }
-        }
+        foreach (var path in LauncherPlatform.Current.JavaHomes())
+            Add(path);
         var roots =
             folder != null
                 ? new[] { folder }
@@ -290,6 +275,7 @@ public static class JavaManager
         Action<string> stage
     )
     {
+        MinecraftPlatform.RequireWindowsX64("Automatic Java downloads");
         stage("获取 Temurin Java " + major + " 下载信息");
         var assets = await core.Json(
             $"https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture=x64&image_type=jdk&os=windows&vendor=eclipse",

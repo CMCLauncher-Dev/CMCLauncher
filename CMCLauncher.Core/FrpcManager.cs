@@ -91,6 +91,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
 
     public async Task<FrpcRelease> FindRelease(string version, CancellationToken ct)
     {
+        MinecraftPlatform.RequireWindowsX64("Frp Client distribution");
         ct.ThrowIfCancellationRequested();
         var latest = string.IsNullOrWhiteSpace(version) || version == "latest";
         var resolved = latest ? "latest" : Version(version);
@@ -200,6 +201,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
 
     public async Task<FrpcReleasePage> Releases(int page, CancellationToken ct)
     {
+        MinecraftPlatform.RequireWindowsX64("Frp Client distribution");
         ct.ThrowIfCancellationRequested();
         if (page < 1)
             throw new ArgumentOutOfRangeException(nameof(page));
@@ -387,6 +389,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
 
     public async Task Install(FrpcRelease release, CancellationToken ct)
     {
+        MinecraftPlatform.RequireWindowsX64("Frp Client distribution");
         await gate.WaitAsync(ct);
         string? stage = null;
         try
@@ -472,6 +475,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
 
     public ProcessStartInfo StartInfo(string version, string config, bool verify = false)
     {
+        MinecraftPlatform.RequireWindowsX64("Frp Client distribution");
         var path = Config(config);
         var exe = Executable(version);
         if (!File.Exists(exe))

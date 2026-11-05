@@ -44,35 +44,9 @@
       Condition="'$(PublishSingleFile)' == 'true'"
     >$(DefineConstants);SINGLE_FILE</DefineConstants>
   </PropertyGroup>
+
   <ItemGroup>
-    <Compile
-      Include="../native/LauncherInstanceFormat.cs"
-      Link="Core/LauncherInstanceFormat.cs"
-    />
-    <Compile
-      Include="../native/LocalInstanceDiscovery.cs"
-      Link="Core/LocalInstanceDiscovery.cs"
-    />
-    <Compile
-      Include="../native/ForeignLauncherMigration.cs"
-      Link="Core/ForeignLauncherMigration.cs"
-    />
-    <Compile
-      Include="../native/GameGpuPreference.cs"
-      Link="Core/GameGpuPreference.cs"
-    />
-    <Compile
-      Include="../native/LauncherUpdates.cs"
-      Link="Core/LauncherUpdates.cs"
-    />
-    <Compile
-      Include="../native/LauncherUpdateInstaller.cs"
-      Link="Core/LauncherUpdateInstaller.cs"
-    />
-    <EmbeddedResource
-      Include="../native/LauncherUpdateWorker.ps1"
-      LogicalName="CMCLauncher.UpdateWorker"
-    />
+    <ProjectReference Include="../native/CMCLauncher.csproj" />
   </ItemGroup>
   <!-- Partial trimming keeps the application and third-party libraries intact. -->
   <ItemGroup Condition="'$(PublishSingleFile)' != 'true'">
@@ -90,44 +64,25 @@
   <!-- Preserve reflection metadata and WinRT projections; trim only safe framework code. -->
   <ItemGroup Condition="'$(PublishTrimmed)' == 'true'">
     <TrimmerRootAssembly Include="$(AssemblyName)" />
+    <TrimmerRootAssembly Include="CMCLauncher.Core" />
+    <TrimmerRootAssembly Include="CMCLauncher.Platform.Windows" />
     <TrimmerRootAssembly Include="Microsoft.Windows.SDK.NET" />
     <TrimmerRootAssembly Include="Microsoft.WinUI" />
     <TrimmerRootAssembly Include="WinRT.Runtime" />
     <TrimmerRootAssembly Include="Microsoft.InteractiveExperiences.Projection" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource
-      Include="themes/craft.json"
-      LogicalName="CMCLauncher.Themes.craft.json"
-    />
     <Content
       Include="themes/*.json"
       CopyToOutputDirectory="PreserveNewest"
       CopyToPublishDirectory="PreserveNewest"
     />
-    <Compile
-      Include="../native/ThemeCatalog.cs"
-      Link="Core/ThemeCatalog.cs"
-    />
-
     <Content
       Include="locales/*.json"
       CopyToOutputDirectory="PreserveNewest"
       CopyToPublishDirectory="PreserveNewest"
     />
-    <EmbeddedResource
-      Include="locales/*.json"
-      LogicalName="CMCLauncher.Locales.%(Filename).json"
-    />
-    <Compile
-      Include="../native/LocalizationCatalog.cs"
-      Link="Core/LocalizationCatalog.cs"
-    />
-    <EmbeddedResource
-      Include="clientid.local.json"
-      LogicalName="CMCLauncher.MicrosoftClient"
-      Condition="Exists('clientid.local.json')"
-    />
+
     <Content
       Update="assets/cmc-logo.png"
       CopyToOutputDirectory="PreserveNewest"
@@ -161,128 +116,7 @@
       Include="Microsoft.WindowsAppSDK.DWrite"
       Version="1.8.25122902"
     />
-    <!-- 核心源码直接编入桌面程序集，认证资源也随当前程序集一起读取。 -->
-    <Compile
-      Include="../native/Models.cs"
-      Link="Core/Models.cs"
-    />
-    <Compile
-      Include="../native/NetworkProxy.cs"
-      Link="Core/NetworkProxy.cs"
-    />
-    <Compile
-      Include="../native/MinecraftPfp.cs"
-      Link="Core/MinecraftPfp.cs"
-    />
-    <Compile
-      Include="../native/MinecraftDirectoryManager.cs"
-      Link="Core/MinecraftDirectoryManager.cs"
-    />
-    <Compile
-      Include="../native/LogTail.cs"
-      Link="Core/LogTail.cs"
-    />
-    <Compile
-      Include="../native/GameMemory.cs"
-      Link="Core/GameMemory.cs"
-    />
-    <Compile
-      Include="../native/JavaManager.cs"
-      Link="Core/JavaManager.cs"
-    />
-    <Compile
-      Include="../native/WorldArchive.cs"
-      Link="Core/WorldArchive.cs"
-    />
-    <Compile
-      Include="../native/LauncherCore.cs"
-      Link="Core/LauncherCore.cs"
-    />
-    <Compile
-      Include="../native/LauncherLibraries.cs"
-      Link="Core/LauncherLibraries.cs"
-    />
-    <Compile
-      Include="../native/NativeDirectoryLease.cs"
-      Link="Core/NativeDirectoryLease.cs"
-    />
-    <Compile
-      Include="../native/CertificatePolicy.cs"
-      Link="Core/CertificatePolicy.cs"
-    />
-    <Compile
-      Include="../native/SchematicManager.cs"
-      Link="Core/SchematicManager.cs"
-    />
-    <Compile
-      Include="../native/FrpcManager.cs"
-      Link="Core/FrpcManager.cs"
-    />
-    <Compile
-      Include="../native/FrpcConfigurations.cs"
-      Link="Core/FrpcConfigurations.cs"
-    />
-    <Compile
-      Include="../native/ContentManager.cs"
-      Link="Core/ContentManager.cs"
-    />
-    <Compile
-      Include="../native/ModrinthService.cs"
-      Link="Core/ModrinthService.cs"
-    />
-    <Compile
-      Include="../native/CmsBlueprints.cs"
-      Link="Core/CmsBlueprints.cs"
-    />
-    <Compile
-      Include="../native/CmsCache.cs"
-      Link="Core/CmsCache.cs"
-    />
-    <Compile
-      Include="../native/CmsHtml.cs"
-      Link="Core/CmsHtml.cs"
-    />
-    <Compile
-      Include="../native/BlueprintService.cs"
-      Link="Core/BlueprintService.cs"
-    />
-    <Compile
-      Include="../native/CommunityService.cs"
-      Link="Core/CommunityService.cs"
-    />
-    <Compile
-      Include="../native/CurseForgeCommunityService.cs"
-      Link="Core/CurseForgeCommunityService.cs"
-    />
-    <EmbeddedResource
-      Include="$(CurseForgeConfigurationFile)"
-      LogicalName="CMCLauncher.CurseForgeApi"
-      Condition="Exists('$(CurseForgeConfigurationFile)')"
-    />
-    <Compile
-      Include="../native/CurseForgeCredentials.cs"
-      Link="Core/CurseForgeCredentials.cs"
-    />
-    <Compile
-      Include="../native/CurseForgeService.cs"
-      Link="Core/CurseForgeService.cs"
-    />
-    <Compile
-      Include="../native/CurseForgeClient.cs"
-      Link="Core/CurseForgeClient.cs"
-    />
-    <Compile
-      Include="../native/MicrosoftAuth.cs"
-      Link="Core/MicrosoftAuth.cs"
-    />
-    <Compile
-      Include="../native/ExternalAuth.cs"
-      Link="Core/ExternalAuth.cs"
-    />
-    <Compile
-      Include="../native/GlobalUsings.cs"
-      Link="Core/GlobalUsings.cs"
-    />
+    <!-- Core services are provided by project references. -->
   </ItemGroup>
   <!-- 构建时生成构建信息源码，About 页自动展示构建时间/版本/提交。 -->
   <ItemGroup>
@@ -412,10 +246,4 @@
       Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\organize-winui-languages.ps1&quot; -PublishDir ."
     />
   </Target>
-  <ItemGroup>
-    <PackageReference
-      Include="AngleSharp"
-      Version="1.9.1"
-    />
-  </ItemGroup>
 </Project>

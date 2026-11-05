@@ -69,6 +69,7 @@ internal static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        WindowsLauncherPlatform.Initialize();
         if (
             args.Contains("--launch-audit-child")
             || args.Contains("-XshowSettings:properties")

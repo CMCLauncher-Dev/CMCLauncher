@@ -1,49 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- 核心编译成独立库供测试使用；WinUI 项目也会直接链接这些源码。 -->
+  <!-- Windows adapters; retain this project path for existing build scripts. -->
   <PropertyGroup>
-    <OutputType>Library</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>CMCLauncher</AssemblyName>
+    <AssemblyName>CMCLauncher.Platform.Windows</AssemblyName>
     <RootNamespace>CMCLauncher</RootNamespace>
     <Version>1.0.2-beta</Version>
-    <CurseForgeConfigurationFile
-      Condition="'$(CurseForgeConfigurationFile)' == ''"
-    >$(MSBuildProjectDirectory)/../winui/curseforge.local.json</CurseForgeConfigurationFile>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../CMCLauncher.Core/CMCLauncher.Core.csproj" />
     <EmbeddedResource
       Include="LauncherUpdateWorker.ps1"
       LogicalName="CMCLauncher.UpdateWorker"
-    />
-  </ItemGroup>
-  <!-- 本地构建可嵌入公开 OAuth 客户端 ID，源文件不进入发行包。 -->
-  <ItemGroup>
-    <EmbeddedResource
-      Include="../winui/themes/craft.json"
-      LogicalName="CMCLauncher.Themes.craft.json"
-    />
-
-    <EmbeddedResource
-      Include="../winui/locales/*.json"
-      LogicalName="CMCLauncher.Locales.%(Filename).json"
-    />
-    <EmbeddedResource
-      Include="../winui/clientid.local.json"
-      LogicalName="CMCLauncher.MicrosoftClient"
-      Condition="Exists('../winui/clientid.local.json')"
-    />
-    <EmbeddedResource
-      Include="$(CurseForgeConfigurationFile)"
-      LogicalName="CMCLauncher.CurseForgeApi"
-      Condition="Exists('$(CurseForgeConfigurationFile)')"
-    />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference
-      Include="AngleSharp"
-      Version="1.9.1"
     />
   </ItemGroup>
 </Project>

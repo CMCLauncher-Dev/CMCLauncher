@@ -42,6 +42,7 @@ internal static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        WindowsLauncherPlatform.Initialize();
 #if SINGLE_FILE
         ExtractCompanionFiles();
 #endif

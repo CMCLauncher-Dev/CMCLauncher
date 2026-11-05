@@ -1221,14 +1221,11 @@ public sealed partial class LauncherCore : IDisposable
         bool allowed = false;
         foreach (var r in rules.Items())
         {
-            if (r["os"]?.S("name") is { Length: > 0 } name && name != "windows")
+            if (r["os"]?.S("name") is { Length: > 0 } name && name != MinecraftPlatform.OsName)
                 continue;
             if (
                 r["os"]?.S("arch") is { Length: > 0 } arch
-                && !Regex.IsMatch(
-                    Environment.Is64BitProcess ? "x86_64" : "x86",
-                    "^(?:" + arch + ")$"
-                )
+                && !Regex.IsMatch(MinecraftPlatform.Architecture, "^(?:" + arch + ")$")
             )
                 continue;
             if (

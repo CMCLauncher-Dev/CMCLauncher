@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "parameters": "--deprecated --include-transitive",
+  "sources": [
+    "https://api.nuget.org/v3/index.json"
+  ],
+  "projects": [
+    {
+      "path": "winui/CMCLauncher.WinUI.csproj"
+    }
+  ]
+}

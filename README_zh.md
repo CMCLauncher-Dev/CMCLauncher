@@ -159,7 +159,7 @@
 
 凭据会使用 DPAPI 为当前 Windows 用户加密。将配置复制到其他用户或设备时，可能需要重新登录。备份游戏时，请一并包含其实际实例目录中的存档与设置。
 
-即便启用了 SSL 错误覆盖，启动器的 HTTPS 客户端仍会拒绝其内嵌拒绝列表中的证书公钥。详见 [CertificatePolicy.cs](native/CertificatePolicy.cs)。该策略不会修改 Windows 信任存储，也不会更改外部 Java 安装程序与游戏所执行的证书验证。
+即便启用了 SSL 错误覆盖，启动器的 HTTPS 客户端仍会拒绝其内嵌拒绝列表中的证书公钥。详见 [CertificatePolicy.cs](CMCLauncher.Core/CertificatePolicy.cs)。该策略不会修改 Windows 信任存储，也不会更改外部 Java 安装程序与游戏所执行的证书验证。
 
 ## 从源码运行
 
@@ -236,16 +236,20 @@ dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
 
 ## 源码结构
 
-本仓库采用三层分层架构：
+核心服务与 Windows 集成已拆分，详见[依赖与跨平台审计](docs/DEPENDENCY_AUDIT.md)。
 
-- [`native/`](native/) 为**核心逻辑层**，包含下载、启动参数、认证、Java 处理、内容管理与存储。
+- [`CMCLauncher.Core/`](CMCLauncher.Core/) 为 `net8.0` 核心服务，不依赖 Windows SDK。
+- [`native/`](native/) 为 Windows 适配层，提供凭据加密、注册表集成与更新安装。
+- [`core.tests/`](core.tests/) 包含跨平台核心检查。
 - [`winui/`](winui/) 为**界面层**，包含桌面入口、窗口、页面、控件与 UI 服务。
 - [`native.tests/`](native.tests/) 为**测试层**，包含原生回归测试与证书夹具。
 
 | 目录 | 内容 |
 | --- | --- |
 | [`winui/`](winui/) | 桌面入口、窗口、页面、控件与 UI 服务 |
-| [`native/`](native/) | 下载、启动参数、认证、Java、内容管理与存储 |
+| [`CMCLauncher.Core/`](CMCLauncher.Core/) | 下载、认证协议、资源浏览、存储与平台无关服务 |
+| [`native/`](native/) | Windows 凭据、内存与区域查询、注册表集成和更新安装 |
+| [`core.tests/`](core.tests/) | 跨平台核心回归检查 |
 | [`native.tests/`](native.tests/) | 原生回归测试与证书夹具 |
 | [`scripts/`](scripts/) | 发布、资源整理与打包脚本 |
 | [`docs/`](docs/) | 项目官网源码与截图资源 |

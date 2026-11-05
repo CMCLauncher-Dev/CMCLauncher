@@ -60,7 +60,7 @@ public sealed partial class LauncherCore
                     classpath[index] = file;
                 }
                 var classifier = lib["natives"]
-                    ?.S("windows")
+                    ?.S(MinecraftPlatform.OsName)
                     .Replace("${arch}", Environment.Is64BitProcess ? "64" : "32");
                 if (
                     classifier is { Length: > 0 }

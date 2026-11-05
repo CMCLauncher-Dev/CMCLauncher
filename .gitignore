@@ -10,3 +10,4 @@ winui/artifacts/
 winui/CompanionData.g.cs
 test-extract/
 .vscode/
+scripts/clean-project.ps1

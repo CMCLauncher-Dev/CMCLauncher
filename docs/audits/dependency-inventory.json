@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "parameters": "--include-transitive",
+  "problems": [
+    {
+      "level": "warning",
+      "text": "(A): 自动引用的包。"
+    }
+  ],
+  "projects": [
+    {
+      "path": "winui/CMCLauncher.WinUI.csproj",
+      "frameworks": [
+        {
+          "framework": "net8.0-windows10.0.19041",
+          "topLevelPackages": [
+            {
+              "id": "Markdig",
+              "requestedVersion": "1.4.2",
+              "resolvedVersion": "1.4.2"
+            },
+            {
+              "id": "Microsoft.NET.ILLink.Tasks",
+              "requestedVersion": "[8.0.31, )",
+              "resolvedVersion": "8.0.31",
+              "autoReferenced": "true"
+            },
+            {
+              "id": "Microsoft.WindowsAppSDK.DWrite",
+              "requestedVersion": "1.8.25122902",
+              "resolvedVersion": "1.8.25122902"
+            },
+            {
+              "id": "Microsoft.WindowsAppSDK.WinUI",
+              "requestedVersion": "1.8.260803003",
+              "resolvedVersion": "1.8.260803003"
+            }
+          ],
+          "transitivePackages": [
+            {
+              "id": "AngleSharp",
+              "resolvedVersion": "1.9.1"
+            },
+            {
+              "id": "Microsoft.Web.WebView2",
+              "resolvedVersion": "1.0.3179.45"
+            },
+            {
+              "id": "Microsoft.Windows.SDK.BuildTools",
+              "resolvedVersion": "10.0.26100.4654"
+            },
+            {
+              "id": "Microsoft.Windows.SDK.BuildTools.MSIX",
+              "resolvedVersion": "1.7.20250829.1"
+            },
+            {
+              "id": "Microsoft.WindowsAppSDK.Base",
+              "resolvedVersion": "1.8.251216001"
+            },
+            {
+              "id": "Microsoft.WindowsAppSDK.Foundation",
+              "resolvedVersion": "1.8.260803002"
+            },
+            {
+              "id": "Microsoft.WindowsAppSDK.InteractiveExperiences",
+              "resolvedVersion": "1.8.260708001"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

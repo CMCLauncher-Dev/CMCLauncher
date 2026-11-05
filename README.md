@@ -159,7 +159,7 @@ Existing installations automatically migrate the legacy data directory to `%APPD
 
 Credentials are encrypted with DPAPI for the current Windows user. Copying the configuration to another user or device may require signing in again. When backing up games, include saves and settings from their actual instance directories.
 
-The launcher's HTTPS client rejects certificate public keys on its embedded denylist, even when the SSL-error override is enabled. See [CertificatePolicy.cs](native/CertificatePolicy.cs). This policy does not modify Windows trust stores or change certificate validation performed by external Java installers and games.
+The launcher's HTTPS client rejects certificate public keys on its embedded denylist, even when the SSL-error override is enabled. See [CertificatePolicy.cs](CMCLauncher.Core/CertificatePolicy.cs). This policy does not modify Windows trust stores or change certificate validation performed by external Java installers and games.
 
 ## Run from source
 
@@ -236,16 +236,20 @@ The check uses an isolated data directory and produces screenshots and `passed.t
 
 ## Source layout
 
-The repository follows a three-layer architecture:
+The application separates portable services from Windows integration. See the [dependency and portability audit](docs/DEPENDENCY_AUDIT.md) for verified boundaries and remaining platform work.
 
-- [`native/`](native/) contains the **core logic** layer, including downloads, launch arguments, authentication, Java handling, content management, and storage.
+- [`CMCLauncher.Core/`](CMCLauncher.Core/) builds **CMCLauncher.Core** (`net8.0`), containing domain services and no Windows SDK dependency.
+- [`native/`](native/) builds the **Windows adapter**, including secure credentials, registry integration and the updater.
+- [`core.tests/`](core.tests/) runs portable service and platform-boundary checks.
 - [`winui/`](winui/) is the **UI layer** with the desktop entry point, window, pages, controls, and UI services.
 - [`native.tests/`](native.tests/) is the **test layer** with native regression tests and certificate fixtures.
 
 | Directory | Contents |
 | --- | --- |
 | [`winui/`](winui/) | Desktop entry point, window, pages, controls, and UI services |
-| [`native/`](native/) | Downloads, launch arguments, authentication, Java, content management, and storage |
+| [`CMCLauncher.Core/`](CMCLauncher.Core/) | Portable downloads, authentication protocols, storage, resource providers and catalogs |
+| [`native/`](native/) | Windows credentials, memory/region discovery, registry integration and updater |
+| [`core.tests/`](core.tests/) | Portable regression checks; Windows/Linux/macOS CI matrix |
 | [`native.tests/`](native.tests/) | Native regression tests and certificate fixtures |
 | [`scripts/`](scripts/) | Publishing, resource organization, and packaging scripts |
 | [`docs/`](docs/) | Project website source and screenshot assets |

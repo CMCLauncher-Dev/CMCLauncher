@@ -1,103 +1,8 @@
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Nodes;
 
 namespace CMCLauncher;
-
-// Windows DPAPI 凭据加密 — 用当前用户身份加密/解密账号 Token
-public static class CredentialVault
-{
-    [StructLayout(LayoutKind.Sequential)]
-    struct Blob
-    {
-        public int Length;
-        public IntPtr Data;
-    }
-
-    [DllImport("crypt32.dll", SetLastError = true)]
-    static extern bool CryptProtectData(
-        ref Blob input,
-        string? description,
-        IntPtr entropy,
-        IntPtr reserved,
-        IntPtr prompt,
-        int flags,
-        out Blob output
-    );
-
-    [DllImport("crypt32.dll", SetLastError = true)]
-    static extern bool CryptUnprotectData(
-        ref Blob input,
-        IntPtr description,
-        IntPtr entropy,
-        IntPtr reserved,
-        IntPtr prompt,
-        int flags,
-        out Blob output
-    );
-
-    [DllImport("kernel32.dll")]
-    static extern IntPtr LocalFree(IntPtr memory);
-
-    // 输入由本程序分配，输出由 DPAPI 分配，分别用 FreeHGlobal 和 LocalFree 释放。
-    static byte[] Transform(byte[] data, bool protect)
-    {
-        var input = new Blob { Length = data.Length, Data = Marshal.AllocHGlobal(data.Length) };
-        Blob output = default;
-        try
-        {
-            Marshal.Copy(data, 0, input.Data, data.Length);
-            var success = protect
-                ? CryptProtectData(
-                    ref input,
-                    "CMCLauncher",
-                    IntPtr.Zero,
-                    IntPtr.Zero,
-                    IntPtr.Zero,
-                    1,
-                    out output
-                )
-                : CryptUnprotectData(
-                    ref input,
-                    IntPtr.Zero,
-                    IntPtr.Zero,
-                    IntPtr.Zero,
-                    IntPtr.Zero,
-                    1,
-                    out output
-                );
-            if (!success)
-                throw new Exception("Windows 凭据加密失败，请重新登录");
-            var bytes = new byte[output.Length];
-            Marshal.Copy(output.Data, bytes, 0, output.Length);
-            return bytes;
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(input.Data);
-            if (output.Data != IntPtr.Zero)
-                LocalFree(output.Data);
-        }
-    }
-
-    public static string Protect(JsonNode value) =>
-        Convert.ToBase64String(Transform(Encoding.UTF8.GetBytes(value.ToJsonString()), true));
-
-    public static JsonNode Read(Account account) =>
-        account.Type == "offline"
-            ? new JsonObject { ["accessToken"] = "0" }
-            : JsonNode.Parse(
-                Encoding.UTF8.GetString(
-                    Transform(
-                        Convert.FromBase64String(
-                            account.Secret ?? throw new Exception("账号凭据不存在，请重新登录")
-                        ),
-                        false
-                    )
-                )
-            )!;
-}
 
 // Microsoft OAuth 设备代码登录 — 流程：设备代码 → Xbox Live → XSTS → Minecraft 服务
 public sealed class MicrosoftAuth(LauncherCore core)
@@ -262,8 +167,6 @@ public sealed class MicrosoftAuth(LauncherCore core)
     public const string OfflineLockedMessage =
         "请先通过 Microsoft 登录并验证 Minecraft Java Edition 正版档案，才能使用离线身份。";
 
-    [DllImport("kernel32.dll")]
-    static extern int GetUserGeoID(int geoClass);
 
     // Use system region information, not the launcher's selected UI language.
     public static bool IsMainlandEnvironment(string zone, string region, int geoId) =>
@@ -280,7 +183,7 @@ public sealed class MicrosoftAuth(LauncherCore core)
                 return IsMainlandEnvironment(
                     TimeZoneInfo.Local.Id,
                     System.Globalization.RegionInfo.CurrentRegion.TwoLetterISORegionName,
-                    OperatingSystem.IsWindows() ? GetUserGeoID(16) : -1
+                    LauncherPlatform.Current.GeoId
                 );
             }
             catch

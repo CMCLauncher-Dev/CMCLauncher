@@ -159,7 +159,7 @@ GitHub の API が 403/429 を返すか利用できない場合、ランチャ�
 
 資格情報は現在の Windows ユーザーに対して DPAPI で暗号化されます。設定を別のユーザーやデバイスにコピーした場合、再サインインが必要になることがあります。ゲームをバックアップする際は、実際のインスタンスディレクトリのセーブと設定を含めてください。
 
-SSL エラーの上書きが有効でも、ランチャーの HTTPS クライアントは組み込みの拒否リストにある証明書の公開鍵を拒否します。[CertificatePolicy.cs](native/CertificatePolicy.cs) を参照してください。このポリシーは Windows のトラストストアを変更したり、外部の Java インストーラやゲームが実行する証明書検証を変更したりしません。
+SSL エラーの上書きが有効でも、ランチャーの HTTPS クライアントは組み込みの拒否リストにある証明書の公開鍵を拒否します。[CertificatePolicy.cs](CMCLauncher.Core/CertificatePolicy.cs) を参照してください。このポリシーは Windows のトラストストアを変更したり、外部の Java インストーラやゲームが実行する証明書検証を変更したりしません。
 
 ## ソースから実行
 
@@ -236,16 +236,20 @@ dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
 
 ## ソース構造
 
-このリポジトリは 3 層アーキテクチャを採用しています：
+コアサービスと Windows 統合を分離しています。[依存関係と移植性の監査](docs/DEPENDENCY_AUDIT.md)を参照してください。
 
-- [`native/`](native/) は**コアロジック層**で、ダウンロード、起動引数、認証、Java 処理、コンテンツ管理、ストレージを含みます。
+- [`CMCLauncher.Core/`](CMCLauncher.Core/) は Windows SDK に依存しない `net8.0` コアサービスです。
+- [`native/`](native/) は資格情報、レジストリ、更新処理の Windows アダプターです。
+- [`core.tests/`](core.tests/) は移植可能なコアの回帰チェックです。
 - [`winui/`](winui/) は**界面層（UI 層）** で、デスクトップエントリポイント、ウィンドウ、ページ、コントロール、UI サービスを含みます。
 - [`native.tests/`](native.tests/) は**テスト層**で、ネイティブ回帰テストと証明書フィクスチャを含みます。
 
 | ディレクトリ | 内容 |
 | --- | --- |
 | [`winui/`](winui/) | デスクトップエントリポイント、ウィンドウ、ページ、コントロール、UI サービス |
-| [`native/`](native/) | ダウンロード、起動引数、認証、Java、コンテンツ管理、ストレージ |
+| [`CMCLauncher.Core/`](CMCLauncher.Core/) | ダウンロード、認証プロトコル、リソース、ストレージ |
+| [`native/`](native/) | Windows 資格情報、レジストリ、更新処理 |
+| [`core.tests/`](core.tests/) | 移植可能なコアの回帰チェック |
 | [`native.tests/`](native.tests/) | ネイティブ回帰テストと証明書フィクスチャ |
 | [`scripts/`](scripts/) | 公開、リソース整理、パッケージングスクリプト |
 | [`docs/`](docs/) | プロジェクト Web サイトのソースとスクリーンショットアセット |

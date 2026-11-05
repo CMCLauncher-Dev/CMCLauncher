@@ -22,7 +22,7 @@ An embedded desktop credential can be extracted from the binary. CI Secrets prot
 
 ## Available extension points
 
-`ICurseForgeClient` in `native/CurseForgeClient.cs` exposes Minecraft project search, project details, paginated file lists, individual files, and a conservative file-access assessment. Models retain project links, authors, game versions and hashes for later attribution and integrity checks. Refer to the [official API reference](https://docs.curseforge.com/rest-api/).
+`ICurseForgeClient` in `CMCLauncher.Core/CurseForgeClient.cs` exposes Minecraft project search, project details, paginated file lists, individual files, and a conservative file-access assessment. Models retain project links, authors, game versions and hashes for later attribution and integrity checks. Refer to the [official API reference](https://docs.curseforge.com/rest-api/).
 
 - API requests use the fixed official HTTPS origin and a per-request `x-api-key` header. There is no API-key query parameter or shared default authentication header.
 - Production transport disables proxies, redirects and cookies, validates TLS, and does not inherit the launcher's proxy or SSL-error override settings. This is separate from Git's command-specific proxy setting.
