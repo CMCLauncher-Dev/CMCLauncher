@@ -4,7 +4,7 @@
 
 # CMCLauncher
 
-**A native Windows home for your Minecraft Java worlds.**
+A Windows launcher for Minecraft Java Edition.
 
 [English](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md)
 
@@ -24,146 +24,60 @@
 
 </div>
 
-A native Windows launcher for Minecraft Java Edition, built with C#, .NET 8, and WinUI 3. Manage isolated instances, download game versions and loaders, install Modrinth and CurseForge content, and manage Java and accounts.
-
-This launcher ships with interface translations for English, Simplified Chinese, Japanese, Russian, French, Spanish, and Arabic, selected automatically or in **Settings → General → Language**. The README itself is available in English, Simplified Chinese, and Japanese.
-
-## Preview
+Built with C#, .NET 8 and WinUI 3. CMCLauncher installs Minecraft and mod loaders, manages instances, and downloads community content.
 
 <div align="center">
 <img src="docs/assets/launcher-home.png" alt="CMCLauncher home" width="960" />
 </div>
 
-## Built for your next world
+## Download and run
 
-<table>
-<tr>
-<td width="33%" valign="top">
-<h3>🧩 Instances, together</h3>
-<p>Isolated game folders, local imports, and PCL / HMCL compatibility.</p>
-</td>
-<td width="33%" valign="top">
-<h3>📦 Modpacks & loaders</h3>
-<p>Fabric, Forge, NeoForge, Modrinth packs, and supported ZIP imports.</p>
-</td>
-<td width="33%" valign="top">
-<h3>🔎 Community content</h3>
-<p>Discover Mods, resource packs, shaders, and more on Modrinth / CurseForge.</p>
-</td>
-</tr>
-<tr>
-<td width="33%" valign="top">
-<h3>🎨 Make it yours</h3>
-<p>Light and dark themes, custom colors, fonts, and seven interface languages.</p>
-</td>
-<td width="33%" valign="top">
-<h3>📈 Know your system</h3>
-<p>Live CPU, memory, and per-GPU charts, plus automatic Java memory budgets.</p>
-</td>
-<td width="33%" valign="top">
-<h3>🔄 Keep moving</h3>
-<p>Verified launcher updates, an optional Beta channel, and Frp Client management.</p>
-</td>
-</tr>
-</table>
+Download the Windows x64 ZIP or EXE from [Releases](https://github.com/com-in/CMCLauncher/releases). Extract the ZIP before running `CMCLauncher.exe`. The single EXE extracts its runtime on first launch. Use a writable folder.
 
-## Quick start
+Requires Windows 10 version 2004 (build 19041) or later. Release builds include .NET and the Windows App SDK; Java is installed separately.
 
-1. Download `CMCLauncher-1.0.2-beta-win-x64.zip` from [Releases](https://github.com/com-in/CMCLauncher/releases), extract the entire archive, and run `CMCLauncher.exe`.
-2. Open **Settings → Java** to scan for or import an existing Java installation, or download Temurin Java.
-3. Open **Settings → Accounts** and choose Microsoft device-code sign-in. Complete authorization in your browser, then wait for the launcher to verify your Minecraft Java profile.
-4. Download a game version, import an existing `.minecraft` folder, or import a modpack. Select a version and account on Home, then launch.
+1. Choose where to store Minecraft files on first launch. You can import existing instances or add more directories later.
+2. Scan, import or download Java in **Settings → Java**.
+3. Sign in under **Settings → Accounts**.
+4. Download a game version or import a modpack, then select an instance and account to launch.
 
-External sign-in is available under **Settings → Accounts → External sign-in (authlib-injector)** after a Microsoft account has passed Minecraft Java profile verification. Enter your Yggdrasil server URL and that server's credentials, then select a player profile if prompted. The launcher stores encrypted session tokens, downloads and verifies authlib-injector when launching, and requires a verified Microsoft account to remain in the account list. Removing the last verified Microsoft account locks external accounts until Microsoft verification is restored.
-
-The release archive includes the .NET and Windows App SDK runtimes, so you do not need to install .NET separately. Java and game files are downloaded or imported separately. The launcher checks GitHub Releases on startup by default. In **More → About → Launcher updates**, you can disable startup checks, check manually, and opt into Beta releases. Choose **Download and install update** to verify the package with GitHub’s SHA-256 digest, close the launcher, install the update, and restart. Active tasks and games must finish first. Accounts, instances, settings, and existing language/theme files are kept. The installation folder must be writable; replacement failures attempt to restore backed-up files, with diagnostics and backups under `%LOCALAPPDATA%/CMCLauncher/updates/`. If a release has no compatible package or SHA-256 digest, use **View release notes** to download manually. Turning Beta off affects future checks and never downgrades an installed version.
-
-### Requirements
-
-- Windows 10 version 2004 (build 19041) or later, x64.
-- A compatible Java runtime for the selected Minecraft version. The launcher checks and matches discovered Java installations at launch.
-- A Microsoft account with a Minecraft Java Edition profile for Microsoft sign-in. Offline identities are available on mainland China systems, detected from the system time zone and region without an IP lookup. Elsewhere they require a verified Microsoft account. External authentication always requires Microsoft verification.
+Microsoft sign-in requires a Minecraft Java Edition profile. Account availability depends on the launcher's ownership checks and system region. Browser authorization is followed by Xbox and Minecraft profile verification.
 
 ## Features
 
-| Area | Supported features |
-| --- | --- |
-| Games and instances | Browse releases, snapshots, and April Fools versions; create isolated instances; import local game folders |
-| Loaders | Query and install Fabric, Forge, and NeoForge; identify loaders used by imported versions |
-| Modpacks | Import Modrinth `.mrpack` files, ZIP archives with supported manifests, and MultiMC / Prism ZIP exports; drag-and-drop import |
-| Community content | Choose Modrinth, CurseForge, or both; browse paginated results, view project versions, and check game, loader, and installation-target compatibility |
-| Content management | Inspect Mod metadata and icons; import, disable, or remove content; manage data packs by world |
-| Schematics | Search, import, export, rename, and delete `.litematic`, `.schematic`, `.schem`, and `.nbt` files, including nested folders |
-| Java and memory | Scan, import, and download Temurin Java; match Java versions automatically; use automatic or manual heap allocation |
-| Downloads | View progress and speed, cancel tasks, and configure 1–256 simultaneous file downloads; default: 16 |
-| Frp Client | Download official Windows x64 releases, verify INI/TOML configurations, start or stop the client, and view its output |
-| Appearance and language | Light, dark, and system themes; colors, fonts, scaling, and appearance presets; launcher and game language settings |
-| Accounts and diagnostics | Microsoft device-code sign-in, external authlib-injector sign-in, Windows DPAPI credential encryption, runtime logs, and game error report export |
+- **Instances:** isolated game folders, multiple Minecraft directories, favorites, and imports from PCL, HMCL, MultiMC and Prism. Migration is available for directories created and recorded by CMCLauncher.
+- **Games and modpacks:** Minecraft releases and snapshots; Fabric, Forge and NeoForge; Modrinth `.mrpack` files and ZIP archives with recognized manifests.
+- **Community content:** Modrinth and CurseForge search, filters, pagination, project details and compatible file selection. Mod updates keep previous files in `mod-backups`.
+- **Worlds and schematics:** world backup and restore; schematic import, export, rename and folder browsing. Blueprint downloads from Schematicraft, MCS and CMS can be saved to compatible instances.
+- **Java and downloads:** runtime discovery, Temurin downloads, automatic Java selection, memory allocation, transfer progress and cancellation.
+- **Tools:** Minecraft skin avatars exported as PNG, Frp Client downloads and saved INI/TOML configurations, runtime logs and game error reports.
+- **Appearance:** light, dark and system modes; JSON theme presets, fonts and scaling. Seven interface languages are included.
 
-New instances keep Mods, saves, and settings separate. Imported games retain their original locations, including recognized version-isolation layouts.
+Forge and NeoForge compatibility varies by game version. ZIP imports need a recognized manifest. Shaders require an appropriate shader loader, and schematic compatibility depends on the installed mod. CurseForge downloads also depend on application credentials and the author's distribution settings.
 
-Local imports accept a PCL/HMCL launcher folder, `.minecraft`, `versions`, or an individual `versions/<id>` folder. CMCLauncher reads PCL isolation settings and description/favorite/icon metadata, legacy HMCL `hmclversion.cfg`, and current `.hmcl/config/instance-game-settings.json` directory overrides. Explicit isolation and custom runtime directories take precedence over folder detection. HMCL game-component metadata also identifies renamed Minecraft profiles. New isolated instances write compatible PCL and legacy/current HMCL isolation metadata. Discovery uses local profiles only and keeps source files in place; launcher-global preferences and credentials remain managed by each launcher.
+CMS browsing reads HTML pages. Searches run only when submitted, results are cached, and requests are rate-limited. Access restrictions or changes to the site can interrupt browsing; the page provides a link to the original website.
 
-Interface translations are loaded from editable JSON files under `locales/` beside the executable, with built-in fallback copies. Additional valid packs appear in the language selector. See [Interface language packs](docs/LOCALIZATION.md) for the schema, reload behavior, and translation guidelines.
-
-Completed tasks show a temporary toast at the bottom center of the window. Canceled and failed tasks show their respective outcomes there. Deletion uses a confirmation popover beside the action; dismissed popovers leave files unchanged.
-
-Schematics appears in version settings for modded instances with an existing `schematics` folder. If the folder is absent, the launcher checks enabled Mod metadata for supported Litematica/Schematica ports or Create and creates it when detected. Vanilla instances hide this page. File management preserves the original format; compatibility with a particular schematic remains the responsibility of the installed Mod.
-
-Schematic subfolders appear as expandable directories, including empty folders. Search expands matching paths automatically. Enable **DEBUG mode** on the runtime logs page for HTTP request status and header timings, page transitions, task durations, transfer counts, and exception traces. The setting persists across restarts; disabling it stops new DEBUG events. HTTP diagnostics omit query strings, headers, and response bodies.
-
-Community resource pages place filters above the search box. Filter by game version, applicable mod or shader loader, and resource category; resource packs also expose features and resolution, while shaders expose features and performance impact. The More filters button opens a right-side drawer with grouped environment, source availability, license, author, project details, count, date, and content disclosure options. Apply filters updates results from the first page; Reset clears only the drawer options. Closing the drawer keeps your inputs. Submit with Search or Enter, or use Reset filters. Submitted filters remain active while paging and when returning from project details. Game version lists show releases by default. Enable Show snapshots or Show April Fools to reveal those versions in the dropdown; these switches work independently. Select a version and submit the search to filter resources.
-
-### Theme presets
-
-Choose Modrinth, CurseForge, or All using the source selector. All alternates results from the two providers; source-specific categories and the Modrinth-only More filters drawer require selecting the corresponding provider. Basic filters stay on one row. CurseForge requires the application credential included in official release builds; see [CurseForge integration](docs/CURSEFORGE.md).
-
-Color presets are loaded from `themes/*.json`. Fresh green is embedded as a fallback; other palettes are external JSON files. The WinUI3 native preset continues to use Windows resources. See [Theme presets](docs/THEMES.md) for editing and adding palettes.
-
-## Support and limitations
-
-### Frp Client
-
-Open **More → Frp Client**, select a version from the online release list, and choose **Download online**. **Refresh releases** updates the list; **Load more releases** fetches older versions. Downloads come from [official frp releases](https://github.com/fatedier/frp/releases) and must pass the official SHA-256 check. The client is downloaded on demand and is not included in the launcher package.
-
-The downloads section opens by default until a client is installed, then starts collapsed with the installed version shown in its header. Expand it to change or download versions. The selected saved profile stays above separate **New configuration** and **Import** sections, both collapsed by default. The entire creation form, including its own content editor and creation button, is inside the New configuration section. Imports close after a successful copy. Name, format, and path fields adapt to the available width.
-
-If GitHub's API returns 403/429 or is unavailable, the launcher uses the official release webpages and honors the API retry window. Download metadata can also use official release assets and checksums without the API. Previously fetched version lists and release metadata are cached in the launcher data directory and remain available when both online sources fail. Cached or alternate sources are identified on the page and in runtime logs; downloads still require the official SHA-256 check.
-
-Configurations are managed under `frpc/configs/` beside `CMCLauncher.exe`. Enter a file or folder path, choose files, or choose a folder to import copies. Folder imports also copy relative includes, certificates, and other supporting files; single-file imports copy only the selected configuration. The original files are never edited or used to launch Frp Client. Imports with matching names create separate copies. Existing external configuration selections are copied into this managed directory when the page opens.
-
-To create a configuration, expand **New configuration**, enter a name, choose INI or TOML, and type or paste the content in that section. Choose **Create configuration** to save and select the new profile. **Copy current content** fills the new draft from the selected profile without modifying it; **Save as** opens the same form with the current content prefilled. Keep multiple profiles, switch between them, edit and save a profile, save its text as a new profile, or delete a saved configuration with confirmation. The program directory must be writable. Select a downloaded client and a saved profile, then use **Verify** or **Start Frp Client**; edited content is saved and verified before starting. INI is a legacy format; new configurations should use TOML. Match your client version to your frps server.
-
-The client keeps running while you navigate the launcher. **Stop Frp Client** terminates the managed process and its children; closing the launcher stops it too. The page shows a bounded, redacted output log. “Running” indicates that the process is alive; check the Frp Client output to confirm the server connection. Configure your own frps server and credentials in the selected file. Client binaries are stored under `tools/frpc/` in the launcher data directory; only the selected version and configuration path are saved in launcher settings.
-
-### Other limitations
-
-- Forge and NeoForge installation is available, but installation and runtime compatibility have not been fully validated across game versions.
-- ZIP is a container, not a modpack format. Archives must contain a recognized Modrinth, CurseForge, or MultiMC / Prism manifest.
-- CurseForge requires an authorized application credential. Author restrictions, unavailable files, and unsupported download endpoints stop installation; see [CurseForge integration](docs/CURSEFORGE.md).
-- Shaders require an installed and enabled Iris, Oculus, or OptiFine setup. Confirm data pack enablement in game after importing.
-- Browser authorization is followed by Xbox and Minecraft service verification. Actual sign-in and reaching an in-game menu require a valid application configuration and a real account; local tests cannot replace end-to-end verification.
-- Windows x64 is the build and validation target. ARM-native dependencies are not selected.
-
-## Data and logs
+## Settings and data
 
 | Location | Contents |
 | --- | --- |
-| `%APPDATA%/CMCLauncher.Native/settings.json` | Launcher settings, instance records, and encrypted account credentials |
-| `%APPDATA%/CMCLauncher.Native/library/` | Default instances and dependency libraries; a different game root can be selected in the launcher |
-| `%APPDATA%/CMCLauncher.Native/runtimes/` | Java installations downloaded by the launcher |
-| `logs/launcher-yyyyMMdd.log` beside the executable | Launcher runtime logs |
-| `logs/` and `crash-reports/` inside an instance | Game logs and crash reports |
+| `%APPDATA%/CMCLauncher.Native/settings.json` | Settings, instance records and encrypted account credentials |
+| `%APPDATA%/CMCLauncher.Native/library/` | Default library; game directories can be changed in the launcher |
+| `%APPDATA%/CMCLauncher.Native/runtimes/` | Downloaded Java runtimes |
+| `logs/` beside the executable | Launcher logs |
+| `logs/` and `crash-reports/` in each instance | Minecraft logs and crash reports |
 
-Existing installations automatically migrate the legacy data directory to `%APPDATA%/CMCLauncher.Native/` when the new directory does not exist. Internal paths are updated; accounts, settings, and external game directories are preserved.
+Accounts use Windows DPAPI encryption. Moving settings to another Windows user or device may require signing in again. Back up saves from their actual instance directories.
 
-Credentials are encrypted with DPAPI for the current Windows user. Copying the configuration to another user or device may require signing in again. When backing up games, include saves and settings from their actual instance directories.
+Frp Client configurations are copied into the launcher's managed configuration directory; imported originals are left untouched. The client is downloaded separately from official frp releases. New configurations should use TOML; INI support depends on the chosen client version.
 
-The launcher's HTTPS client rejects certificate public keys on its embedded denylist, even when the SSL-error override is enabled. See [CertificatePolicy.cs](CMCLauncher.Core/CertificatePolicy.cs). This policy does not modify Windows trust stores or change certificate validation performed by external Java installers and games.
+Launcher updates are available under **More → About**. Startup checks and the Beta channel can be changed there. Updates verify the release package's SHA-256 digest and require running tasks and games to finish first.
 
-## Run from source
+Language packs and theme presets use editable JSON files with built-in fallbacks. See [language packs](docs/LOCALIZATION.md) and [theme presets](docs/THEMES.md).
 
-On Windows, install the .NET 8 SDK and the Windows SDK / development tools needed to build WinUI 3 projects. The project targets `net8.0-windows10.0.19041.0` and x64. Run the following commands from the repository root after cloning:
+## Build from source
+
+Install the .NET 8 SDK and Windows SDK tools for WinUI 3 development, then run:
 
 ```powershell
 git clone https://github.com/com-in/CMCLauncher.git
@@ -171,15 +85,15 @@ cd CMCLauncher
 dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
 ```
 
-For a one-click local build, double-click `build-and-run.cmd` in the repository root. It publishes a self-contained Release build to a new folder under `.artifacts/local-runs/` and opens that build for manual testing. It leaves `dist` untouched and keeps the console open so build errors are visible. Each run keeps its own output folder; you can remove old folders after closing those builds. The application uses your usual launcher settings.
+For a self-contained test build, run `build-and-run.cmd`. It builds into `.artifacts/local-runs/` and launches the result using your normal launcher settings. To build without launching:
 
-To build without opening the application, run `./build-and-run.ps1 -NoLaunch` in PowerShell.
+```powershell
+./build-and-run.ps1 -NoLaunch
+```
 
-To test CurseForge locally, run `build-and-run.cmd "-curseforgekey=YOUR_KEY"` in Command Prompt. Add `-NoLaunch` to build only. The script embeds the key through a temporary configuration file and deletes that file when the build finishes, including failed builds. It does not print the key or modify `dist`.
+### Login configuration
 
-### Configure Microsoft sign-in
-
-A source build without a client ID can run the interface, but Microsoft sign-in is unavailable. To enable it in a local build, create `winui/clientid.local.json` with your configured public OAuth client ID:
+Microsoft sign-in needs a public OAuth client ID in the Git-ignored `winui/clientid.local.json`:
 
 ```json
 {
@@ -187,110 +101,77 @@ A source build without a client ID can run the interface, but Microsoft sign-in 
 }
 ```
 
-Replace the placeholder with a valid GUID. This file is ignored by Git and embedded as an assembly resource during compilation; it is not distributed as a separate JSON file. The client ID is a public identifier, not a client secret. Your application still needs the appropriate Microsoft / Minecraft API access configuration. The launcher does not collect Microsoft passwords.
+Use a valid GUID for an application configured to access Microsoft and Minecraft services. The ID is embedded during compilation. Tagged CI builds read it from the `MICROSOFT_CLIENT_ID` repository secret.
 
-Tagged release builds read this identifier from the `MICROSOFT_CLIENT_ID` GitHub Actions secret. Ordinary PR builds do not write it.
+For local CurseForge testing:
 
-### Build and package
-
-Build the Release configuration:
-
-```powershell
-dotnet build winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64
+```cmd
+build-and-run.cmd "-curseforgekey=YOUR_KEY" -NoLaunch
 ```
 
-Publish a self-contained directory and create a ZIP archive:
+The build script uses a temporary configuration file. Embedded developer keys can be recovered from binaries; do not treat build-time injection as secret storage. See [CurseForge integration](docs/CURSEFORGE.md).
+
+### Publish
 
 ```powershell
 dotnet publish winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
-./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-1.0.2-beta-win-x64.zip
+./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-win-x64.zip
 ```
 
-The packaging script excludes local configuration, credential, and key files, then checks that the archive contains the launcher executable.
+For a single EXE:
 
-Build a self-extracting single EXE with `./scripts/publish-singlefile.ps1`. It embeds the validated portable runtime rather than changing WinUI's native library layout. Runtime files are cached under `%LOCALAPPDATA%/CMCLauncher/singlefile/`; editable language packs, themes, Frp Client configurations, and logs stay beside the distributed EXE. Existing language/theme edits are preserved. Use a writable folder. Pass `-CurseForgeConfigurationFile PATH` to embed your local application credential through the same portable build.
+```powershell
+./scripts/publish-singlefile.ps1
+```
 
-CI produces both `CMCLauncher-win-x64.zip` and `CMCLauncher-win-x64.exe`. Only tagged Release assets receive a version in their filenames. Both formats use the same credential injection and archive checks; the single EXE also runs an isolated WinUI activation smoke test before upload.
+Publish into a fresh directory to avoid retaining obsolete files. Release builds use partial trimming and preserve application assemblies for reflection and WinUI. Add `-p:PublishTrimmed=false` when comparing with an untrimmed build.
 
-Portable releases include the .NET runtime and the required Windows App SDK components, so users do not need to install these runtimes separately. The project references the WinUI and DWrite component packages instead of the full Windows App SDK bundle to avoid shipping unused AI, machine learning, and Widgets dependencies. Keep their versions aligned with the dependencies of the same Windows App SDK release when updating them. Publish into a fresh directory: publishing over an older output does not remove obsolete dependency files.
-
-Release builds also use partial .NET trimming. The launcher assembly and Windows/WinUI projections remain fully rooted to preserve reflection-based JSON models, XAML controls, and WinRT collection conversions; built-in COM and JSON reflection stay enabled. Trim analysis warnings remain visible. Debug builds are not trimmed. To compare against an untrimmed release, add `-p:PublishTrimmed=false` to the publish command.
+CI builds both ZIP and EXE packages. Workflow artifacts use fixed filenames; tagged release assets include the version.
 
 ### Tests
 
-Run the native regression tests:
+Portable core checks:
+
+```powershell
+dotnet run --project core.tests/CMCLauncher.Core.Tests.csproj -c Release
+```
+
+Windows regression tests (requires Java on PATH):
 
 ```powershell
 dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
 ```
 
-These tests use Windows DPAPI and must run on Windows. The final local Java detection check also requires `java` on PATH.
-
-After publishing the application directory, run the WinUI integration check:
+After publishing, run the UI check:
 
 ```powershell
 & ./dist/cmc-launcher/CMCLauncher.exe --verify-ui "$PWD/.artifacts/winui-check"
 ```
 
-The check uses an isolated data directory and produces screenshots and `passed.txt`. Failures are recorded in `failure.txt`.
+UI checks use isolated data and write screenshots, `passed.txt` and, on failure, `failure.txt`.
 
 ## Source layout
 
-The application separates portable services from Windows integration. See the [dependency and portability audit](docs/DEPENDENCY_AUDIT.md) for verified boundaries and remaining platform work.
-
-- [`CMCLauncher.Core/`](CMCLauncher.Core/) builds **CMCLauncher.Core** (`net8.0`), containing domain services and no Windows SDK dependency.
-- [`native/`](native/) builds the **Windows adapter**, including secure credentials, registry integration and the updater.
-- [`core.tests/`](core.tests/) runs portable service and platform-boundary checks.
-- [`winui/`](winui/) is the **UI layer** with the desktop entry point, window, pages, controls, and UI services.
-- [`native.tests/`](native.tests/) is the **test layer** with native regression tests and certificate fixtures.
-
 | Directory | Contents |
 | --- | --- |
-| [`winui/`](winui/) | Desktop entry point, window, pages, controls, and UI services |
-| [`CMCLauncher.Core/`](CMCLauncher.Core/) | Portable downloads, authentication protocols, storage, resource providers and catalogs |
-| [`native/`](native/) | Windows credentials, memory/region discovery, registry integration and updater |
-| [`core.tests/`](core.tests/) | Portable regression checks; Windows/Linux/macOS CI matrix |
-| [`native.tests/`](native.tests/) | Native regression tests and certificate fixtures |
-| [`scripts/`](scripts/) | Publishing, resource organization, and packaging scripts |
-| [`docs/`](docs/) | Project website source and screenshot assets |
-| [`.github/workflows/`](.github/workflows/) | Automated tests, builds, and tagged releases |
+| [CMCLauncher.Core/](CMCLauncher.Core/) | `net8.0` domain services, networking, storage and resource providers |
+| [native/](native/) | Windows credentials, registry integration and updater |
+| [winui/](winui/) | Windows UI and entry point |
+| [core.tests/](core.tests/) | Portable core checks |
+| [native.tests/](native.tests/) | Windows regression tests and fixtures |
+| [scripts/](scripts/) | Build, packaging and maintenance scripts |
+| [docs/](docs/) | Website, documentation and screenshots |
 
-## Feedback and contributions
+The application currently targets Windows x64. Core has been separated for future platform work; this does not make the WinUI application portable. See the [dependency and portability audit](docs/DEPENDENCY_AUDIT.md) for test results and remaining work.
 
-Report problems through [Issues](https://github.com/com-in/CMCLauncher/issues). Include the launcher version, Windows version, Minecraft and loader versions, and steps to reproduce. For launch failures, attach the error report or relevant logs. Check for account information and local paths before sharing them.
+## Contributing
 
-Run tests relevant to your changes before submitting a pull request. Include screenshots for layout changes, and check cancellation and failure cleanup when changing downloads, installation, or imports.
+Report bugs through [Issues](https://github.com/com-in/CMCLauncher/issues). Include your launcher and Windows versions, Minecraft and loader versions, steps to reproduce, and relevant logs. Remove tokens and other account information before sharing logs.
+
+For code changes, run the relevant tests. Include screenshots for UI changes and check cancellation and cleanup when changing installation or downloads.
 
 ## License
 
-CMCLauncher is licensed under the [GNU General Public License v3.0](LICENSE). Third-party dependencies retain their respective licenses.
+[GNU General Public License v3.0](LICENSE). Third-party dependencies retain their own licenses.
 
-Minecraft, mods, and modpacks belong to their respective owners. CMCLauncher is not affiliated with Mojang Studios, Microsoft, or NetEase.
-
-### Multiple Minecraft directories
-
-Open the version library and expand **Manage Minecraft directories**. Create a new directory, register an existing installation, or select the default location for new installations. Existing instances keep their own game and dependency paths.
-
-Only directories created and recorded by CMCLauncher with a matching ownership marker can be migrated. Imported directories and older directories without ownership records remain usable but cannot be migrated. Close games and other launchers before migrating. Choose a destination that does not exist; the launcher copies and verifies the files, saves updated instance paths, and then removes the old directory. Cancellation or a failed configuration save preserves the source. If cleanup fails after a successful migration, the new location remains active and the launcher reports the remaining old files.
-
-### Mod updates and world backups
-
-The Mod manager checks compatible Modrinth versions by file hash and tracked CurseForge installations. Disabled and unrecognized files are left unchanged. Updates are prepared in a separate directory; old files are retained under the instance's `mod-backups` folder. Close the game before updating.
-
-World management can create ZIP backups outside the game directory and restore them as new worlds without overwriting existing saves.
-
-Blueprint downloads support Schematicraft and MCS Blueprint Library (`mcschematic.top`) with source selection, preview images, search, pagination, file downloads, and installation into supported instances. MCS uses its public developer API.
-
-### CMS Create blueprints
-
-Select CMS in Download → Blueprints to browse up to 12 popular builds. CMS is accessed through its existing HTML pages, not an invented API. Search runs only on Enter or Search; sorting is applied with the next explicit search. Paging is manual. Returning to the page retains its results.
-
-CMS requests share a single scheduler, defaulting to at least 1500 ms between starts. This is a conservative client setting, not a rate published by CMS. Recognized CSRF failures receive at most one session refresh and retry; other 403 responses and verification pages stop requests. A 429 response starts a shared cooldown using Retry-After, with no automatic retry.
-
-Parsed public lists are cached for 30 minutes (home) or 10 minutes (search), details for 30 minutes, and visible covers for 24 hours. The disk cache is capped at 128 MB; stale parsed results can be shown offline. The access notice is a modal with a three-second reading countdown. Request controls are not exposed on the page; internal throttling and cache limits remain active. Session cookies and CSRF tokens are held only in memory.
-
-Details and files are fetched only by user action. Downloads are limited to 8 MB, preserve original bytes and filenames, and reject empty files or HTML error pages. CMS blueprints are not restricted to the Create NBT structure. Installation uses the selected compatible instance only and never overwrites existing schematics; formats unsupported by instance management remain available as file-only downloads. CMS HTML changes can require parser maintenance; inline errors and a website link remain available on failure.
-
-CMS page routes and form fields were checked against the live site and [Create-Cchematics-Internet](https://github.com/wuliaoppx/Create-Cchematics-Internet). The C# integration uses AngleSharp DOM parsing and its own scheduler and cache.
-
-All blueprint providers share the same list cards and standalone detail page, including the preview, introduction, compatible-instance selector and download-file cards. Returning from details restores the corresponding cached list. Provider-specific request and access rules remain in their adapters.
+Minecraft, mods and modpacks belong to their respective owners. CMCLauncher is not affiliated with Mojang Studios, Microsoft or NetEase.
