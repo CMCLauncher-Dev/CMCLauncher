@@ -2,6 +2,9 @@
   "code": "en_us",
   "displayName": "English",
   "strings": {
+    "Maps are downloaded from CurseForge and installed as new saves in the selected instance. Existing saves are kept.": "Maps are downloaded from CurseForge and installed as new saves in the selected instance. Existing saves are kept.",
+    "Maps": "Maps",
+    "Download maps": "Download maps",
     "Original file": "Original file",
 
     "CMS returned an empty file or a web page instead of a blueprint.": "CMS returned an empty file or a web page instead of a blueprint.",

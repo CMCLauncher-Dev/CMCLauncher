@@ -48,7 +48,7 @@ Microsoft sign-in requires a Minecraft Java Edition profile. Account availabilit
 - **Instances:** isolated game folders, multiple Minecraft directories, favorites, and imports from PCL, HMCL, MultiMC and Prism. Migration is available for directories created and recorded by CMCLauncher.
 - **Games and modpacks:** Minecraft releases and snapshots; Fabric, Forge and NeoForge; Modrinth `.mrpack` files and ZIP archives with recognized manifests.
 - **Community content:** Modrinth and CurseForge search, filters, pagination, project details and compatible file selection. Mod updates keep previous files in `mod-backups`.
-- **Worlds and schematics:** world backup and restore; schematic import, export, rename and folder browsing. Blueprint downloads from Schematicraft, MCS and CMS can be saved to compatible instances.
+- **Worlds and schematics:** CurseForge map downloads, world backup and restore; schematic import, export, rename and folder browsing. Blueprint downloads from Schematicraft, MCS and CMS can be saved to compatible instances.
 - **Java and downloads:** runtime discovery, Temurin downloads, automatic Java selection, memory allocation, transfer progress and cancellation.
 - **Tools:** Minecraft skin avatars exported as PNG, Frp Client downloads and saved INI/TOML configurations, runtime logs and game error reports.
 - **Appearance:** light, dark and system modes; JSON theme presets, fonts and scaling. Seven interface languages are included.

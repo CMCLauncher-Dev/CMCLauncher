@@ -56,6 +56,21 @@ static class CurseForgeCommunityTests
         var modrinth = new ModrinthService(core, store);
         var denied = false;
         var badHash = false;
+        var mapMode = false;
+        byte[] mapBytes;
+        using (var data = new MemoryStream())
+        {
+            using (
+                var zip = new System.IO.Compression.ZipArchive(
+                    data,
+                    System.IO.Compression.ZipArchiveMode.Create,
+                    true
+                )
+            )
+            using (var writer = new StreamWriter(zip.CreateEntry("Adventure/level.dat").Open()))
+                writer.Write("world fixture");
+            mapBytes = data.ToArray();
+        }
         var calls = new List<Uri>();
         using var api = new CurseForgeClient(
             () => "fixture-not-a-real-key",
@@ -101,10 +116,14 @@ static class CurseForgeCommunityTests
                 if (uri.Host == "edge.forgecdn.net")
                     return new(HttpStatusCode.OK)
                     {
-                        Content = new StringContent("abc", Encoding.UTF8),
+                        Content = mapMode
+                            ? new ByteArrayContent(mapBytes)
+                            : new StringContent("abc", Encoding.UTF8),
                     };
                 if (uri.AbsolutePath.EndsWith("/categories"))
-                    return Json("""{"data":[{"id":6,"slug":"mc-mods","name":"Mods"}]}""");
+                    return Json(
+                        """{"data":[{"id":6,"slug":"mc-mods","name":"Mods"},{"id":17,"slug":"worlds","name":"Worlds"}]}"""
+                    );
                 if (uri.AbsolutePath.EndsWith("/mods/search"))
                 {
                     var start = Parameter(uri, "index");
@@ -135,7 +154,9 @@ static class CurseForgeCommunityTests
                     return Json("""{"data":"<p>First</p><p>Second &amp; third</p>"}""");
                 if (uri.AbsolutePath.EndsWith("/mods/7"))
                     return Json(
-                        "{\"data\":{\"id\":7,\"gameId\":432,\"classId\":6,\"name\":\"Fixture\",\"allowModDistribution\":"
+                        "{\"data\":{\"id\":7,\"gameId\":432,\"classId\":"
+                            + (mapMode ? "17" : "6")
+                            + ",\"name\":\"Fixture\",\"allowModDistribution\":"
                             + (!denied).ToString().ToLowerInvariant()
                             + ",\"authors\":[{\"name\":\"Author\"}]}}"
                     );
@@ -164,6 +185,20 @@ static class CurseForgeCommunityTests
                         }
                     ),
                 };
+                if (mapMode)
+                {
+                    file["fileName"] = "adventure.zip";
+                    file["fileLength"] = mapBytes.Length;
+                    file["hashes"] = new JsonArray(
+                        new JsonObject
+                        {
+                            ["algo"] = 1,
+                            ["value"] = Convert.ToHexString(
+                                System.Security.Cryptography.SHA1.HashData(mapBytes)
+                            ),
+                        }
+                    );
+                }
                 return uri.AbsolutePath.EndsWith("/files")
                     ? Json(
                         new JsonObject
@@ -296,6 +331,51 @@ static class CurseForgeCommunityTests
             "Cancellation left an installed or partial file"
         );
         var community = new CommunityService(modrinth, service);
+        mapMode = true;
+        badHash = false;
+        var maps = await community.SearchPage("adventure", "world", default, 0, 16);
+        Check(
+            maps.Hits.All(h => h.Type == "world" && h.Source == "curseforge")
+                && calls.Last().Query.Contains("classId=17"),
+            "Maps use CurseForge worlds rather than Modrinth"
+        );
+        var mapInstance = new Instance
+        {
+            GameVersion = "1.21.1",
+            Directory = Path.Combine(root, "map-instance"),
+        };
+        await service.InstallContent(
+            mapInstance,
+            "curseforge:7",
+            "curseforge:9",
+            "world",
+            null,
+            default
+        );
+        await service.InstallContent(
+            mapInstance,
+            "curseforge:7",
+            "curseforge:9",
+            "world",
+            null,
+            default
+        );
+        Check(
+            System.IO.File.Exists(
+                Path.Combine(store.GameDirectory(mapInstance), "saves", "adventure", "level.dat")
+            )
+                && System.IO.File.Exists(
+                    Path.Combine(
+                        store.GameDirectory(mapInstance),
+                        "saves",
+                        "adventure-2",
+                        "level.dat"
+                    )
+                ),
+            "Map installation preserves existing worlds"
+        );
+        mapMode = false;
+
         var merged = new List<string>();
         for (var offset = 0; offset < 36; offset += 16)
         {

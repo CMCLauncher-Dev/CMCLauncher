@@ -72,10 +72,17 @@ public sealed partial class MainWindow
             }
         )
             source.Items.Add(entry);
+        if (type == "world")
+        {
+            source.Items.Clear();
+            source.Items.Add(new FilterChoice("curseforge", "CurseForge"));
+            source.IsEnabled = false;
+        }
         source.SelectedItem =
             source.Items.OfType<FilterChoice>().FirstOrDefault(c => c.Value == initial.Source)
             ?? source.Items[0];
-        root.Children.Add(source);
+        if (type != "world")
+            root.Children.Add(source);
         IEnumerable<FilterChoice> Values(params (string Id, string Key)[] entries) =>
             entries.Select(e => new FilterChoice(e.Id, Ui(e.Key)));
 

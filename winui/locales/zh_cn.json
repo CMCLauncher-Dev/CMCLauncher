@@ -2,6 +2,9 @@
   "code": "zh_cn",
   "displayName": "简体中文",
   "strings": {
+    "Maps are downloaded from CurseForge and installed as new saves in the selected instance. Existing saves are kept.": "地图从 CurseForge 下载，并作为新存档安装到所选实例中，不会覆盖已有存档。",
+    "Maps": "地图",
+    "Download maps": "下载地图",
     "Original file": "原始文件",
 
     "CMS returned an empty file or a web page instead of a blueprint.": "CMS 返回了空文件或网页，并非蓝图文件。",

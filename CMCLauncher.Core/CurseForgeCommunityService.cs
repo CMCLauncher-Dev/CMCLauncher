@@ -85,6 +85,7 @@ public sealed class CurseForgeCommunityService : IDisposable
             "resourcepack" => "texture-packs",
             "shader" => "shaders",
             "datapack" => "data-packs",
+            "world" => "worlds",
             _ => throw new ArgumentException("Unsupported resource type."),
         };
 
@@ -602,7 +603,39 @@ public sealed class CurseForgeCommunityService : IDisposable
             ct.ThrowIfCancellationRequested();
             var rootMetadata =
                 type == "mod" ? await File(Number(project), Number(version), ct) : null;
-            ContentManager.Import(store.GameDirectory(instance), type, world, pending);
+            if (type == "world")
+            {
+                var archive = pending.Single();
+                using var zip = System.IO.Compression.ZipFile.OpenRead(archive);
+                var levels = zip
+                    .Entries.Where(e =>
+                        e.FullName.Replace('\\', '/').Split('/').Last() == "level.dat"
+                    )
+                    .ToArray();
+                var rootLevel =
+                    levels.FirstOrDefault(e => e.FullName == "level.dat")
+                    ?? levels.SingleOrDefault(e =>
+                        e.FullName.Replace('\\', '/').Split('/').Length == 2
+                    )
+                    ?? throw new InvalidDataException(
+                        "The map archive must contain one Minecraft world with level.dat."
+                    );
+                var rootPath = rootLevel.FullName.Replace('\\', '/');
+                var archiveRoot = rootPath.Contains('/') ? rootPath.Split('/')[0] : "";
+                var saves = Store.SafePath(store.GameDirectory(instance), "saves");
+                var name = Path.GetFileNameWithoutExtension(archive);
+
+                var destination = Store.SafePath(saves, name);
+                for (
+                    var suffix = 2;
+                    Directory.Exists(destination) || System.IO.File.Exists(destination);
+                    suffix++
+                )
+                    destination = Store.SafePath(saves, name + "-" + suffix);
+                await WorldArchive.Import(archive, destination, archiveRoot, ct);
+            }
+            else
+                ContentManager.Import(store.GameDirectory(instance), type, world, pending);
             if (type == "mod")
             {
                 var recordFile = Path.Combine(

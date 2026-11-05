@@ -176,14 +176,8 @@ public sealed partial class MainWindow
                 detailTarget = target;
             };
             host.Children.Add(picker);
-            host.Children.Add(
-                Text(
-                    compatible.Length == 0
-                        ? "No compatible instances. Install Create or a schematic mod in a modded instance first. You can still download files."
-                        : "Choose a blueprint format your mod supports. Installing a file does not convert it or install required mods.",
-                    12
-                )
-            );
+            if (compatible.Length == 0)
+                host.Children.Add(Text("No compatible instances. Install Create or a schematic mod in a modded instance first. You can still download files.", 12));
             host.Children.Add(Text("Downloads", 16, true));
             foreach (var file in result.Detail.Files)
             {

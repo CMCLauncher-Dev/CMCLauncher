@@ -313,6 +313,7 @@ public sealed partial class MainWindow
                 or "blueprint-detail"
             ? Visibility.Visible
             : Visibility.Collapsed;
+        PageHeader.ColumnSpacing = PageBackButton.Visibility == Visibility.Visible ? 10 : 0;
         ToolTipService.SetToolTip(
             PageBackButton,
             Ui(page is "resource-detail" or "blueprint-detail" ? "返回列表" : "返回主页")

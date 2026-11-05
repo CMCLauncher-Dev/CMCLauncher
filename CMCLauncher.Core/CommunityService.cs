@@ -44,6 +44,8 @@ public sealed class CommunityService(
     )
     {
         filters ??= new();
+        if (type == "world")
+            filters = filters with { Source = "curseforge" };
         if (offset < 0 || limit is < 1 or > 50)
             throw new ArgumentOutOfRangeException(nameof(offset));
         Task<CommunitySearchPage> Fetch(bool cf, int start, int count) =>

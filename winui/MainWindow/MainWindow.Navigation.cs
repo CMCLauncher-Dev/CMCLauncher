@@ -76,6 +76,7 @@ public sealed partial class MainWindow
                 ("数据包", "\uE8FD", "download-datapack"),
                 ("资源包", "\uE8B9", "download-resourcepack"),
                 ("光影包", "\uE706", "download-shader"),
+                ("Maps", "\uE80F", "download-world"),
                 ("Blueprints", "\uE8A5", "download-blueprint"),
             }
         );
@@ -282,6 +283,7 @@ public sealed partial class MainWindow
             or "download-datapack"
             or "download-resourcepack"
             or "download-shader"
+            or "download-world"
             or "download-blueprint" => "downloads",
             "settings" or "personalization" or "java" or "accounts" or "logs" => "settings",
             _ => "more",
@@ -441,6 +443,7 @@ public sealed partial class MainWindow
                 case "download-blueprint":
                     await BlueprintsPage();
                     break;
+                case "download-world":
                 case "download-mod":
                 case "download-datapack":
                 case "download-resourcepack":

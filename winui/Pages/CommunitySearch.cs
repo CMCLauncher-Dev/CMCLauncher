@@ -40,6 +40,7 @@ public sealed partial class MainWindow
                     ("数据包", "download-datapack"),
                     ("资源包", "download-resourcepack"),
                     ("光影包", "download-shader"),
+                    ("Maps", "download-world"),
                 }
             )
                 PageBody.Children.Add(
@@ -61,12 +62,21 @@ public sealed partial class MainWindow
                 "resourcepack" => "下载资源包",
                 "datapack" => "下载数据包",
                 "shader" => "下载光影包",
+                "world" => "Download maps",
                 _ => "下载 Mod",
             },
             ""
         );
         var state = communityBrowseStates.GetValueOrDefault(preset) ?? new("", 0);
-        var filters = BuildCommunityFilters(preset, state.Filters ?? new());
+        var filters = BuildCommunityFilters(
+            preset,
+            preset == "world"
+                ? (state.Filters ?? new()) with
+                {
+                    Source = "curseforge",
+                }
+                : state.Filters ?? new()
+        );
         var query = new TextBox
         {
             PlaceholderText = Ui("Search community content"),

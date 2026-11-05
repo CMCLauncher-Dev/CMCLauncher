@@ -2,6 +2,9 @@
   "code": "ja_jp",
   "displayName": "日本語",
   "strings": {
+    "Maps are downloaded from CurseForge and installed as new saves in the selected instance. Existing saves are kept.": "マップを CurseForge からダウンロードし、選択したインスタンスに新しいワールドとして追加します。既存のワールドは保持されます。",
+    "Maps": "マップ",
+    "Download maps": "マップをダウンロード",
     "Prefer mirror sources": "Prefer mirror sources",
     "Game download source": "Game download source",
     "Prefer official sources": "Prefer official sources",

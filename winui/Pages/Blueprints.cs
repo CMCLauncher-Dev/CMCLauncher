@@ -119,12 +119,6 @@ public sealed partial class MainWindow
         };
         UpdateDestinationHint();
         PageBody.Children.Add(destinationHint);
-        PageBody.Children.Add(
-            Text(
-                "Choose a blueprint format your mod supports. Installing a file does not convert it or install required mods.",
-                12
-            )
-        );
         if (blueprintSource == "cms")
         {
             await CmsContent(() => target, supported.Length > 0);
