@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>CMCLauncher.Platform.Windows</AssemblyName>
     <RootNamespace>CMCLauncher</RootNamespace>
-    <Version>1.0.2-beta</Version>
+    <Version>1.0.3</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../CMCLauncher.Core/CMCLauncher.Core.csproj" />

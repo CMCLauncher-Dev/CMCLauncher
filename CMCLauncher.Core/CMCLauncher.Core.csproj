@@ -8,7 +8,7 @@
     <WarningsAsErrors>$(WarningsAsErrors);CA1416</WarningsAsErrors>
     <AssemblyName>CMCLauncher.Core</AssemblyName>
     <RootNamespace>CMCLauncher</RootNamespace>
-    <Version>1.0.2-beta</Version>
+    <Version>1.0.3</Version>
     <CurseForgeConfigurationFile
       Condition="'$(CurseForgeConfigurationFile)' == ''"
     >$(MSBuildProjectDirectory)/../winui/curseforge.local.json</CurseForgeConfigurationFile>

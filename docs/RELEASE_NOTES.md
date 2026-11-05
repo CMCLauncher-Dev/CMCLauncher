@@ -1,23 +1,16 @@
-# CMCLauncher 1.0.2-beta
+# CMCLauncher 1.0.3
 
-This is a prerelease for testing the recent interface, monitoring, and launch changes.
+## 更新内容
 
-## Highlights
+- 新增 CurseForge 地图下载，支持搜索、筛选、分页和安装到实例；同名存档自动另存。
+- 新增 CMS 机械动力蓝图来源，统一各蓝图来源的列表与详情页，加入缓存和请求限速。
+- 调整下载页面的标题对齐，移除多余提示，简化单一来源页面的筛选项。
+- 拆出 CMCLauncher.Core，隔离 Windows 平台功能，并加入 Windows、Linux 和 macOS 核心测试流程，为后续跨平台适配做准备。目前启动器仍仅支持 Windows x64。
+- 精简 README，更新源码结构和构建说明。
 
-- Refresh the About page with launcher identity, build information, update controls, and contributors. Unify the displayed release version with update comparisons.
-- Expand system status with responsive half-width CPU, memory, and per-GPU area charts. Cache graphics adapter information and offer continuous sampling after leaving the page.
-- Improve account management layout, show external sign-in directly, and add a LittleSkin server preset.
-- Refine community filter spacing and alignment, and add deletion of downloaded Frp Client versions with confirmation.
-- Improve README presentation with the project logo, badges, feature cards, and English, Chinese, and Japanese documentation.
-- Add a default-on high-performance GPU preference for the selected game Java executable, prefer javaw.exe when available, and retain previous Windows graphics preferences for restoration.
+## 下载
 
-## GPU preference limitation
+- CMCLauncher-1.0.3-win-x64.zip：完整解压后运行 CMCLauncher.exe。
+- CMCLauncher-1.0.3-win-x64.exe：单文件版本，首次运行会释放运行时文件。
 
-The graphics option requests a Windows preference; it does not force hardware selection. Disabling it restores recorded previous settings and may still select a discrete GPU. Check the Minecraft F3 renderer or the OpenGL renderer line in the game log to confirm the GPU used. Game-level GPU selection across all hybrid systems is not verified.
-
-## Downloads
-
-- `CMCLauncher-1.0.2-beta-win-x64.zip`: extract the complete archive and run `CMCLauncher.exe`.
-- `CMCLauncher-1.0.2-beta-win-x64.exe`: standalone self-extracting launcher.
-
-The updater offers this version when **Receive Beta releases** is enabled. Java, game files, and Frp Client are downloaded separately.
+发行包包含 .NET 和 Windows App SDK 运行时，Java 与游戏文件需另行下载或导入。
