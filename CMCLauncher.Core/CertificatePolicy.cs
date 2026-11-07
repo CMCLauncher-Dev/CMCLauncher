@@ -38,21 +38,29 @@ public static class CertificatePolicy
         Action<string>? blocked = null
     )
     {
-        // An absent chain cannot be inspected, even when the user ignores ordinary TLS errors.
-        if (certificate == null || chain == null || chain.ChainElements.Count == 0)
+        // 没有证书实体必然拒绝——即便是忽略模式也无法评估拒绝列表。
+        if (certificate == null)
             return false;
         try
         {
             using var leaf = new X509Certificate2(certificate);
             var authority = BlockedAuthority(leaf);
-            foreach (var element in chain.ChainElements)
-                authority ??= BlockedAuthority(element.Certificate);
+            var hasChain = chain is { ChainElements.Count: > 0 };
+            // 空链/缺失链时无法遍历中间证书，但只要叶子不在拒绝列表、且用户显式
+            // 忽略 TLS 错误，就放行——兼容 Watt Toolkit 等本地代理注入的未信任链。
+            // 关闭忽略或存在链但报告无错误时，分别按既有规则处理。
+            if (hasChain)
+                foreach (var element in chain.ChainElements)
+                    authority ??= BlockedAuthority(element.Certificate);
             // 拒绝列表优先于用户的 SSL 错误忽略选项。
             if (authority != null)
             {
                 blocked?.Invoke(authority);
                 return false;
             }
+            // 空链只能靠显式“忽略 SSL 错误”放行，避免以“无错误”名义绕过校验。
+            if (!hasChain)
+                return ignoreSslErrors;
             return ignoreSslErrors || errors == SslPolicyErrors.None;
         }
         catch (CryptographicException)

@@ -120,8 +120,12 @@ internal static class CertificatePolicyTests
             "Untrusted chain accepted"
         );
         Check(
-            !CertificatePolicy.Validate(safe, null, SslPolicyErrors.None, true),
-            "Missing chain accepted"
+            CertificatePolicy.Validate(safe, null, SslPolicyErrors.None, true),
+            "Missing chain rejected despite user override"
+        );
+        Check(
+            !CertificatePolicy.Validate(safe, null, SslPolicyErrors.None, false),
+            "Missing chain accepted without override"
         );
 
         var files = Directory.GetFiles(Path.Combine(fixtures, "emudhra-chains"), "*.pem");
