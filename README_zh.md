@@ -9,18 +9,18 @@
 [English](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md)
 
 <p>
-<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/com-in/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
-<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/com-in/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
-<a href="https://github.com/com-in/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/com-in/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/CMCLauncher-Dev/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/CMCLauncher-Dev/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CMCLauncher-Dev/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
 <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-7654c4?style=flat-square" /></a>
 <br />
 <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square" />
 <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8-512bd4?style=flat-square" />
 <img alt="WinUI 3" src="https://img.shields.io/badge/WinUI-3-00a4ef?style=flat-square" />
-<a href="https://github.com/com-in/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/com-in/CMCLauncher?style=flat-square" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/CMCLauncher-Dev/CMCLauncher?style=flat-square" /></a>
 </p>
 
-### [下载启动器](https://github.com/com-in/CMCLauncher/releases) · [访问官网](https://cmcl.ctfun.top/) · [反馈问题](https://github.com/com-in/CMCLauncher/issues)
+### [下载启动器](https://github.com/CMCLauncher-Dev/CMCLauncher/releases) · [访问官网](https://cmcl.ctfun.top/) · [反馈问题](https://github.com/CMCLauncher-Dev/CMCLauncher/issues)
 
 </div>
 
@@ -69,7 +69,7 @@
 
 ## 快速开始
 
-1. 从 [Releases](https://github.com/com-in/CMCLauncher/releases) 下载 `CMCLauncher-1.0.2-beta-win-x64.zip`，解压整个压缩包，并运行 `CMCLauncher.exe`。
+1. 从 [Releases](https://github.com/CMCLauncher-Dev/CMCLauncher/releases) 下载 `CMCLauncher-1.0.2-beta-win-x64.zip`，解压整个压缩包，并运行 `CMCLauncher.exe`。
 2. 打开 **设置 → Java**，扫描或导入已有的 Java 安装，或下载 Temurin Java。
 3. 打开 **设置 → 账号**，选择 Microsoft 设备代码登录。在浏览器中完成授权，然后等待启动器验证你的 Minecraft Java 档案。
 4. 下载游戏版本、导入已有的 `.minecraft` 文件夹，或导入整合包。在主界面选择版本与账号，然后启动。
@@ -166,7 +166,7 @@
 在 Windows 上，安装 .NET 8 SDK 以及构建 WinUI 3 项目所需的 Windows SDK / 开发工具。项目目标框架为 `net8.0-windows10.0.19041.0`，架构为 x64。克隆仓库后，在仓库根目录运行以下命令：
 
 ```powershell
-git clone https://github.com/com-in/CMCLauncher.git
+git clone https://github.com/CMCLauncher-Dev/CMCLauncher.git
 cd CMCLauncher
 dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
 ```
@@ -257,7 +257,7 @@ dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
 
 ## 反馈与贡献
 
-通过 [Issues](https://github.com/com-in/CMCLauncher/issues) 反馈问题。请附上启动器版本、Windows 版本、Minecraft 与加载器版本，以及复现步骤。对于启动失败，请附上错误报告或相关日志。分享前请检查是否包含账号信息与本地路径。
+通过 [Issues](https://github.com/CMCLauncher-Dev/CMCLauncher/issues) 反馈问题。请附上启动器版本、Windows 版本、Minecraft 与加载器版本，以及复现步骤。对于启动失败，请附上错误报告或相关日志。分享前请检查是否包含账号信息与本地路径。
 
 提交 Pull Request 前，请运行与你改动相关的测试。布局改动请附上截图，并在修改下载、安装或导入功能时检查取消与失败后的清理情况。
 

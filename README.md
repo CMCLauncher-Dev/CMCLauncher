@@ -9,18 +9,18 @@ A Windows launcher for Minecraft Java Edition.
 [English](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md)
 
 <p>
-<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/com-in/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
-<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/com-in/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
-<a href="https://github.com/com-in/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/com-in/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/CMCLauncher-Dev/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/CMCLauncher-Dev/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CMCLauncher-Dev/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
 <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-7654c4?style=flat-square" /></a>
 <br />
 <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square" />
 <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8-512bd4?style=flat-square" />
 <img alt="WinUI 3" src="https://img.shields.io/badge/WinUI-3-00a4ef?style=flat-square" />
-<a href="https://github.com/com-in/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/com-in/CMCLauncher?style=flat-square" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/CMCLauncher-Dev/CMCLauncher?style=flat-square" /></a>
 </p>
 
-### [Download](https://github.com/com-in/CMCLauncher/releases) · [Website](https://cmcl.ctfun.top/) · [Report an issue](https://github.com/com-in/CMCLauncher/issues)
+### [Download](https://github.com/CMCLauncher-Dev/CMCLauncher/releases) · [Website](https://cmcl.ctfun.top/) · [Report an issue](https://github.com/CMCLauncher-Dev/CMCLauncher/issues)
 
 </div>
 
@@ -32,7 +32,7 @@ Built with C#, .NET 8 and WinUI 3. CMCLauncher installs Minecraft and mod loader
 
 ## Download and run
 
-Download the Windows x64 ZIP or EXE from [Releases](https://github.com/com-in/CMCLauncher/releases). Extract the ZIP before running `CMCLauncher.exe`. The single EXE extracts its runtime on first launch. Use a writable folder.
+Download the Windows x64 ZIP or EXE from [Releases](https://github.com/CMCLauncher-Dev/CMCLauncher/releases). Extract the ZIP before running `CMCLauncher.exe`. The single EXE extracts its runtime on first launch. Use a writable folder.
 
 Requires Windows 10 version 2004 (build 19041) or later. Release builds include .NET and the Windows App SDK; Java is installed separately.
 
@@ -80,7 +80,7 @@ Language packs and theme presets use editable JSON files with built-in fallbacks
 Install the .NET 8 SDK and Windows SDK tools for WinUI 3 development, then run:
 
 ```powershell
-git clone https://github.com/com-in/CMCLauncher.git
+git clone https://github.com/CMCLauncher-Dev/CMCLauncher.git
 cd CMCLauncher
 dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
 ```
@@ -166,7 +166,7 @@ The application currently targets Windows x64. Core has been separated for futur
 
 ## Contributing
 
-Report bugs through [Issues](https://github.com/com-in/CMCLauncher/issues). Include your launcher and Windows versions, Minecraft and loader versions, steps to reproduce, and relevant logs. Remove tokens and other account information before sharing logs.
+Report bugs through [Issues](https://github.com/CMCLauncher-Dev/CMCLauncher/issues). Include your launcher and Windows versions, Minecraft and loader versions, steps to reproduce, and relevant logs. Remove tokens and other account information before sharing logs.
 
 For code changes, run the relevant tests. Include screenshots for UI changes and check cancellation and cleanup when changing installation or downloads.
 

@@ -9,18 +9,18 @@
 [English](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md)
 
 <p>
-<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/com-in/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
-<a href="https://github.com/com-in/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/com-in/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
-<a href="https://github.com/com-in/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/com-in/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/CMCLauncher-Dev/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/CMCLauncher-Dev/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CMCLauncher-Dev/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
 <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-7654c4?style=flat-square" /></a>
 <br />
 <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square" />
 <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8-512bd4?style=flat-square" />
 <img alt="WinUI 3" src="https://img.shields.io/badge/WinUI-3-00a4ef?style=flat-square" />
-<a href="https://github.com/com-in/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/com-in/CMCLauncher?style=flat-square" /></a>
+<a href="https://github.com/CMCLauncher-Dev/CMCLauncher/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/CMCLauncher-Dev/CMCLauncher?style=flat-square" /></a>
 </p>
 
-### [ダウンロード](https://github.com/com-in/CMCLauncher/releases) · [公式サイト](https://cmcl.ctfun.top/) · [問題を報告](https://github.com/com-in/CMCLauncher/issues)
+### [ダウンロード](https://github.com/CMCLauncher-Dev/CMCLauncher/releases) · [公式サイト](https://cmcl.ctfun.top/) · [問題を報告](https://github.com/CMCLauncher-Dev/CMCLauncher/issues)
 
 </div>
 
@@ -69,7 +69,7 @@ Minecraft Java Edition 向けのネイティブ Windows ランチャーです。
 
 ## クイックスタート
 
-1. [Releases](https://github.com/com-in/CMCLauncher/releases) から `CMCLauncher-1.0.2-beta-win-x64.zip` をダウンロードし、アーカイブ全体を展開して `CMCLauncher.exe` を実行します。
+1. [Releases](https://github.com/CMCLauncher-Dev/CMCLauncher/releases) から `CMCLauncher-1.0.2-beta-win-x64.zip` をダウンロードし、アーカイブ全体を展開して `CMCLauncher.exe` を実行します。
 2. **設定 → Java** を開き、既存の Java インストールをスキャン／インポートするか、Temurin Java をダウンロードします。
 3. **設定 → アカウント** を開き、Microsoft デバイスコードサインインを選びます。ブラウザで認証を完了し、ランチャーがあなたの Minecraft Java プロフィールを検証するのを待ちます。
 4. ゲームバージョンをダウンロードするか、既存の `.minecraft` フォルダをインポートするか、統合パックをインポートします。ホームでバージョンとアカウントを選んで起動します。
@@ -166,7 +166,7 @@ SSL エラーの上書きが有効でも、ランチャーの HTTPS クライア
 Windows で、.NET 8 SDK と WinUI 3 プロジェクトの構築に必要な Windows SDK / 開発ツールをインストールします。プロジェクトは `net8.0-windows10.0.19041.0` と x64 を対象とします。クローン後、リポジトリルートで以下のコマンドを実行します。
 
 ```powershell
-git clone https://github.com/com-in/CMCLauncher.git
+git clone https://github.com/CMCLauncher-Dev/CMCLauncher.git
 cd CMCLauncher
 dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
 ```
@@ -257,7 +257,7 @@ dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
 
 ## フィードバックとコントリビューション
 
-問題は [Issues](https://github.com/com-in/CMCLauncher/issues) から報告してください。ランチャーバージョン、Windows バージョン、Minecraft とローダーのバージョン、再現手順を含めてください。起動失敗の場合は、エラーレポートまたは関連ログを添付してください。共有前にアカウント情報とローカルパスを確認してください。
+問題は [Issues](https://github.com/CMCLauncher-Dev/CMCLauncher/issues) から報告してください。ランチャーバージョン、Windows バージョン、Minecraft とローダーのバージョン、再現手順を含めてください。起動失敗の場合は、エラーレポートまたは関連ログを添付してください。共有前にアカウント情報とローカルパスを確認してください。
 
 プルリクエストを送る前に、変更に関連するテストを実行してください。レイアウト変更にはスクリーンショットを添付し、ダウンロード・導入・インポート機能を変更するときはキャンセルと失敗後のクリーンアップを確認してください。
 
