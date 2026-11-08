@@ -105,7 +105,10 @@ public sealed partial class MainWindow
                             await monitoringDone.Task;
                             Report(instance.Name + "：游戏已退出");
                             if (!cancelledByLauncher)
+                            {
+                                await RestoreLauncherWindowAsync();
                                 await HandleGameExit(instance, launchedGame, launchStarted);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -200,6 +203,33 @@ public sealed partial class MainWindow
                 Close();
                 break;
         }
+    }
+
+    // 「隐藏并重新打开」：游戏退出后在弹崩溃报告前先行恢复窗口，
+    // 使崩溃对话框有可见的宿主窗口，否则在隐藏窗口上显示会异常或卡住。
+    async Task RestoreLauncherWindowAsync()
+    {
+        if (launcherExitBehavior != "reopen")
+            return;
+        launcherExitBehavior = null;
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                if (AppWindow.Presenter is OverlappedPresenter presenter)
+                    AppWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                AddLog("Restore launcher window failed: " + ex.Message);
+            }
+            finally
+            {
+                completion.TrySetResult();
+            }
+        });
+        await completion.Task;
     }
 
     // 游戏退出后按先前选择的可见性设置恢复或关闭启动器窗口。
