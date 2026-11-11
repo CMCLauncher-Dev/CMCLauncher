@@ -284,6 +284,25 @@ public sealed partial class MainWindow
             label.Foreground = Brush(lightTheme ? "#73786F" : "#AAAAB7");
             return label;
         }
+        ProgressBar MiniProgress()
+        {
+            var bar = new ProgressBar
+            {
+                Minimum = 0,
+                Maximum = 1,
+                Value = 0,
+                Height = 5,
+                Foreground = Brush(PrimaryColor),
+            };
+            return bar;
+        }
+        double MemoryFraction(GCMemoryInfo info, Process proc)
+        {
+            var total = info.TotalAvailableMemoryBytes;
+            if (total <= 0)
+                return 0;
+            return Math.Clamp((double)proc.WorkingSet64 / total, 0, 1);
+        }
         var stack = new StackPanel { Spacing = 10 };
         if (placement.Id == "account")
         {
@@ -468,12 +487,16 @@ public sealed partial class MainWindow
             var processMemory = Muted(
                 $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB"
             );
+            var processMemoryBar = MiniProgress();
             var processCpu = Muted($"{Ui("CPU")}: 0.0%");
+            var processCpuBar = MiniProgress();
             var systemMemory = Muted(
                 $"{Ui("System memory")}: {memory.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}"
             );
             stack.Children.Add(processMemory);
+            stack.Children.Add(processMemoryBar);
             stack.Children.Add(processCpu);
+            stack.Children.Add(processCpuBar);
             stack.Children.Add(systemMemory);
             homePerformanceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             homePerformanceTimer.Tick += (_, _) =>
@@ -489,7 +512,9 @@ public sealed partial class MainWindow
                     usage = 0;
                 processMemory.Text =
                     $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
+                processMemoryBar.Value = MemoryFraction(latest, process);
                 processCpu.Text = $"{Ui("CPU")}: {Math.Min(usage, 100):N1}%";
+                processCpuBar.Value = Math.Clamp(usage / 100.0, 0, 1);
                 systemMemory.Text =
                     $"{Ui("System memory")}: {latest.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}";
                 lastCpu = now;
