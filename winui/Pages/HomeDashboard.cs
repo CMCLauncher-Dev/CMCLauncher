@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -17,8 +18,44 @@ public sealed partial class MainWindow
 {
     bool homeCustomizeMode;
     DispatcherTimer? homePerformanceTimer;
+    ulong perfSysLastIdle, perfSysLastKernel, perfSysLastUser;
+    bool perfSysFirst;
 
     void Home() => HomeDashboard();
+
+    // 系统总体 CPU 占用率（%），首调返回负值表示需要下一次采样。
+    double GetSystemCpuLoad()
+    {
+        GetSystemTimes(out var idleNow, out var kernelNow, out var userNow);
+        var idle = FileTimeTick(idleNow);
+        var kernel = FileTimeTick(kernelNow);
+        var user = FileTimeTick(userNow);
+        if (perfSysFirst)
+        {
+            perfSysLastIdle = idle;
+            perfSysLastKernel = kernel;
+            perfSysLastUser = user;
+            perfSysFirst = false;
+            return -1;
+        }
+        var di = idle - perfSysLastIdle;
+        var dk = kernel - perfSysLastKernel;
+        var du = user - perfSysLastUser;
+        var total = dk + du;
+        var busy = total > di ? total - di : 0UL;
+        perfSysLastIdle = idle;
+        perfSysLastKernel = kernel;
+        perfSysLastUser = user;
+        return total > 0 ? 100.0 * busy / total : 0;
+    }
+
+    // 系统总体内存占用率（%）。
+    double GetSystemMemoryLoad()
+    {
+        var ms = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
+        GlobalMemoryStatusEx(ref ms);
+        return ms.TotalPhys > 0 ? 100.0 * (ms.TotalPhys - ms.AvailPhys) / ms.TotalPhys : 0;
+    }
 
     void HomeCustomize_Click(object sender, RoutedEventArgs e)
     {
@@ -500,17 +537,17 @@ public sealed partial class MainWindow
             stack.Children.Add(Text("性能监视器", 18, true));
             var process = Process.GetCurrentProcess();
             var memory = GC.GetGCMemoryInfo();
-            var lastCpu = process.TotalProcessorTime;
             var smoothCpu = 0.0;
             var smoothMemory = 0.0;
+            perfSysFirst = true;
             var processMemory = Muted(
                 $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB"
             );
             var processMemoryBar = MiniProgress();
-            var processCpu = Muted($"{Ui("CPU")}: 0.0%");
+            var processCpu = Muted($"{Ui("System CPU")}: 0.0%");
             var processCpuBar = MiniProgress();
             var systemMemory = Muted(
-                $"{Ui("System memory")}: {memory.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}"
+                $"{Ui("System memory")}: {GetSystemMemoryLoad():N0}%"
             );
             stack.Children.Add(processMemory);
             stack.Children.Add(processMemoryBar);
@@ -525,21 +562,18 @@ public sealed partial class MainWindow
             {
                 process.Refresh();
                 var latest = GC.GetGCMemoryInfo();
-                var now = process.TotalProcessorTime;
-                var usage = (now - lastCpu).TotalSeconds / 0.5 * 100.0;
+                var usage = GetSystemCpuLoad();
                 if (usage < 0)
                     usage = 0;
                 // 指数移动平均平滑：过滤采样瞬时 0 值和跳变，使数值与条形自然过渡。
                 smoothCpu = smoothCpu * 0.7 + Math.Min(usage, 100) * 0.3;
-                smoothMemory = smoothMemory * 0.7 + MemoryFraction(latest, process) * 0.3;
+                smoothMemory = smoothMemory * 0.7 + GetSystemMemoryLoad() * 0.3;
                 processMemory.Text =
                     $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
-                SetProgress(processMemoryBar, smoothMemory);
-                processCpu.Text = $"{Ui("CPU")}: {smoothCpu:N1}%";
+                SetProgress(processMemoryBar, MemoryFraction(latest, process));
+                processCpu.Text = $"{Ui("System CPU")}: {smoothCpu:N1}%";
                 SetProgress(processCpuBar, smoothCpu / 100.0);
-                systemMemory.Text =
-                    $"{Ui("System memory")}: {latest.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}";
-                lastCpu = now;
+                systemMemory.Text = $"{Ui("System memory")}: {smoothMemory:N0}%";
             };
             homePerformanceTimer.Start();
         }
