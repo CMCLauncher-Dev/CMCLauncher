@@ -48,11 +48,11 @@ flowchart TD
 
 `CMCLauncher.Core/CMCLauncher.Core.csproj` owns domain models, storage, networking, authentication protocols, downloads, resource providers, archives, version rules and UI-independent theme/localization catalogs. It contains no P/Invoke, registry calls, WinUI/WinRT types or Windows SDK reference. CA1416 is an error, and a reflection-based regression check rejects native imports and Windows assembly references.
 
-`native/CMCLauncher.csproj` retains its path for existing scripts but now produces `CMCLauncher.Platform.Windows.dll`. It provides DPAPI, memory/region queries, Java registry discovery, GPU registry preferences and the PowerShell updater. Both the Windows application and Windows regression entry point install `WindowsLauncherPlatform` before accessing services. A future non-Windows host references Core directly and supplies its own `LauncherPlatform` implementation. Configure once at startup; it is process-wide host state, not per-request state.
+`CMCLauncher.Platform/Windows/CMCLauncher.Platform.Windows.csproj` produces `CMCLauncher.Platform.Windows.dll`. It provides DPAPI, memory/region queries, Java registry discovery, GPU registry preferences and the PowerShell updater. Both the Windows application and Windows regression entry point install `WindowsLauncherPlatform` before accessing services. A future non-Windows host references Core directly and supplies its own `LauncherPlatform` implementation. Configure once at startup; it is process-wide host state, not per-request state.
 
 Without a secure credential adapter, Core refuses to encrypt/decrypt online credentials; it never falls back to plaintext. Offline identity data requires no credential store. Automatic memory allocation falls back to 2048 MB if no memory capability is supplied; manual memory remains available. GPU integration defaults to a no-op, and Java registry discovery defaults to an empty sequence.
 
-Core embeds the existing built-in theme, language packs and optional build-time authentication resources, retaining their logical resource names. Editable theme/locale files remain copied by WinUI. The source JSON files currently live under `winui/` and are referenced as data inputs, so building Core from a source subset must include those files. Core does not require compiling WinUI or installing the Windows SDK. Namespace `CMCLauncher` is preserved to limit public API churn.
+Core embeds shared theme and language packs from its own `Resources/` directory. Optional local build credentials come from Git-ignored `.config/` files. WinUI copies editable packs to the existing published paths. See [the current architecture](ARCHITECTURE.md) for the later directory migration.
 
 ## Portability status and remaining work
 
@@ -60,12 +60,12 @@ Core embeds the existing built-in theme, language packs and optional build-time 
 | --- | --- |
 | HTTP, CMS parsing/cache/rate limiting, blueprint metadata/downloads | Portable Core; existing fixture suites run without a Windows adapter |
 | Mojang OS rules and native classifier selection | Use current `windows`, `linux` or `osx`; architecture matching follows the current process |
-| Java discovery | Host executable name and PATH separator; Windows registry paths supplied by adapter. Expand Linux/macOS system JDK discovery next |
+| Java discovery | Host executable name and PATH separator; Windows registry paths supplied by adapter. Linux/macOS JDK locations supplied by adapters |
 | Java automatic download | Existing Windows x64 ZIP pipeline retained; explicitly rejected on other platforms before network access. Needs platform/architecture asset selection, tar handling and executable permissions |
-| FRP distribution/process startup | Existing Windows x64 assets retained; explicit platform guard. Needs Linux/macOS archives and permission handling |
+| FRP distribution/process startup | OS/architecture asset selection, bounded ZIP/TAR extraction and executable permissions |
 | Game launch and loaders | Managed implementation extracted, but **not certified on Linux/macOS**. Validate native extraction, permissions, loader installers, argument expansion and actual games on each OS/architecture |
 | File paths, migration and archives | Existing conservative Windows naming rules and case-insensitive comparisons remain in several managers; audit case-sensitive volumes, symlinks and platform-specific directory ownership before shipping another OS |
-| Credentials | Windows DPAPI unchanged; Linux secret service / macOS Keychain adapter required. Windows-encrypted credentials must not be copied as if portable |
+| Credentials | Windows DPAPI unchanged; Linux Secret Service / macOS Keychain adapters added. Windows-encrypted credentials must not be copied as if portable |
 | Updates | Windows adapter still validates Windows packages and invokes PowerShell; other hosts need their own updater |
 | UI and file pickers | WinUI, shell/recycle-bin integration, rendering and native dialogs remain Windows-only; no replacement frontend selected in this change |
 
@@ -73,11 +73,11 @@ Core embeds the existing built-in theme, language packs and optional build-time 
 
 ```text
 dotnet build CMCLauncher.Core/CMCLauncher.Core.csproj -c Release
-dotnet run --project core.tests/CMCLauncher.Core.Tests.csproj -c Release
-dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
-dotnet build winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64
-dotnet list winui/CMCLauncher.WinUI.csproj package --include-transitive --vulnerable
-dotnet list winui/CMCLauncher.WinUI.csproj package --include-transitive --deprecated
+dotnet run --project CMCLauncher.Tests/Core/CMCLauncher.Core.Tests.csproj -c Release
+dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Release
+dotnet build CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64
+dotnet list CMCLauncher.WinUI/CMCLauncher.WinUI.csproj package --include-transitive --vulnerable
+dotnet list CMCLauncher.WinUI/CMCLauncher.WinUI.csproj package --include-transitive --deprecated
 ```
 
 The portable test runner reuses the CMS and blueprint protocol/cache/download regression suites, and checks assembly isolation, credential failure behavior, injected memory services, embedded resources, OS rules and Java path handling. CI adds Windows, Ubuntu and macOS jobs for this runner; release packaging depends on all three plus the existing Windows regression suite.
@@ -95,3 +95,7 @@ Local execution was on Windows only: no WSL/Linux runtime or macOS host was avai
 - Single-file isolated cold-start activation and warm-start preservation of locale/FRP edits: passed.
 
 Logs and isolated builds are under `.artifacts/core-*` and `.artifacts/core-split-*`; no `dist` files were overwritten.
+
+Avalonia frontend: Avalonia.Desktop, Avalonia.Themes.Fluent and Avalonia.Fonts.Inter 11.3.23; Markdig 1.4.2. Packages remain frontend-only. Desktop CI publishes Avalonia for Linux x64 and macOS ARM64; Windows publishes WinUI. Avalonia UI smoke checks run on Linux. Actual games and native credential/trash services require host-level verification.
+
+Final migration checks also cover Avalonia frontend update-package separation, staged replacement, user-file preservation and rollback. Windows GPU telemetry lives in the Windows adapter used by WinUI.

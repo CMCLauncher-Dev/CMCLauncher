@@ -159,7 +159,7 @@
 
 凭据会使用 DPAPI 为当前 Windows 用户加密。将配置复制到其他用户或设备时，可能需要重新登录。备份游戏时，请一并包含其实际实例目录中的存档与设置。
 
-即便启用了 SSL 错误覆盖，启动器的 HTTPS 客户端仍会拒绝其内嵌拒绝列表中的证书公钥。详见 [CertificatePolicy.cs](CMCLauncher.Core/CertificatePolicy.cs)。该策略不会修改 Windows 信任存储，也不会更改外部 Java 安装程序与游戏所执行的证书验证。
+即便启用了 SSL 错误覆盖，启动器的 HTTPS 客户端仍会拒绝其内嵌拒绝列表中的证书公钥。详见 [CertificatePolicy.cs](CMCLauncher.Core/Download/CertificatePolicy.cs)。该策略不会修改 Windows 信任存储，也不会更改外部 Java 安装程序与游戏所执行的证书验证。
 
 ## 从源码运行
 
@@ -168,7 +168,7 @@
 ```powershell
 git clone https://github.com/CMCLauncher-Dev/CMCLauncher.git
 cd CMCLauncher
-dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
+dotnet run --project CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -p:Platform=x64
 ```
 
 如需一键本地构建，可双击仓库根目录中的 `build-and-run.cmd`。它会将自包含 Release 构建发布到 `.artifacts/local-runs/` 下的新文件夹，并打开该构建以供手动测试。它不会改动 `dist`，并保持控制台开启以便查看构建错误。每次运行都会保留各自的输出文件夹；关闭这些构建后可删除旧文件夹。应用程序会使用你惯常的启动器设置。
@@ -179,7 +179,7 @@ dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
 
 ### 配置 Microsoft 登录
 
-缺少 client ID 的源码构建可运行界面，但 Microsoft 登录不可用。若要在本地构建中启用，请创建 `winui/clientid.local.json` 并填入你已配置的公开 OAuth client ID：
+缺少 client ID 的源码构建可运行界面，但 Microsoft 登录不可用。若要在本地构建中启用，请创建 `.config/clientid.local.json` 并填入你已配置的公开 OAuth client ID：
 
 ```json
 {
@@ -196,13 +196,13 @@ dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
 构建 Release 配置：
 
 ```powershell
-dotnet build winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64
+dotnet build CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64
 ```
 
 发布自包含目录并创建 ZIP 压缩包：
 
 ```powershell
-dotnet publish winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
+dotnet publish CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
 ./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-1.0.2-beta-win-x64.zip
 ```
 
@@ -221,7 +221,7 @@ Release 构建还使用部分 .NET 裁剪。启动器程序集以及 Windows/Win
 运行原生回归测试：
 
 ```powershell
-dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
+dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Release
 ```
 
 这些测试使用 Windows DPAPI，必须在 Windows 上运行。最后一项本地 Java 检测检查还需要 PATH 中存在 `java`。
@@ -239,18 +239,18 @@ dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
 核心服务与 Windows 集成已拆分，详见[依赖与跨平台审计](docs/DEPENDENCY_AUDIT.md)。
 
 - [`CMCLauncher.Core/`](CMCLauncher.Core/) 为 `net8.0` 核心服务，不依赖 Windows SDK。
-- [`native/`](native/) 为 Windows 适配层，提供凭据加密、注册表集成与更新安装。
-- [`core.tests/`](core.tests/) 包含跨平台核心检查。
-- [`winui/`](winui/) 为**界面层**，包含桌面入口、窗口、页面、控件与 UI 服务。
-- [`native.tests/`](native.tests/) 为**测试层**，包含原生回归测试与证书夹具。
+- [`CMCLauncher.Platform/Windows/`](CMCLauncher.Platform/Windows/) 为 Windows 适配层，提供凭据加密、注册表集成与更新安装。
+- [`CMCLauncher.Tests/Core/`](CMCLauncher.Tests/Core/) 包含跨平台核心检查。
+- [`CMCLauncher.WinUI/`](CMCLauncher.WinUI/) 为**界面层**，包含桌面入口、窗口、页面、控件与 UI 服务。
+- [`CMCLauncher.Tests/Windows/`](CMCLauncher.Tests/Windows/) 为**测试层**，包含原生回归测试与证书夹具。
 
 | 目录 | 内容 |
 | --- | --- |
-| [`winui/`](winui/) | 桌面入口、窗口、页面、控件与 UI 服务 |
+| [`CMCLauncher.WinUI/`](CMCLauncher.WinUI/) | 桌面入口、窗口、页面、控件与 UI 服务 |
 | [`CMCLauncher.Core/`](CMCLauncher.Core/) | 下载、认证协议、资源浏览、存储与平台无关服务 |
-| [`native/`](native/) | Windows 凭据、内存与区域查询、注册表集成和更新安装 |
-| [`core.tests/`](core.tests/) | 跨平台核心回归检查 |
-| [`native.tests/`](native.tests/) | 原生回归测试与证书夹具 |
+| [`CMCLauncher.Platform/Windows/`](CMCLauncher.Platform/Windows/) | Windows 凭据、内存与区域查询、注册表集成和更新安装 |
+| [`CMCLauncher.Tests/Core/`](CMCLauncher.Tests/Core/) | 跨平台核心回归检查 |
+| [`CMCLauncher.Tests/Windows/`](CMCLauncher.Tests/Windows/) | 原生回归测试与证书夹具 |
 | [`scripts/`](scripts/) | 发布、资源整理与打包脚本 |
 | [`docs/`](docs/) | 项目官网源码与截图资源 |
 | [`.github/workflows/`](.github/workflows/) | 自动化测试、构建与打标签发布 |

@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>CMCLauncher.Avalonia</AssemblyName>
+    <RootNamespace>CMCLauncher.Avalonia</RootNamespace>
+    <Version>1.0.3</Version>
+    <ApplicationIcon>../CMCLauncher.WinUI/assets/cmc-logo.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CMCLauncher.Core/CMCLauncher.Core.csproj" />
+    <ProjectReference Include="../CMCLauncher.Platform/Linux/CMCLauncher.Platform.Linux.csproj" />
+    <ProjectReference Include="../CMCLauncher.Platform/MacOS/CMCLauncher.Platform.MacOS.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference
+      Include="Avalonia.Desktop"
+      Version="11.3.23"
+    />
+    <PackageReference
+      Include="Avalonia.Themes.Fluent"
+      Version="11.3.23"
+    />
+    <PackageReference
+      Include="Avalonia.Fonts.Inter"
+      Version="11.3.23"
+    />
+    <PackageReference
+      Include="Markdig"
+      Version="1.4.2"
+    />
+    <Content
+      Include="../CMCLauncher.Core/Resources/Locales/*.json"
+      Link="locales/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <Content
+      Include="../CMCLauncher.Core/Resources/Themes/*.json"
+      Link="themes/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+  </ItemGroup>
+  <Target
+    Name="RejectWindowsAvaloniaPublish"
+    BeforeTargets="PrepareForPublish;Publish"
+    Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))"
+  >
+    <Error Text="Windows releases use CMCLauncher.WinUI. Publish Avalonia for Linux or macOS." />
+  </Target>
+</Project>

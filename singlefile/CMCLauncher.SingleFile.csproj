@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>CMCLauncher</AssemblyName>
     <Product>CMCLauncher</Product>
-    <ApplicationIcon>../winui/assets/cmc-logo.ico</ApplicationIcon>
+    <ApplicationIcon>../CMCLauncher.WinUI/assets/cmc-logo.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>

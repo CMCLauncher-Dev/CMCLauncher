@@ -1,7 +1,7 @@
-﻿# Keep native WinUI resources aligned with the interface packs shipped by the launcher.
+# Keep native WinUI resources aligned with the interface packs shipped by the launcher.
 function Get-LauncherMuiLanguages
 {
-    param([string]$LocaleDirectory = (Join-Path $PSScriptRoot '../winui/locales'))
+    param([string]$LocaleDirectory = (Join-Path $PSScriptRoot '../CMCLauncher.Core/Resources/Locales'))
     $cultures = @('en-US')
     foreach ($file in Get-ChildItem -LiteralPath $LocaleDirectory -Filter '*.json' -File)
     {

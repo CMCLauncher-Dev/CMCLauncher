@@ -82,7 +82,7 @@ Install the .NET 8 SDK and Windows SDK tools for WinUI 3 development, then run:
 ```powershell
 git clone https://github.com/CMCLauncher-Dev/CMCLauncher.git
 cd CMCLauncher
-dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
+dotnet run --project CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -p:Platform=x64
 ```
 
 For a self-contained test build, run `build-and-run.cmd`. It builds into `.artifacts/local-runs/` and launches the result using your normal launcher settings. To build without launching:
@@ -93,7 +93,7 @@ For a self-contained test build, run `build-and-run.cmd`. It builds into `.artif
 
 ### Login configuration
 
-Microsoft sign-in needs a public OAuth client ID in the Git-ignored `winui/clientid.local.json`:
+Microsoft sign-in needs a public OAuth client ID in the Git-ignored `.config/clientid.local.json`:
 
 ```json
 {
@@ -114,7 +114,7 @@ The build script uses a temporary configuration file. Embedded developer keys ca
 ### Publish
 
 ```powershell
-dotnet publish winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
+dotnet publish CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
 ./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-win-x64.zip
 ```
 
@@ -126,20 +126,29 @@ For a single EXE:
 
 Publish into a fresh directory to avoid retaining obsolete files. Release builds use partial trimming and preserve application assemblies for reflection and WinUI. Add `-p:PublishTrimmed=false` when comparing with an untrimmed build.
 
-CI builds both ZIP and EXE packages. Workflow artifacts use fixed filenames; tagged release assets include the version.
+CI runs Core tests on all three systems and Windows regression tests before packaging. Windows builds WinUI ZIP/EXE packages; Linux x64 builds Avalonia DEB, RPM, AppImage and TAR.GZ packages; macOS ARM64 builds an Avalonia TAR.GZ package. Published WinUI/Linux pages and the Windows single-file startup are checked in CI. Workflow artifacts use fixed filenames; tagged release assets include the version. Pushes to `main`, pull requests and manual runs build artifacts; supported version tags also create a GitHub release.
+
+### Avalonia frontend
+
+```sh
+dotnet run --project CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj
+dotnet publish CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -c Release -r linux-x64 --self-contained true -o .artifacts/avalonia-linux
+```
+
+Windows uses WinUI. Publish Avalonia with `linux-x64` or `osx-arm64` for Linux/macOS. See the [frontend notes](CMCLauncher.Avalonia/README.md) for credential-store requirements and platform verification status, and [Linux packages](docs/LINUX_PACKAGES.md) for installation and compatibility. CI packages Unix applications as TAR archives to retain executable permissions.
 
 ### Tests
 
 Portable core checks:
 
 ```powershell
-dotnet run --project core.tests/CMCLauncher.Core.Tests.csproj -c Release
+dotnet run --project CMCLauncher.Tests/Core/CMCLauncher.Core.Tests.csproj -c Release
 ```
 
 Windows regression tests (requires Java on PATH):
 
 ```powershell
-dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
+dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Release
 ```
 
 After publishing, run the UI check:
@@ -152,17 +161,20 @@ UI checks use isolated data and write screenshots, `passed.txt` and, on failure,
 
 ## Source layout
 
+See [architecture and platform boundaries](docs/ARCHITECTURE.md) for the migration status.
+
 | Directory | Contents |
 | --- | --- |
 | [CMCLauncher.Core/](CMCLauncher.Core/) | `net8.0` domain services, networking, storage and resource providers |
-| [native/](native/) | Windows credentials, registry integration and updater |
-| [winui/](winui/) | Windows UI and entry point |
-| [core.tests/](core.tests/) | Portable core checks |
-| [native.tests/](native.tests/) | Windows regression tests and fixtures |
+| [CMCLauncher.Platform/](CMCLauncher.Platform/) | Host contracts and Windows/Linux/macOS integration |
+| [CMCLauncher.WinUI/](CMCLauncher.WinUI/) | Windows frontend and entry point |
+| [CMCLauncher.Avalonia/](CMCLauncher.Avalonia/) | Linux/macOS frontend; see its README for validation status |
+| [CMCLauncher.Tests/Core/](CMCLauncher.Tests/Core/) | Portable core checks |
+| [CMCLauncher.Tests/Windows/](CMCLauncher.Tests/Windows/) | Windows regression tests and fixtures |
 | [scripts/](scripts/) | Build, packaging and maintenance scripts |
 | [docs/](docs/) | Website, documentation and screenshots |
 
-The application currently targets Windows x64. Core has been separated for future platform work; this does not make the WinUI application portable. See the [dependency and portability audit](docs/DEPENDENCY_AUDIT.md) for test results and remaining work.
+The WinUI application targets Windows x64. Linux/macOS use Avalonia over the shared Core and platform adapters; Linux/macOS game execution still requires host testing. See the [dependency and portability audit](docs/DEPENDENCY_AUDIT.md) for test results and remaining work.
 
 ## Contributing
 

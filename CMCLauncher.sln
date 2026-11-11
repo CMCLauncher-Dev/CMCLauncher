@@ -1,0 +1,82 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.Core", "CMCLauncher.Core\CMCLauncher.Core.csproj", "{2CB089B8-F77E-42EC-AF54-44443160405D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CMCLauncher.Platform", "CMCLauncher.Platform", "{EA27455A-5459-4293-9EDA-845344F1A95C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.Platform.Abstractions", "CMCLauncher.Platform\Abstractions\CMCLauncher.Platform.Abstractions.csproj", "{7D203905-116C-4BDA-A156-C6A86A959DFC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.Platform.Windows", "CMCLauncher.Platform\Windows\CMCLauncher.Platform.Windows.csproj", "{77539F7F-941F-4992-9062-9CC836C5D46F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.WinUI", "CMCLauncher.WinUI\CMCLauncher.WinUI.csproj", "{3371F2FD-3BF9-4AEE-9DB1-6792A9B863C2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CMCLauncher.Tests", "CMCLauncher.Tests", "{E63C5CB8-0D50-4A0D-91FB-A0680854B69C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.Core.Tests", "CMCLauncher.Tests\Core\CMCLauncher.Core.Tests.csproj", "{70E872B8-986F-4EE4-966B-8E398810D2BF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.Tests", "CMCLauncher.Tests\Windows\CMCLauncher.Tests.csproj", "{20216724-1A0E-4331-80EE-4B4A0BDD17EE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.Avalonia", "CMCLauncher.Avalonia\CMCLauncher.Avalonia.csproj", "{5CEF2B7D-6E6C-4BAD-B095-462F094F6696}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.Platform.Linux", "CMCLauncher.Platform\Linux\CMCLauncher.Platform.Linux.csproj", "{2ED1B3C7-BF40-425B-B37E-1D72F904D929}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CMCLauncher.Platform.MacOS", "CMCLauncher.Platform\MacOS\CMCLauncher.Platform.MacOS.csproj", "{C03B0D43-A015-4723-A456-756728F36993}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2CB089B8-F77E-42EC-AF54-44443160405D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2CB089B8-F77E-42EC-AF54-44443160405D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2CB089B8-F77E-42EC-AF54-44443160405D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2CB089B8-F77E-42EC-AF54-44443160405D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7D203905-116C-4BDA-A156-C6A86A959DFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7D203905-116C-4BDA-A156-C6A86A959DFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7D203905-116C-4BDA-A156-C6A86A959DFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7D203905-116C-4BDA-A156-C6A86A959DFC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77539F7F-941F-4992-9062-9CC836C5D46F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77539F7F-941F-4992-9062-9CC836C5D46F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77539F7F-941F-4992-9062-9CC836C5D46F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77539F7F-941F-4992-9062-9CC836C5D46F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3371F2FD-3BF9-4AEE-9DB1-6792A9B863C2}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{3371F2FD-3BF9-4AEE-9DB1-6792A9B863C2}.Debug|Any CPU.Build.0 = Debug|x64
+		{3371F2FD-3BF9-4AEE-9DB1-6792A9B863C2}.Release|Any CPU.ActiveCfg = Release|x64
+		{3371F2FD-3BF9-4AEE-9DB1-6792A9B863C2}.Release|Any CPU.Build.0 = Release|x64
+		{70E872B8-986F-4EE4-966B-8E398810D2BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70E872B8-986F-4EE4-966B-8E398810D2BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70E872B8-986F-4EE4-966B-8E398810D2BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70E872B8-986F-4EE4-966B-8E398810D2BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{20216724-1A0E-4331-80EE-4B4A0BDD17EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20216724-1A0E-4331-80EE-4B4A0BDD17EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20216724-1A0E-4331-80EE-4B4A0BDD17EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20216724-1A0E-4331-80EE-4B4A0BDD17EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5CEF2B7D-6E6C-4BAD-B095-462F094F6696}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5CEF2B7D-6E6C-4BAD-B095-462F094F6696}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5CEF2B7D-6E6C-4BAD-B095-462F094F6696}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5CEF2B7D-6E6C-4BAD-B095-462F094F6696}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2ED1B3C7-BF40-425B-B37E-1D72F904D929}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2ED1B3C7-BF40-425B-B37E-1D72F904D929}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2ED1B3C7-BF40-425B-B37E-1D72F904D929}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2ED1B3C7-BF40-425B-B37E-1D72F904D929}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C03B0D43-A015-4723-A456-756728F36993}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C03B0D43-A015-4723-A456-756728F36993}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C03B0D43-A015-4723-A456-756728F36993}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C03B0D43-A015-4723-A456-756728F36993}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{7D203905-116C-4BDA-A156-C6A86A959DFC} = {EA27455A-5459-4293-9EDA-845344F1A95C}
+		{77539F7F-941F-4992-9062-9CC836C5D46F} = {EA27455A-5459-4293-9EDA-845344F1A95C}
+		{70E872B8-986F-4EE4-966B-8E398810D2BF} = {E63C5CB8-0D50-4A0D-91FB-A0680854B69C}
+		{20216724-1A0E-4331-80EE-4B4A0BDD17EE} = {E63C5CB8-0D50-4A0D-91FB-A0680854B69C}
+		{2ED1B3C7-BF40-425B-B37E-1D72F904D929} = {EA27455A-5459-4293-9EDA-845344F1A95C}
+		{C03B0D43-A015-4723-A456-756728F36993} = {EA27455A-5459-4293-9EDA-845344F1A95C}
+	EndGlobalSection
+EndGlobal

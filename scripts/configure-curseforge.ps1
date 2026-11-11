@@ -1,6 +1,6 @@
 # Read the environment directly so '$' and quotes in a key survive unchanged.
 param(
-    [string]$OutputPath = (Join-Path $PSScriptRoot "../winui/curseforge.local.json")
+    [string]$OutputPath = (Join-Path $PSScriptRoot "../.config/curseforge.local.json")
 )
 
 $ErrorActionPreference = "Stop"

@@ -1,0 +1,644 @@
+using System.Globalization;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace CMCLauncher;
+
+public enum VersionDeletionBlockReason
+{
+    None,
+    OutsideVersionDirectory,
+    UnsafePath,
+    SharedDirectory,
+    Dependency,
+    UnreadableProfile,
+}
+
+public sealed record VersionDeletionInspection(
+    string? Directory,
+    VersionDeletionBlockReason Reason,
+    IReadOnlyList<string> RelatedVersions
+)
+{
+    public string? DeletableDirectory =>
+        Reason == VersionDeletionBlockReason.None ? Directory : null;
+}
+
+// settings.json 中的全局偏好；实例和账号另存在 Configuration 的列表里。
+public sealed class Settings
+{
+    public int CmsRequestIntervalMs { get; set; } = 1500;
+    public bool MinecraftDirectorySetupPending { get; set; }
+    public string FrpcVersion { get; set; } = "";
+    public string FrpcConfigPath { get; set; } = "";
+    public bool DebugLogging { get; set; }
+    public string JavaPath { get; set; } = "";
+    public List<JavaInstallation> JavaInstallations { get; set; } = [];
+    public List<string> IgnoredJavaPaths { get; set; } = [];
+    public int MemoryMb { get; set; } = 4096;
+    public int DownloadThreads { get; set; } = 16;
+
+    // JSON values override this regional default, including an explicit opt-out.
+    public bool UseBmclApi { get; set; } = MicrosoftAuth.IsMainlandMachine;
+    public string GameDownloadSource { get; set; } = "";
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string EffectiveGameDownloadSource =>
+        GameDownloadSource is "mirror" or "auto" or "official" ? GameDownloadSource
+        : UseBmclApi ? "mirror"
+        : "official";
+    public bool AutoMemory { get; set; } = true;
+    public string MicrosoftClientId { get; set; } = "";
+    public string Proxy { get; set; } = "";
+    public string ProxyMode { get; set; } = "auto";
+    public string ProxyUsername { get; set; } = "";
+    public string? ProxyPasswordProtected { get; set; }
+    public string ProxyBypassHosts { get; set; } = "";
+    public bool ProxyBypassLocal { get; set; }
+    public bool ProxyDirectFallback { get; set; } = true;
+    public bool IgnoreSslErrors { get; set; }
+    public string Theme { get; set; } = "dark";
+    public string ColorPreset { get; set; } = "craft";
+    public double UiScale { get; set; } = 1;
+    public double UiButtonScale { get; set; } = 1;
+    public double UiMenuScale { get; set; } = 1;
+    public string UiFontFamily { get; set; } = "Segoe UI Variable Text";
+    public double UiFontSize { get; set; } = 14;
+    public Dictionary<string, string> CustomLightColors { get; set; } = new();
+    public Dictionary<string, string> CustomDarkColors { get; set; } = new();
+    public List<CustomAppearancePreset> CustomAppearancePresets { get; set; } = [];
+    public string GameLanguage { get; set; } = "auto";
+    public string CustomJvmArgs { get; set; } = "";
+    public string PlayerPriority { get; set; } = "normal";
+    public bool PreferHighPerformanceGpu { get; set; } = true;
+    public Dictionary<string, string?> ManagedGpuPreferences { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    public string GameWindowTitle { get; set; } = "";
+    public string MinecraftRoot { get; set; } = "";
+    public string DownloadMirror { get; set; } = "";
+    public bool StartMaximized { get; set; }
+    public string LauncherVisibility { get; set; } = "keep";
+    public int WindowWidth { get; set; } = 1280;
+    public int WindowHeight { get; set; } = 820;
+    public int? WindowX { get; set; }
+    public int? WindowY { get; set; }
+    public bool ExpandProjectIntroduction { get; set; } = true;
+    public string LauncherLanguage { get; set; } = "en_us";
+    public bool CheckLauncherUpdates { get; set; } = true;
+    public bool ReceiveBetaUpdates { get; set; }
+    public bool ContinuousStatsSampling { get; set; } = true;
+    public string InstanceView { get; set; } = "list";
+    public List<HomeCardPlacement> HomeCards { get; set; } =
+    [new() { Id = "account" }, new() { Id = "game" }];
+    public string HomeNote { get; set; } = "";
+}
+
+public sealed class HomeCardPlacement
+{
+    public string Id { get; set; } = "";
+    public int Width { get; set; } = 2;
+    public int Height { get; set; } = 1;
+}
+
+// 外观预设只保存配色和排版，不携带账号、路径或下载设置。
+public sealed class CustomAppearancePreset
+{
+    public string Name { get; set; } = "";
+    public string Theme { get; set; } = "dark";
+    public string ColorPreset { get; set; } = "craft";
+    public double UiScale { get; set; } = 1;
+    public double UiButtonScale { get; set; } = 1;
+    public double UiMenuScale { get; set; } = 1;
+    public string UiFontFamily { get; set; } = "Segoe UI Variable Text";
+    public double UiFontSize { get; set; } = 14;
+    public Dictionary<string, string> CustomLightColors { get; set; } = new();
+    public Dictionary<string, string> CustomDarkColors { get; set; } = new();
+}
+
+public sealed class JavaInstallation
+{
+    public string Path { get; set; } = "";
+    public string Version { get; set; } = "";
+    public int Major { get; set; }
+    public string Vendor { get; set; } = "";
+    public string Architecture { get; set; } = "";
+}
+
+// Directory 是游戏目录，StorageRoot 是依赖库根目录；导入实例还保留原版本 ID。
+public sealed class Instance
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Name { get; set; } = "新世界";
+    public string Description { get; set; } = "";
+    public string? IconPath { get; set; }
+    public string? StorageRoot { get; set; }
+    public string GameVersion { get; set; } = "";
+    public string Loader { get; set; } = "vanilla";
+    public string? LoaderVersion { get; set; }
+    public string? ImportRoot { get; set; }
+    public string? Directory { get; set; }
+    public string? VersionId { get; set; }
+    public DateTime? LastPlayed { get; set; }
+    public bool Favorite { get; set; }
+
+    public override string ToString() => $"{Name}  ·  {GameVersion} / {Loader}";
+}
+
+public sealed class Account
+{
+    public string Type { get; set; } = "offline";
+    public string Name { get; set; } = "";
+    public string Uuid { get; set; } = "";
+    public string? Secret { get; set; }
+    public string AuthServer { get; set; } = "";
+    public string LoginName { get; set; } = "";
+
+    // External servers may issue the same UUID as another provider. Keep the game UUID
+    // separate from the key used to select and remove launcher accounts.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Key =>
+        Type == "yggdrasil"
+            ? "yggdrasil:"
+                + Convert
+                    .ToHexString(
+                        SHA256.HashData(
+                            Encoding.UTF8.GetBytes(AuthServer + "\n" + LoginName + "\n" + Uuid)
+                        )
+                    )
+                    .ToLowerInvariant()
+            : Uuid;
+
+    public override string ToString() =>
+        $"{Name} · {(Type == "microsoft" ? "Microsoft" : Type == "yggdrasil" ? AuthServer : "离线身份")}";
+
+    public static Account Offline(string name)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9_]{3,16}$"))
+            throw new Exception("玩家名须为 3–16 位字母、数字或下划线");
+        // 离线 UUID 要与 Minecraft 的 OfflinePlayer 命名规则一致，不能换成随机 GUID。
+        var bytes = MD5.HashData(Encoding.UTF8.GetBytes("OfflinePlayer:" + name));
+        bytes[6] = (byte)((bytes[6] & 15) | 48);
+        bytes[8] = (byte)((bytes[8] & 63) | 128);
+        return new() { Name = name, Uuid = Convert.ToHexString(bytes).ToLowerInvariant() };
+    }
+}
+
+public sealed class Configuration
+{
+    public Settings Settings { get; set; } = new();
+    public List<Instance> Instances { get; set; } = [];
+    public List<Account> Accounts { get; set; } = [];
+    public List<MinecraftDirectory> MinecraftDirectories { get; set; } = [];
+    public string? SelectedAccount { get; set; }
+    public string? SelectedInstanceId { get; set; }
+}
+
+// 集中处理配置落盘和实例路径，调用方不必自行拼接新旧目录布局。
+public sealed class Store
+{
+    readonly SemaphoreSlim saveLock = new(1, 1);
+    public static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+        // JsonNode values created through Add<T> need a resolver even before the first settings save.
+        TypeInfoResolver =
+            new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(),
+    };
+    public string Root { get; }
+    public string Library => Path.Combine(Root, "library");
+    public string MinecraftRoot =>
+        string.IsNullOrWhiteSpace(Config.Settings.MinecraftRoot)
+            ? Library
+            : Path.GetFullPath(Config.Settings.MinecraftRoot);
+
+    public string StorageDirectory(Instance instance) =>
+        instance.ImportRoot ?? instance.StorageRoot ?? Library;
+
+    public Configuration Config { get; }
+
+    public Store(string? root = null)
+    {
+        Root =
+            root
+            ?? DefaultRoot(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+        System.IO.Directory.CreateDirectory(Library);
+        var file = Path.Combine(Root, "settings.json");
+        var firstRun = !File.Exists(file);
+        Config = firstRun
+            ? new()
+            : JsonSerializer.Deserialize<Configuration>(File.ReadAllText(file), JsonOptions)
+                ?? throw new Exception("配置为空");
+        if (firstRun)
+        {
+            Config.Settings.MinecraftDirectorySetupPending = true;
+            // 首次启动：根据系统 UI 语言选择对应的界面语言。
+            Config.Settings.LauncherLanguage = InterfaceLanguageForSystem();
+        }
+        if (new MinecraftDirectoryManager(this).RegisterDefaultLibrary())
+            File.WriteAllText(file, JsonSerializer.Serialize(Config, JsonOptions));
+    }
+
+    internal static string DefaultRoot(string appData)
+    {
+        var current = Path.Combine(appData, "CMCLauncher.Native");
+        var legacy = Path.Combine(appData, "CraftLauncher.Native");
+        if (System.IO.Directory.Exists(current) || !System.IO.Directory.Exists(legacy))
+            return current;
+        // 旧数据目录被符号链接指向外部时拒绝迁移，回退用当前目录，而不是让首次启动崩溃。
+        if ((File.GetAttributes(legacy) & FileAttributes.ReparsePoint) != 0)
+            return current;
+        var settings = Path.Combine(legacy, "settings.json");
+        var pending = Path.Combine(
+            legacy,
+            "settings-rename-" + Guid.NewGuid().ToString("N") + ".tmp"
+        );
+        // Rewrite only paths rooted in the old data directory; external games stay in place.
+        void Rewrite(JsonNode? node)
+        {
+            if (node is JsonObject obj)
+                foreach (var key in obj.Select(p => p.Key).ToArray())
+                {
+                    if (
+                        obj[key] is JsonValue value
+                        && value.TryGetValue<string>(out var text)
+                        && (
+                            text.Equals(legacy, StringComparison.OrdinalIgnoreCase)
+                            || text.StartsWith(
+                                legacy + Path.DirectorySeparatorChar,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        )
+                    )
+                        obj[key] = current + text[legacy.Length..];
+                    else
+                        Rewrite(obj[key]);
+                }
+            else if (node is JsonArray array)
+                foreach (var child in array)
+                    Rewrite(child);
+        }
+        if (File.Exists(settings))
+        {
+            var config = JsonNode.Parse(File.ReadAllText(settings));
+            Rewrite(config);
+            File.WriteAllText(pending, config!.ToJsonString(JsonOptions));
+        }
+        try
+        {
+            System.IO.Directory.Move(legacy, current);
+            try
+            {
+                var movedPending = Path.Combine(current, Path.GetFileName(pending));
+                if (File.Exists(movedPending))
+                    File.Move(movedPending, Path.Combine(current, "settings.json"), true);
+            }
+            catch
+            {
+                System.IO.Directory.Move(current, legacy);
+                throw;
+            }
+        }
+        finally
+        {
+            if (File.Exists(pending))
+                File.Delete(pending);
+        }
+        return current;
+    }
+
+    // 首次启动时根据系统 UI 语言推断启动器界面语言；不支持的语言回退到英文。
+    static string InterfaceLanguageForSystem()
+    {
+        var name = CultureInfo.CurrentUICulture.Name;
+        if (name.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
+            return "zh_cn";
+        var language = name.Split('-')[0].ToLowerInvariant();
+        return language switch
+        {
+            "ja" => "ja_jp",
+            "fr" => "fr_fr",
+            "es" => "es_es",
+            "ru" => "ru_ru",
+            "ar" => "ar_sa",
+            _ => "en_us",
+        };
+    }
+
+    // 多个 UI 回调可能同时保存，用锁串行执行写入。
+    public async Task Save()
+    {
+        await saveLock.WaitAsync();
+        try
+        {
+            await AtomicJson(
+                Path.Combine(Root, "settings.json"),
+                JsonSerializer.SerializeToNode(Config, JsonOptions)!
+            );
+        }
+        finally
+        {
+            saveLock.Release();
+        }
+    }
+
+    // 兼容导入版本的隔离目录，以及早期使用 instances/<id> 的本地布局。
+    public string GameDirectory(Instance instance)
+    {
+        if (
+            instance.ImportRoot != null
+            && instance.VersionId != null
+            && (
+                instance.Directory == null
+                || string.Equals(
+                    Path.GetFullPath(instance.Directory),
+                    Path.GetFullPath(instance.ImportRoot),
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+        )
+        {
+            var configured = LauncherInstanceFormat.GameDirectory(
+                instance.ImportRoot,
+                instance.VersionId
+            );
+            if (configured != null)
+                return configured;
+            var isolated = SafePath(instance.ImportRoot, "versions/" + instance.VersionId);
+            if (
+                new[] { "mods", "saves", "options.txt" }.Any(name =>
+                    System.IO.Directory.Exists(Path.Combine(isolated, name))
+                    || File.Exists(Path.Combine(isolated, name))
+                )
+            )
+                return isolated;
+        }
+        var storage = StorageDirectory(instance);
+        var legacy = SafePath(storage, "instances/" + instance.Id);
+        return instance.Directory
+            ?? (
+                System.IO.Directory.Exists(legacy)
+                    ? legacy
+                    : SafePath(storage, "versions/" + instance.Id)
+            );
+    }
+
+    // Protect shared profile files while allowing individual imported version folders to be recycled.
+    public string? DeletableInstanceDirectory(Instance instance) =>
+        InspectVersionDeletion(instance).DeletableDirectory;
+
+    public VersionDeletionInspection InspectVersionDeletion(Instance instance)
+    {
+        var storage = Path.GetFullPath(StorageDirectory(instance))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        // Imported versions can share a runtime root while owning distinct versions/<id> folders.
+        string VersionDirectory(Instance candidate)
+        {
+            if (
+                candidate.ImportRoot != null
+                && candidate.VersionId != null
+                && (
+                    candidate.Directory == null
+                    || string.Equals(
+                        Path.GetFullPath(candidate.Directory),
+                        Path.GetFullPath(candidate.ImportRoot),
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+            )
+                return SafePath(candidate.ImportRoot, "versions/" + candidate.VersionId);
+            return Path.GetFullPath(GameDirectory(candidate));
+        }
+        var target = VersionDirectory(instance);
+        target = target.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var parent = Path.GetDirectoryName(target);
+        if (
+            !string.Equals(
+                parent,
+                Path.Combine(storage, "versions"),
+                StringComparison.OrdinalIgnoreCase
+            )
+            && !string.Equals(
+                parent,
+                Path.Combine(storage, "instances"),
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            return new(target, VersionDeletionBlockReason.OutsideVersionDirectory, []);
+        try
+        {
+            target = SafePath(storage, Path.GetRelativePath(storage, target));
+        }
+        catch
+        {
+            return new(target, VersionDeletionBlockReason.UnsafePath, []);
+        }
+        static bool Overlaps(string left, string right) =>
+            string.Equals(left, right, StringComparison.OrdinalIgnoreCase)
+            || left.StartsWith(
+                right + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase
+            )
+            || right.StartsWith(
+                left + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase
+            );
+        var shared = Config
+            .Instances.Where(other =>
+                other.Id != instance.Id
+                && Overlaps(
+                    Path.GetFullPath(VersionDirectory(other))
+                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    target
+                )
+            )
+            .Select(other => other.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (shared.Length > 0)
+            return new(target, VersionDeletionBlockReason.SharedDirectory, shared);
+
+        // The base game version alone is not evidence of a dependency: inspect actual profile references.
+        if (
+            string.Equals(
+                parent,
+                Path.Combine(storage, "versions"),
+                StringComparison.OrdinalIgnoreCase
+            ) && System.IO.Directory.Exists(parent)
+        )
+        {
+            var id = Path.GetFileName(target);
+            var references = new List<string>();
+            string? reading = null;
+            try
+            {
+                foreach (var folder in System.IO.Directory.EnumerateDirectories(parent))
+                {
+                    if (
+                        string.Equals(
+                            Path.GetFullPath(folder),
+                            target,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    )
+                        continue;
+                    var profileId = Path.GetFileName(folder);
+                    reading = profileId;
+                    var profilePath = SafePath(storage, $"versions/{profileId}/{profileId}.json");
+                    if (!File.Exists(profilePath))
+                        continue;
+                    var profile = JsonNode.Parse(File.ReadAllText(profilePath));
+                    if (profile is not JsonObject)
+                        throw new InvalidDataException("Invalid version profile.");
+                    if (
+                        string.Equals(
+                            profile.S("inheritsFrom"),
+                            id,
+                            StringComparison.OrdinalIgnoreCase
+                        ) || string.Equals(profile.S("jar"), id, StringComparison.OrdinalIgnoreCase)
+                    )
+                        references.Add(profileId);
+                }
+            }
+            catch
+            {
+                return new(
+                    target,
+                    VersionDeletionBlockReason.UnreadableProfile,
+                    reading == null ? [] : [reading]
+                );
+            }
+            if (references.Count > 0)
+                return new(
+                    target,
+                    VersionDeletionBlockReason.Dependency,
+                    references.Distinct(StringComparer.OrdinalIgnoreCase).ToArray()
+                );
+        }
+        return new(target, VersionDeletionBlockReason.None, []);
+    }
+
+    public void PrepareIsolatedInstance(Instance instance)
+    {
+        if (instance.Directory != null || instance.ImportRoot != null)
+            return;
+        instance.StorageRoot ??= MinecraftRoot;
+        var name = instance.Name.Trim();
+        var path = SafePath(StorageDirectory(instance), "versions/" + name);
+        if (
+            System.IO.Directory.Exists(path)
+            || Config.Instances.Any(i =>
+                string.Equals(GameDirectory(i), path, StringComparison.OrdinalIgnoreCase)
+            )
+        )
+            path = SafePath(StorageDirectory(instance), "versions/" + name + "-" + instance.Id);
+        instance.Directory = path;
+    }
+
+    public void EnsureUniqueInstanceName(Instance instance)
+    {
+        var name = instance.Name.Trim();
+        if (name.Length == 0)
+            throw new Exception("请填写实例名称");
+        if (name.Contains('/') || name.Contains('\\'))
+            throw new Exception("文件路径不安全");
+        SafePath(instance.StorageRoot ?? MinecraftRoot, "versions/" + name);
+        if (
+            Config.Instances.Any(existing =>
+                string.Equals(existing.Name.Trim(), name, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(
+                    Path.GetFullPath(StorageDirectory(existing))
+                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    Path.GetFullPath(instance.ImportRoot ?? instance.StorageRoot ?? MinecraftRoot)
+                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+        )
+            throw new Exception("已有同名游戏版本，请更换名称后再下载：" + name);
+        if (instance.ImportRoot == null && instance.Directory == null)
+        {
+            var path = SafePath(instance.StorageRoot ?? MinecraftRoot, "versions/" + name);
+            if (System.IO.Directory.Exists(path))
+                throw new Exception("游戏目录中已存在同名版本：" + name);
+        }
+    }
+
+    // 临时文件放在目标旁边，写完再替换，避免留下半份 JSON。
+    public static async Task AtomicJson(string file, JsonNode value)
+    {
+        System.IO.Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        var temp = file + "." + Guid.NewGuid() + ".tmp";
+        try
+        {
+            await File.WriteAllTextAsync(temp, value.ToJsonString(JsonOptions));
+            File.Move(temp, file, true);
+        }
+        finally
+        {
+            if (File.Exists(temp))
+                File.Delete(temp);
+        }
+    }
+
+    // 先检查路径片段，再检查规范化后的边界；Windows 设备名和联接也不能当普通文件用。
+    public static string SafePath(string root, string relative)
+    {
+        var parts = relative.Replace('\\', '/').Split('/');
+        if (
+            string.IsNullOrWhiteSpace(relative)
+            || Path.IsPathRooted(relative)
+            || parts.Any(p =>
+                p is ".." or "."
+                || p.Length == 0
+                || p.EndsWith('.')
+                || p.EndsWith(' ')
+                || p.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                || System.Text.RegularExpressions.Regex.IsMatch(
+                    p,
+                    @"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                )
+            )
+        )
+            throw new Exception("文件路径不安全");
+        var full = Path.GetFullPath(Path.Combine(root, Path.Combine(parts)));
+        if (
+            !full.StartsWith(
+                Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+            throw new Exception("路径越过实例目录");
+        // Refuse junctions and symlinks along write/read paths.
+        for (
+            var cursor = full;
+            cursor != null && cursor.Length >= Path.GetFullPath(root).Length;
+            cursor = Path.GetDirectoryName(cursor)
+        )
+            if (
+                (File.Exists(cursor) || System.IO.Directory.Exists(cursor))
+                && File.GetAttributes(cursor).HasFlag(FileAttributes.ReparsePoint)
+            )
+                throw new Exception("内容路径包含符号链接或目录联接");
+        return full;
+    }
+}
+
+// 版本清单中不少字段可选，这些扩展统一处理空值和默认值。
+public static class J
+{
+    public static string S(this JsonNode? node, string key, string fallback = "") =>
+        node?[key]?.ToString() ?? fallback;
+
+    public static IEnumerable<JsonNode> Items(this JsonNode? node) =>
+        node is JsonArray array ? array.OfType<JsonNode>() : [];
+
+    public static int Int(this JsonNode? node, string key, int fallback = 0) =>
+        int.TryParse(node.S(key), out var n) ? n : fallback;
+}

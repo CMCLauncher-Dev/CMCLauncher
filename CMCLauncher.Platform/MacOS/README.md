@@ -1,0 +1,1 @@
+macOS adapter: Keychain credentials, system memory and CPU, JDK discovery and Finder trash. Actual games, credentials and desktop integration require macOS host testing. GPU counters are reported as unavailable when no supported interface exists.

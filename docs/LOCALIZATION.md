@@ -1,6 +1,6 @@
 # Interface language packs
 
-The launcher reads UTF-8 JSON files from `locales/` beside `CMCLauncher.exe`. The source files are in `winui/locales/`. These interface translations are separate from Minecraft's game language and the Windows MUI files under `languages/`.
+The launcher reads UTF-8 JSON files from `locales/` beside `CMCLauncher.exe`. The source files are in `CMCLauncher.Core/Resources/Locales/`. These interface translations are separate from Minecraft's game language and the Windows MUI files under `languages/`.
 
 New installations default to English. Explicitly saved language preferences are preserved. The `strings` keys are English; Chinese text lives in the Chinese pack values. The English pack's `aliases` map supports legacy source messages.
 
@@ -35,4 +35,4 @@ The launcher does not translate project descriptions, user configuration content
 
 ## Native WinUI resources
 
-Release packaging retains only native WinUI language folders matching the source interface packs in `winui/locales/`, with English always kept as a fallback. The current distribution includes `languages/en-US`, `languages/zh-CN`, and `languages/ja-JP`. Both regular publishes and single-file companion resources use the same filter. Adding an external JSON language pack after installation does not install additional WinUI native resources; native controls use an available fallback. To bundle another native language, add its source interface pack and rebuild.
+Release packaging retains only native WinUI language folders matching the source interface packs in `CMCLauncher.Core/Resources/Locales/`, with English always kept as a fallback. The current distribution includes `languages/en-US`, `languages/zh-CN`, and `languages/ja-JP`. Both regular publishes and single-file companion resources use the same filter. Adding an external JSON language pack after installation does not install additional WinUI native resources; native controls use an available fallback. To bundle another native language, add its source interface pack and rebuild.

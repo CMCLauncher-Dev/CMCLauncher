@@ -4,6 +4,6 @@ dist/
 state/
 **/bin/
 **/obj/
-winui/artifacts/
-winui/CompanionData.g.cs
-native.tests/fixtures/
+CMCLauncher.WinUI/artifacts/
+CMCLauncher.WinUI/CompanionData.g.cs
+CMCLauncher.Tests/Windows/fixtures/

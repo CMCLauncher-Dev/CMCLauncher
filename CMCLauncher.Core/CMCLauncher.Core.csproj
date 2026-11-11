@@ -11,28 +11,33 @@
     <Version>1.0.3</Version>
     <CurseForgeConfigurationFile
       Condition="'$(CurseForgeConfigurationFile)' == ''"
-    >$(MSBuildProjectDirectory)/../winui/curseforge.local.json</CurseForgeConfigurationFile>
+    >$(MSBuildProjectDirectory)/../.config/curseforge.local.json</CurseForgeConfigurationFile>
   </PropertyGroup>
   <!-- 本地构建可嵌入公开 OAuth 客户端 ID，源文件不进入发行包。 -->
   <ItemGroup>
     <EmbeddedResource
-      Include="../winui/themes/craft.json"
+      Include="Resources/Themes/craft.json"
       LogicalName="CMCLauncher.Themes.craft.json"
     />
 
     <EmbeddedResource
-      Include="../winui/locales/*.json"
+      Include="Resources/Locales/*.json"
       LogicalName="CMCLauncher.Locales.%(Filename).json"
     />
     <EmbeddedResource
-      Include="../winui/clientid.local.json"
+      Include="../.config/clientid.local.json"
       LogicalName="CMCLauncher.MicrosoftClient"
-      Condition="Exists('../winui/clientid.local.json')"
+      Condition="Exists('../.config/clientid.local.json')"
     />
     <EmbeddedResource
       Include="$(CurseForgeConfigurationFile)"
       LogicalName="CMCLauncher.CurseForgeApi"
       Condition="Exists('$(CurseForgeConfigurationFile)')"
+    />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference
+      Include="../CMCLauncher.Platform/Abstractions/CMCLauncher.Platform.Abstractions.csproj"
     />
   </ItemGroup>
   <ItemGroup>

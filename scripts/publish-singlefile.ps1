@@ -1,4 +1,4 @@
-﻿# Build the portable runtime, then embed its validated archive in one executable.
+# Build the portable runtime, then embed its validated archive in one executable.
 param(
     [string]$OutputDir = "dist/cmc-launcher-single",
     [string]$Configuration = "Release",
@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$projectPath = Join-Path $repoRoot "winui\CMCLauncher.WinUI.csproj"
+$projectPath = Join-Path $repoRoot "CMCLauncher.WinUI\CMCLauncher.WinUI.csproj"
 $workDir = Join-Path $repoRoot ('.artifacts/singlefile-builds/' + [guid]::NewGuid().ToString('N'))
 $targetDir = Join-Path $workDir 'portable'
 $bundleDir = Join-Path $workDir 'bundle'

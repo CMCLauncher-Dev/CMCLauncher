@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=CMCLauncher
+Comment=Minecraft launcher
+Exec=cmclauncher
+Icon=cmclauncher
+Terminal=false
+Categories=Game;
+StartupWMClass=CMCLauncher.Avalonia

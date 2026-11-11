@@ -6,7 +6,7 @@
   ],
   "projects": [
     {
-      "path": "winui/CMCLauncher.WinUI.csproj"
+      "path": "CMCLauncher.WinUI/CMCLauncher.WinUI.csproj"
     }
   ]
 }

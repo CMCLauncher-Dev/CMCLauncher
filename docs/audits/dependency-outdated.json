@@ -6,7 +6,7 @@
   ],
   "projects": [
     {
-      "path": "winui/CMCLauncher.WinUI.csproj",
+      "path": "CMCLauncher.WinUI/CMCLauncher.WinUI.csproj",
       "frameworks": [
         {
           "framework": "net8.0-windows10.0.19041",

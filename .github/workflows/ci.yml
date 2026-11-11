@@ -1,4 +1,4 @@
-name: CI
+name: CI / CD
 
 on:
   push:
@@ -11,9 +11,247 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
+  avalonia:
+    name: Avalonia (${{ matrix.rid }})
+    needs: core-test
+    timeout-minutes: 25
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            rid: linux-x64
+          - os: macos-latest
+            rid: osx-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Linux UI dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6
+      - name: Configure desktop build credentials
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+        run: |
+          ./scripts/configure-curseforge.ps1 -OutputPath (Join-Path $env:RUNNER_TEMP 'curseforge-api.json')
+          if ($env:GITHUB_REF.StartsWith('refs/tags/')) {
+            if ([string]::IsNullOrWhiteSpace($env:MICROSOFT_CLIENT_ID)) { throw 'Set the MICROSOFT_CLIENT_ID secret before publishing a tagged release.' }
+            @{ clientId = $env:MICROSOFT_CLIENT_ID } | ConvertTo-Json | Set-Content -LiteralPath .config/clientid.local.json -Encoding utf8
+          }
+      - name: Publish desktop application
+        shell: pwsh
+        run: |
+          $versionArguments = @()
+          if ($env:GITHUB_REF.StartsWith('refs/tags/')) {
+            if ($env:GITHUB_REF_NAME -notmatch '^(?:CMCL-)?v?(?<version>\d+\.\d+\.\d+)(?:-(?<channel>release|beta|alpha)(?<revision>(?:[.-]\d+)?))?$') { throw 'Unsupported release tag' }
+            $version = $Matches['version']
+            if ($Matches['channel'] -in @('beta', 'alpha')) { $version += '-' + $Matches['channel'] + $Matches['revision'] }
+            $versionArguments = @("-p:Version=$version", "-p:InformationalVersion=$version")
+          }
+          dotnet publish CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o .artifacts/avalonia-publish -p:CurseForgeConfigurationFile="$env:RUNNER_TEMP/curseforge-api.json" @versionArguments
+      - name: Remove temporary desktop credentials
+        if: always()
+        shell: pwsh
+        run: |
+          $configuration = Join-Path $env:RUNNER_TEMP 'curseforge-api.json'
+          if (Test-Path -LiteralPath $configuration) { Remove-Item -LiteralPath $configuration -Force }
+      - name: Verify Linux pages
+        if: runner.os == 'Linux'
+        run: |
+          timeout 90s xvfb-run -a .artifacts/avalonia-publish/CMCLauncher.Avalonia --verify-ui "$PWD/.artifacts/avalonia-ui"
+          test -f .artifacts/avalonia-ui/passed.txt
+          test ! -f .artifacts/avalonia-ui/failure.txt
+      - name: Package desktop application
+        id: desktop-package
+        env:
+          CURSEFORGE_API_KEY: ${{ github.event_name != 'pull_request' && secrets.CURSEFORGE_API_KEY || '' }}
+        shell: pwsh
+        run: |
+          $rid = '${{ matrix.rid }}'
+          $package = ".artifacts/CMCLauncher-Avalonia-$rid.tar.gz"
+          python scripts/package-desktop.py --publish .artifacts/avalonia-publish --output $package --rid $rid
+          if ($LASTEXITCODE) { throw 'Packaging failed' }
+          "path=$package" >> $env:GITHUB_OUTPUT
+      - name: Upload desktop application
+        uses: actions/upload-artifact@v7
+        with:
+          path: ${{ steps.desktop-package.outputs.path }}
+          include-hidden-files: true
+          archive: false
+          if-no-files-found: error
+      - name: Upload UI verification
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Avalonia-UI-${{ matrix.rid }}
+          include-hidden-files: true
+          path: .artifacts/avalonia-ui/
+
+  linux-packages:
+    name: Linux DEB, RPM and AppImage
+    needs: avalonia
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Linux package metadata
+        run: python -B scripts/test-package-linux.py
+      - uses: actions/download-artifact@v8
+        with:
+          name: CMCLauncher-Avalonia-linux-x64.tar.gz
+          path: .artifacts/linux-input
+          skip-decompress: true
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm desktop-file-utils squashfs-tools libicu70 libssl3 libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6 xvfb xauth
+      - name: Extract verified publish directory
+        run: |
+          mkdir -p .artifacts/linux-publish
+          tar -xzf .artifacts/linux-input/CMCLauncher-Avalonia-linux-x64.tar.gz -C .artifacts/linux-publish
+          desktop-file-validate packaging/linux/cmclauncher.desktop
+      - name: Build Linux distributions
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -Raw)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($env:GITHUB_REF.StartsWith('refs/tags/')) {
+            if ($env:GITHUB_REF_NAME -notmatch '^(?:CMCL-)?v?(?<version>\d+\.\d+\.\d+)(?:-(?<channel>release|beta|alpha)(?<revision>(?:[.-]\d+)?))?$') { throw 'Unsupported release tag' }
+            $version = $Matches['version']
+            if ($Matches['channel'] -in @('beta', 'alpha')) { $version += '-' + $Matches['channel'] + $Matches['revision'] }
+          }
+          python scripts/package-linux.py --publish .artifacts/linux-publish --output .artifacts/linux-packages --version $version
+          if ($LASTEXITCODE) { throw 'Linux distribution packaging failed' }
+      - name: Verify AppImage without FUSE
+        run: |
+          chmod +x .artifacts/linux-packages/*.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 timeout 120s xvfb-run -a .artifacts/linux-packages/CMCLauncher-Avalonia-linux-x64.AppImage --verify-ui "$PWD/.artifacts/appimage-ui"
+          test -f .artifacts/appimage-ui/passed.txt
+          test ! -f .artifacts/appimage-ui/failure.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          path: .artifacts/linux-packages/CMCLauncher-Avalonia-linux-x64.deb
+          include-hidden-files: true
+          archive: false
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          path: .artifacts/linux-packages/CMCLauncher-Avalonia-linux-x64.rpm
+          include-hidden-files: true
+          archive: false
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          path: .artifacts/linux-packages/CMCLauncher-Avalonia-linux-x64.AppImage
+          include-hidden-files: true
+          archive: false
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: AppImage-UI-checks
+          path: .artifacts/appimage-ui/
+          include-hidden-files: true
+
+  linux-install-test:
+    name: Install (${{ matrix.distro }})
+    needs: linux-packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu-22.04
+            image: ubuntu:22.04
+            family: deb
+          - distro: ubuntu-24.04
+            image: ubuntu:24.04
+            family: deb
+          - distro: debian-12
+            image: debian:12
+            family: deb
+          - distro: fedora-44
+            image: fedora:44
+            family: rpm
+          - distro: rocky-9
+            image: rockylinux:9
+            family: rpm
+    steps:
+      - name: Install test prerequisites
+        shell: bash
+        env:
+          PACKAGE_FAMILY: ${{ matrix.family }}
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          if [ "$PACKAGE_FAMILY" = deb ]; then
+            apt-get update
+            apt-get install -y libstdc++6 ca-certificates xvfb xauth
+          else
+            dnf install -y libstdc++ ca-certificates xorg-x11-server-Xvfb xorg-x11-xauth tar gzip
+          fi
+      - uses: actions/download-artifact@v8
+        with:
+          name: CMCLauncher-Avalonia-linux-x64.${{ matrix.family }}
+          path: packages
+          skip-decompress: true
+      - name: Install and launch distribution package
+        shell: bash
+        env:
+          PACKAGE_FAMILY: ${{ matrix.family }}
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          if [ "$PACKAGE_FAMILY" = deb ]; then
+            apt-get install -y "$PWD/packages/CMCLauncher-Avalonia-linux-x64.deb"
+          else
+            dnf install -y "$PWD/packages/CMCLauncher-Avalonia-linux-x64.rpm"
+          fi
+          Xvfb :99 -screen 0 1280x800x24 -nolisten tcp &
+          display_pid=$!
+          trap 'kill "$display_pid"' EXIT
+          export DISPLAY=:99
+          for attempt in {1..30}; do
+            if [ -S /tmp/.X11-unix/X99 ]; then break; fi
+            sleep 0.2
+          done
+          timeout 120s cmclauncher --verify-ui /tmp/cmcl-installed-ui
+          test -f /tmp/cmcl-installed-ui/passed.txt
+          test ! -f /tmp/cmcl-installed-ui/failure.txt
+      - name: Verify removal preserves user data
+        shell: bash
+        env:
+          PACKAGE_FAMILY: ${{ matrix.family }}
+        run: |
+          if [ "$PACKAGE_FAMILY" = deb ]; then
+            apt-get remove -y cmclauncher
+          else
+            dnf remove -y cmclauncher
+          fi
+          test -f /tmp/cmcl-installed-ui/data/settings.json
+          test ! -f /usr/bin/cmclauncher
+
   core-test:
     name: Core (${{ matrix.os }})
+    timeout-minutes: 20
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -27,10 +265,11 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Run portable core tests
-        run: dotnet run --project core.tests/CMCLauncher.Core.Tests.csproj -c Release
+        run: dotnet run --project CMCLauncher.Tests/Core/CMCLauncher.Core.Tests.csproj -c Release
 
   test:
-    name: Native tests
+    name: WinUI core regression tests
+    timeout-minutes: 25
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -39,14 +278,19 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Run native tests
-        run: dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
+        run: dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Release
 
   # 原生测试通过后再构建发行包，避免把已知失败的核心代码打包。
   build:
     name: ${{ matrix.format == 'zip' && 'Build Windows release' || 'Build single-file release' }}
     runs-on: windows-latest
     needs: [test, core-test]
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -86,7 +330,7 @@ jobs:
           MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:MICROSOFT_CLIENT_ID)) { throw 'Set the MICROSOFT_CLIENT_ID GitHub Actions secret before publishing a tagged release.' }
-          @{ clientId = $env:MICROSOFT_CLIENT_ID } | ConvertTo-Json | Set-Content -LiteralPath winui/clientid.local.json -Encoding utf8
+          @{ clientId = $env:MICROSOFT_CLIENT_ID } | ConvertTo-Json | Set-Content -LiteralPath .config/clientid.local.json -Encoding utf8
       - name: Configure CurseForge API key
         if: github.event_name != 'pull_request'
         shell: pwsh
@@ -96,7 +340,18 @@ jobs:
       - name: Publish self-contained WinUI app
         if: matrix.format == 'zip'
         shell: pwsh
-        run: dotnet publish winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true "-p:CurseForgeConfigurationFile=$env:RUNNER_TEMP/curseforge-api.json" -o dist/cmc-launcher
+        run: |
+          $versionArguments = @()
+          if ($env:CMC_RELEASE_VERSION) { $versionArguments = @("-p:Version=$env:CMC_RELEASE_VERSION", "-p:InformationalVersion=$env:CMC_RELEASE_VERSION") }
+          dotnet publish CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true "-p:CurseForgeConfigurationFile=$env:RUNNER_TEMP/curseforge-api.json" -o dist/cmc-launcher @versionArguments
+      - name: Verify WinUI pages
+        if: matrix.format == 'zip'
+        shell: pwsh
+        run: |
+          $directory = Join-Path $PWD '.artifacts/winui-ui'
+          $process = Start-Process -FilePath (Resolve-Path dist/cmc-launcher/CMCLauncher.exe) -ArgumentList @('--verify-cms-ui', ('"{0}"' -f $directory)) -WindowStyle Hidden -PassThru
+          if (!$process.WaitForExit(90000)) { $process.Kill(); throw 'WinUI verification timed out' }
+          if ($process.ExitCode -ne 0 -or !(Test-Path "$directory/passed.txt") -or (Test-Path "$directory/failure.txt")) { throw 'WinUI verification failed' }
       - name: Publish single-file WinUI app
         if: matrix.format == 'singlefile'
         shell: pwsh
@@ -131,11 +386,19 @@ jobs:
           # Upload the validated ZIP/EXE directly without another archive wrapper.
           archive: false
           if-no-files-found: error
+      - name: Upload WinUI verification
+        if: always() && matrix.format == 'zip'
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinUI-UI-checks
+          include-hidden-files: true
+          path: .artifacts/winui-ui/
   # 标签发布复用已经检查过的 ZIP 和单文件 EXE。
   release:
     name: Publish tagged release
+    timeout-minutes: 15
     runs-on: windows-latest
-    needs: build
+    needs: [build, avalonia, linux-packages, linux-install-test]
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
@@ -158,6 +421,13 @@ jobs:
           name: CMCLauncher-win-x64.exe
           path: release-files
           skip-decompress: true
+      - name: Download Avalonia artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: CMCLauncher-Avalonia-*
+          path: release-files
+          merge-multiple: true
+          skip-decompress: true
       # Only release assets receive a version; workflow artifacts keep a stable name.
       - name: Name release assets
         id: archive
@@ -177,6 +447,10 @@ jobs:
           Move-Item -LiteralPath release-files/CMCLauncher-win-x64.zip -Destination $archivePath
           $executablePath = "release-files/CMCLauncher-$version$suffix-win-x64.exe"
           Move-Item -LiteralPath release-files/CMCLauncher-win-x64.exe -Destination $executablePath
+          foreach ($package in Get-ChildItem -LiteralPath release-files -File -Filter 'CMCLauncher-Avalonia-*') {
+            $name = $package.Name.Replace('CMCLauncher-Avalonia-', "CMCLauncher-Avalonia-$version$suffix-")
+            Move-Item -LiteralPath $package.FullName -Destination (Join-Path $package.DirectoryName $name)
+          }
           "path=$archivePath" >> $env:GITHUB_OUTPUT
           "executable=$executablePath" >> $env:GITHUB_OUTPUT
           "prerelease=$($prerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
@@ -189,6 +463,7 @@ jobs:
           files: |
             ${{ steps.archive.outputs.path }}
             ${{ steps.archive.outputs.executable }}
+            release-files/CMCLauncher-Avalonia-*
       - name: Set up Python for release mirror
         uses: actions/setup-python@v5
         with:

@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$NoLaunch,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$BuildArguments
@@ -33,7 +33,7 @@ try
     # A fresh directory avoids stale resources and files locked by an earlier test run.
     $runName = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
     $outputDirectory = Join-Path $PSScriptRoot ".artifacts/local-runs/$runName-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
-    $project = Join-Path $PSScriptRoot 'winui/CMCLauncher.WinUI.csproj'
+    $project = Join-Path $PSScriptRoot 'CMCLauncher.WinUI/CMCLauncher.WinUI.csproj'
     $publishArguments = @('publish', $project, '-c', 'Release', '-p:Platform=x64', '-r', 'win-x64', '--self-contained', 'true', '-o', $outputDirectory, '--nologo')
     if ($null -ne $curseForgeKey)
     {

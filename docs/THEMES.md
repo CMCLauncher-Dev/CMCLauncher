@@ -1,6 +1,6 @@
 # Theme presets
 
-The launcher reads UTF-8 theme files from `themes/` beside `CMCLauncher.exe`. Source palettes live in `winui/themes/`.
+The launcher reads UTF-8 theme files from `themes/` beside `CMCLauncher.exe`. Source palettes live in `CMCLauncher.Core/Resources/Themes/`.
 
 Fresh green (`craft`) is the only embedded color preset. Its external `craft.json` can override the embedded colors. If that file is missing or invalid, the embedded JSON remains available. Lake Cyan (`lakecyan.json`) and Sakura (`sakura.json`) are distributed as external palettes and may be edited or removed. The WinUI3 native preset continues to use Windows theme resources; it is never loaded from JSON. The Custom color editor and saved appearance profiles remain separate.
 

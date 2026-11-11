@@ -1,0 +1,255 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <AssemblyName>CMCLauncher</AssemblyName>
+    <Product>CMCLauncher</Product>
+    <Title>CMCLauncher</Title>
+    <RootNamespace>CMCLauncher.WinUI</RootNamespace>
+    <Version>1.0.3</Version>
+    <CurseForgeConfigurationFile
+      Condition="'$(CurseForgeConfigurationFile)' == ''"
+    >$(MSBuildProjectDirectory)/../.config/curseforge.local.json</CurseForgeConfigurationFile>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets/cmc-logo.ico</ApplicationIcon>
+    <!-- 使用 Program.cs 中的自定义入口，负责 OLE 初始化和资源准备。 -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <EnableMsixTooling Condition="'$(PublishSingleFile)' == 'true'">true</EnableMsixTooling>
+    <!-- 构建时自动填写构建时间/版本/提交/发布标识，About 页读取展示。构建提交号由 _GenerateLauncherBuildInfo 在编译时读取 Git 填充。 -->
+    <LauncherBuildTime
+    >$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'"))</LauncherBuildTime>
+    <LauncherGitCommit />
+    <!-- 主版本号 + 提交号构成小版本识别号；发布标识在构建阶段自动填写。 -->
+    <LauncherMajorVersion>1.0</LauncherMajorVersion>
+    <LauncherIsRelease Condition="'$(LauncherIsRelease)' == ''">true</LauncherIsRelease>
+    <IncludeNativeLibrariesForSelfExtract
+      Condition="'$(PublishSingleFile)' == 'true'"
+    >true</IncludeNativeLibrariesForSelfExtract>
+    <DefineConstants
+      Condition="'$(PublishSingleFile)' == 'true'"
+    >$(DefineConstants);SINGLE_FILE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference
+      Include="../CMCLauncher.Platform/Windows/CMCLauncher.Platform.Windows.csproj"
+    />
+  </ItemGroup>
+  <!-- Partial trimming keeps the application and third-party libraries intact. -->
+  <ItemGroup Condition="'$(PublishSingleFile)' != 'true'">
+    <Compile Remove="CompanionData.g.cs" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishTrimmed Condition="'$(PublishTrimmed)' == ''">true</PublishTrimmed>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PublishTrimmed)' == 'true'">
+    <TrimMode>partial</TrimMode>
+    <!-- Settings, API models and shell operations still use reflection and COM. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+  </PropertyGroup>
+  <!-- Preserve reflection metadata and WinRT projections; trim only safe framework code. -->
+  <ItemGroup Condition="'$(PublishTrimmed)' == 'true'">
+    <TrimmerRootAssembly Include="$(AssemblyName)" />
+    <TrimmerRootAssembly Include="CMCLauncher.Core" />
+    <TrimmerRootAssembly Include="CMCLauncher.Platform.Windows" />
+    <TrimmerRootAssembly Include="Microsoft.Windows.SDK.NET" />
+    <TrimmerRootAssembly Include="Microsoft.WinUI" />
+    <TrimmerRootAssembly Include="WinRT.Runtime" />
+    <TrimmerRootAssembly Include="Microsoft.InteractiveExperiences.Projection" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content
+      Include="../CMCLauncher.Core/Resources/Themes/*.json"
+      Link="themes/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+    />
+    <Content
+      Include="../CMCLauncher.Core/Resources/Locales/*.json"
+      Link="locales/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+    />
+
+    <Content
+      Update="assets/cmc-logo.png"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+    />
+    <Content
+      Update="assets/grass-block.png"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+    />
+    <Content
+      Include="assets/loaders/*.png"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+    />
+    <None
+      Update="assets/cmc-logo.ico"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+    />
+    <PackageReference
+      Include="Markdig"
+      Version="1.4.2"
+    />
+    <!-- Component packages keep unused AI, ML and Widgets runtimes out of portable releases. -->
+    <PackageReference
+      Include="Microsoft.WindowsAppSDK.WinUI"
+      Version="1.8.260803003"
+    />
+    <PackageReference
+      Include="Microsoft.WindowsAppSDK.DWrite"
+      Version="1.8.25122902"
+    />
+    <!-- Core services are provided by project references. -->
+  </ItemGroup>
+  <!-- 构建时生成构建信息源码，About 页自动展示构建时间/版本/提交。 -->
+  <ItemGroup>
+    <Compile Include="$(IntermediateOutputPath)LauncherBuildInfo.g.cs" />
+  </ItemGroup>
+  <Target
+    Name="_GenerateLauncherBuildInfo"
+    BeforeTargets="PrepareForBuild;CoreCompile"
+  >
+    <PropertyGroup>
+      <LauncherBuildInfoFile>$(IntermediateOutputPath)LauncherBuildInfo.g.cs</LauncherBuildInfoFile>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <!-- 编译时读取当前 Git 提交号，构建信息页展示真实提交。git 不可用时回退到默认值。 -->
+    <PropertyGroup Condition="'$(LauncherGitCommitOverride)' != ''">
+      <LauncherGitCommit>$(LauncherGitCommitOverride)</LauncherGitCommit>
+    </PropertyGroup>
+    <Exec
+      Condition="'$(LauncherGitCommit)' == ''"
+      Command="git rev-parse --short HEAD"
+      ConsoleToMsBuild="true"
+      EchoOff="true"
+      IgnoreExitCode="true"
+    >
+      <Output
+        TaskParameter="ConsoleOutput"
+        PropertyName="GitShortCommit"
+      />
+    </Exec>
+    <PropertyGroup Condition="'$(LauncherGitCommit)' == ''">
+      <LauncherGitCommit Condition="'$(GitShortCommit)' != ''">$(GitShortCommit)</LauncherGitCommit>
+      <LauncherGitCommit Condition="'$(LauncherGitCommit)' == ''">unknown</LauncherGitCommit>
+    </PropertyGroup>
+    <!-- 发行版本与程序集及更新比较一致；Git 提交号单独展示。 -->
+    <PropertyGroup>
+      <LauncherFullVersion>$(Version)</LauncherFullVersion>
+    </PropertyGroup>
+    <!-- 逐行生成 C#，用 %3B 转义分号，避免 XML 属性换行规范化和 item 分号拆分导致代码损坏。 -->
+    <ItemGroup>
+      <BuildInfoLine Include="#pragma warning disable CS1591" />
+      <BuildInfoLine Include="// 本文件由 MSBuild 在编译前自动生成，请勿手动修改。" />
+      <BuildInfoLine Include="namespace CMCLauncher.WinUI%3B" />
+      <BuildInfoLine Include="     " />
+      <BuildInfoLine Include="internal static partial class LauncherBuildInfo" />
+      <BuildInfoLine Include="{" />
+      <BuildInfoLine
+        Include="    public const string Version = &quot;$(LauncherFullVersion)&quot;%3B"
+      />
+      <BuildInfoLine
+        Include="    public const string BuildTime = &quot;$(LauncherBuildTime)&quot;%3B"
+      />
+      <BuildInfoLine
+        Include="    public const string GitCommit = &quot;$(LauncherGitCommit)&quot;%3B"
+      />
+      <BuildInfoLine
+        Include="    public const bool IsRelease = &quot;$(LauncherIsRelease)&quot; == &quot;true&quot;%3B"
+      />
+      <BuildInfoLine Include="}" />
+      <BuildInfoLine Include="     " />
+    </ItemGroup>
+    <WriteLinesToFile
+      File="$(LauncherBuildInfoFile)"
+      Overwrite="true"
+      Encoding="UTF-8"
+      Lines="@(BuildInfoLine)"
+    />
+  </Target>
+  <!-- Filter before copying or bundling, so single-file releases cannot retain unused MUI files. -->
+  <Target
+    Name="FilterWinUIMuiLanguages"
+    AfterTargets="ComputeResolvedFilesToPublishList"
+    BeforeTargets="_ComputeFilesToBundle"
+  >
+    <ItemGroup>
+      <LauncherMuiLanguage
+        Include="$(MSBuildProjectDirectory)/../CMCLauncher.Core/Resources/Locales/*.json"
+      />
+    </ItemGroup>
+    <PropertyGroup>
+      <LauncherMuiCultureNames>@(LauncherMuiLanguage->'%(Filename)', '|')</LauncherMuiCultureNames>
+      <LauncherMuiCulturePattern
+      >(?i)^(en-us|$([System.String]::Copy('$(LauncherMuiCultureNames)').Replace('_', '-')))[\\/]</LauncherMuiCulturePattern>
+    </PropertyGroup>
+    <ItemGroup>
+      <UnsupportedMui
+        Include="@(ResolvedFileToPublish)"
+        Condition="'%(ResolvedFileToPublish.Extension)' == '.mui' and $([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.RelativePath)', '^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})+[\\/]')) and !$([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.RelativePath)', '$(LauncherMuiCulturePattern)'))"
+      />
+      <ResolvedFileToPublish Remove="@(UnsupportedMui)" />
+    </ItemGroup>
+    <Message
+      Importance="high"
+      Text="Excluded @(UnsupportedMui->Count()) unsupported WinUI MUI files from publishing."
+    />
+  </Target>
+  <!-- Windows paths are case-insensitive; avoid duplicate SDK asset entries in single-file bundles. -->
+  <Target
+    Name="DeduplicateSingleFileInputs"
+    BeforeTargets="GenerateSingleFileBundle"
+    DependsOnTargets="_ComputeFilesToBundle"
+    Condition="'$(PublishSingleFile)' == 'true'"
+  >
+    <RemoveDuplicates Inputs="@(FilesToBundle)">
+      <Output
+        TaskParameter="Filtered"
+        ItemName="UniqueFilesToBundle"
+      />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <FilesToBundle Remove="@(FilesToBundle)" />
+      <FilesToBundle Include="@(UniqueFilesToBundle)" />
+    </ItemGroup>
+  </Target>
+  <!-- 普通发布复制外部 WinUI 资源；单文件发布由伴生数据释放资源。 -->
+  <Target
+    Name="PublishWinUIResources"
+    AfterTargets="Publish"
+    Condition="'$(PublishSingleFile)' != 'true'"
+  >
+    <ItemGroup>
+      <WinUIResource Include="$(TargetDir)*.pri;$(TargetDir)*.xbf" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(WinUIResource)"
+      DestinationFolder="$(PublishDir)"
+    />
+    <Exec
+      WorkingDirectory="$(PublishDir)"
+      Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\organize-winui-languages.ps1&quot; -PublishDir ."
+    />
+  </Target>
+</Project>

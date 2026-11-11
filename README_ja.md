@@ -159,7 +159,7 @@ GitHub の API が 403/429 を返すか利用できない場合、ランチャ�
 
 資格情報は現在の Windows ユーザーに対して DPAPI で暗号化されます。設定を別のユーザーやデバイスにコピーした場合、再サインインが必要になることがあります。ゲームをバックアップする際は、実際のインスタンスディレクトリのセーブと設定を含めてください。
 
-SSL エラーの上書きが有効でも、ランチャーの HTTPS クライアントは組み込みの拒否リストにある証明書の公開鍵を拒否します。[CertificatePolicy.cs](CMCLauncher.Core/CertificatePolicy.cs) を参照してください。このポリシーは Windows のトラストストアを変更したり、外部の Java インストーラやゲームが実行する証明書検証を変更したりしません。
+SSL エラーの上書きが有効でも、ランチャーの HTTPS クライアントは組み込みの拒否リストにある証明書の公開鍵を拒否します。[CertificatePolicy.cs](CMCLauncher.Core/Download/CertificatePolicy.cs) を参照してください。このポリシーは Windows のトラストストアを変更したり、外部の Java インストーラやゲームが実行する証明書検証を変更したりしません。
 
 ## ソースから実行
 
@@ -168,7 +168,7 @@ Windows で、.NET 8 SDK と WinUI 3 プロジェクトの構築に必要な Win
 ```powershell
 git clone https://github.com/CMCLauncher-Dev/CMCLauncher.git
 cd CMCLauncher
-dotnet run --project winui/CMCLauncher.WinUI.csproj -p:Platform=x64
+dotnet run --project CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -p:Platform=x64
 ```
 
 ワンクリックのローカルビルドには、リポジトリルートの `build-and-run.cmd` をダブルクリックします。自己完結型 Release ビルドを `.artifacts/local-runs/` の新フォルダに公開し、手動テスト用にそのビルドを開きます。`dist` には触れず、ビルドエラーが見えるようにコンソールを開いたままにします。実行ごとに独自の出力フォルダが保持されます。それらのビルドを閉じた後、古いフォルダを削除できます。アプリケーションは通常のランチャー設定を使用します。
@@ -179,7 +179,7 @@ CurseForge をローカルでテストするには、コマンドプロンプト
 
 ### Microsoft サインインの設定
 
-クライアント ID のないソースビルドはインターフェースを実行できますが、Microsoft サインインは利用できません。ローカルビルドで有効にするには、設定済みの公開 OAuth クライアント ID を `winui/clientid.local.json` に作成します。
+クライアント ID のないソースビルドはインターフェースを実行できますが、Microsoft サインインは利用できません。ローカルビルドで有効にするには、設定済みの公開 OAuth クライアント ID を `.config/clientid.local.json` に作成します。
 
 ```json
 {
@@ -196,13 +196,13 @@ CurseForge をローカルでテストするには、コマンドプロンプト
 Release 設定をビルドします。
 
 ```powershell
-dotnet build winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64
+dotnet build CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64
 ```
 
 自己完結型ディレクトリを公開し、ZIP アーカイブを作成します。
 
 ```powershell
-dotnet publish winui/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
+dotnet publish CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
 ./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-1.0.2-beta-win-x64.zip
 ```
 
@@ -221,7 +221,7 @@ Release ビルドは部分的な .NET トリミングも使用します。ラン
 ネイティブ回帰テストを実行します。
 
 ```powershell
-dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
+dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Release
 ```
 
 これらのテストは Windows DPAPI を使用するため、Windows 上で実行する必要があります。最後のローカル Java 検出チェックには PATH に `java` も必要です。
@@ -239,18 +239,18 @@ dotnet run --project native.tests/CMCLauncher.Tests.csproj -c Release
 コアサービスと Windows 統合を分離しています。[依存関係と移植性の監査](docs/DEPENDENCY_AUDIT.md)を参照してください。
 
 - [`CMCLauncher.Core/`](CMCLauncher.Core/) は Windows SDK に依存しない `net8.0` コアサービスです。
-- [`native/`](native/) は資格情報、レジストリ、更新処理の Windows アダプターです。
-- [`core.tests/`](core.tests/) は移植可能なコアの回帰チェックです。
-- [`winui/`](winui/) は**界面層（UI 層）** で、デスクトップエントリポイント、ウィンドウ、ページ、コントロール、UI サービスを含みます。
-- [`native.tests/`](native.tests/) は**テスト層**で、ネイティブ回帰テストと証明書フィクスチャを含みます。
+- [`CMCLauncher.Platform/Windows/`](CMCLauncher.Platform/Windows/) は資格情報、レジストリ、更新処理の Windows アダプターです。
+- [`CMCLauncher.Tests/Core/`](CMCLauncher.Tests/Core/) は移植可能なコアの回帰チェックです。
+- [`CMCLauncher.WinUI/`](CMCLauncher.WinUI/) は**界面層（UI 層）** で、デスクトップエントリポイント、ウィンドウ、ページ、コントロール、UI サービスを含みます。
+- [`CMCLauncher.Tests/Windows/`](CMCLauncher.Tests/Windows/) は**テスト層**で、ネイティブ回帰テストと証明書フィクスチャを含みます。
 
 | ディレクトリ | 内容 |
 | --- | --- |
-| [`winui/`](winui/) | デスクトップエントリポイント、ウィンドウ、ページ、コントロール、UI サービス |
+| [`CMCLauncher.WinUI/`](CMCLauncher.WinUI/) | デスクトップエントリポイント、ウィンドウ、ページ、コントロール、UI サービス |
 | [`CMCLauncher.Core/`](CMCLauncher.Core/) | ダウンロード、認証プロトコル、リソース、ストレージ |
-| [`native/`](native/) | Windows 資格情報、レジストリ、更新処理 |
-| [`core.tests/`](core.tests/) | 移植可能なコアの回帰チェック |
-| [`native.tests/`](native.tests/) | ネイティブ回帰テストと証明書フィクスチャ |
+| [`CMCLauncher.Platform/Windows/`](CMCLauncher.Platform/Windows/) | Windows 資格情報、レジストリ、更新処理 |
+| [`CMCLauncher.Tests/Core/`](CMCLauncher.Tests/Core/) | 移植可能なコアの回帰チェック |
+| [`CMCLauncher.Tests/Windows/`](CMCLauncher.Tests/Windows/) | ネイティブ回帰テストと証明書フィクスチャ |
 | [`scripts/`](scripts/) | 公開、リソース整理、パッケージングスクリプト |
 | [`docs/`](docs/) | プロジェクト Web サイトのソースとスクリーンショットアセット |
 | [`.github/workflows/`](.github/workflows/) | 自動テスト、ビルド、タグ付けリリース |

@@ -1,0 +1,1 @@
+Linux adapter: Secret Service credentials, /proc memory and CPU, JDK discovery, optional NVIDIA telemetry and gio trash. Install secret-tool and unlock the desktop credential store before online sign-in. Actual games and desktop integration require Linux host testing.

@@ -14,7 +14,7 @@ The typed client defaults to disabled and still requires an explicit approval fl
 
 Create a repository Actions secret named `CURSEFORGE_API_KEY` containing the key issued for this application. Push and manually dispatched builds require it; pull-request builds skip injection and build without a key. Missing keys fail trusted builds before publishing.
 
-`scripts/configure-curseforge.ps1` reads the secret from its environment and writes `curseforge-api.json` under `RUNNER_TEMP` without printing the value. CI passes only that file path to MSBuild through `CurseForgeConfigurationFile`; the key never appears in the publish command. The desktop and native projects embed that JSON as `CMCLauncher.CurseForgeApi`; `CurseForgeCredentials` reads it for the modpack service. The temporary file stays outside the checkout and is removed after publishing, including failed publishes. The optional local-development file `winui/curseforge.local.json` is ignored by Git and excluded from ZIP packaging. Before upload, `scripts/verify-curseforge-secrets.ps1` rejects the configured key in tracked files or non-executable ZIP entries. Runtime logs redact both the configured value and API-key fields. A build without a key reports that CurseForge is not configured when a request is attempted; there is no borrowed-key fallback.
+`scripts/configure-curseforge.ps1` reads the secret from its environment and writes `curseforge-api.json` under `RUNNER_TEMP` without printing the value. CI passes only that file path to MSBuild through `CurseForgeConfigurationFile`; the key never appears in the publish command. The desktop and native projects embed that JSON as `CMCLauncher.CurseForgeApi`; `CurseForgeCredentials` reads it for the modpack service. The temporary file stays outside the checkout and is removed after publishing, including failed publishes. The optional local-development file `.config/curseforge.local.json` is ignored by Git and excluded from ZIP packaging. Before upload, `scripts/verify-curseforge-secrets.ps1` rejects the configured key in tracked files or non-executable ZIP entries. Runtime logs redact both the configured value and API-key fields. A build without a key reports that CurseForge is not configured when a request is attempted; there is no borrowed-key fallback.
 
 For a local build, set `CURSEFORGE_API_KEY` in the process environment and run the same script before publishing. Remove the generated local file when it is no longer needed.
 
@@ -22,7 +22,7 @@ An embedded desktop credential can be extracted from the binary. CI Secrets prot
 
 ## Available extension points
 
-`ICurseForgeClient` in `CMCLauncher.Core/CurseForgeClient.cs` exposes Minecraft project search, project details, paginated file lists, individual files, and a conservative file-access assessment. Models retain project links, authors, game versions and hashes for later attribution and integrity checks. Refer to the [official API reference](https://docs.curseforge.com/rest-api/).
+`ICurseForgeClient` in `CMCLauncher.Core/Download/CurseForgeClient.cs` exposes Minecraft project search, project details, paginated file lists, individual files, and a conservative file-access assessment. Models retain project links, authors, game versions and hashes for later attribution and integrity checks. Refer to the [official API reference](https://docs.curseforge.com/rest-api/).
 
 - API requests use the fixed official HTTPS origin and a per-request `x-api-key` header. There is no API-key query parameter or shared default authentication header.
 - Production transport disables proxies, redirects and cookies, validates TLS, and does not inherit the launcher's proxy or SSL-error override settings. This is separate from Git's command-specific proxy setting.
@@ -37,4 +37,4 @@ Community installations and imported CurseForge packs recheck project permission
 
 ## Verification
 
-`native.tests/CurseForgeClientTests.cs` uses a fake handler and a fake key. It checks disabled access, request scoping, pagination, cancellation, author metadata, distribution restrictions, unavailable files, untrusted URLs, identity mismatches, rate limits, redirects and sanitized errors. It makes no live CurseForge requests and does not accept terms or obtain credentials on the operator's behalf.
+`CMCLauncher.Tests/Windows/CurseForgeClientTests.cs` uses a fake handler and a fake key. It checks disabled access, request scoping, pagination, cancellation, author metadata, distribution restrictions, unavailable files, untrusted URLs, identity mismatches, rate limits, redirects and sanitized errors. It makes no live CurseForge requests and does not accept terms or obtain credentials on the operator's behalf.
