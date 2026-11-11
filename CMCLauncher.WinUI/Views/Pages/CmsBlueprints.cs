@@ -28,6 +28,7 @@ public sealed partial class MainWindow
 
     bool cmsNoticeAccepted;
     ContentDialog? cmsNoticeDialog;
+    bool cmsNoticeOpened;
 
     async Task ShowCmsNotice()
     {
@@ -57,6 +58,7 @@ public sealed partial class MainWindow
         };
         dialog.Opened += (_, _) =>
         {
+            cmsNoticeOpened = true;
             clock.Start();
             timer.Start();
         };
@@ -65,6 +67,7 @@ public sealed partial class MainWindow
             if (!ready)
                 e.Cancel = true;
         };
+        cmsNoticeOpened = false;
         cmsNoticeDialog = dialog;
         dialogOpen = true;
         try
@@ -77,6 +80,7 @@ public sealed partial class MainWindow
             timer.Stop();
             clock.Stop();
             cmsNoticeDialog = null;
+            cmsNoticeOpened = false;
             dialogOpen = false;
         }
     }

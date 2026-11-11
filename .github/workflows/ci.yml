@@ -40,8 +40,7 @@ jobs:
       - name: Install Linux UI dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb xauth libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6
+          sudo env GITHUB_ACTIONS=true sh scripts/ci-apt-install.sh xvfb xauth libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6
       - name: Configure desktop build credentials
         if: github.event_name != 'pull_request'
         shell: pwsh
@@ -122,8 +121,7 @@ jobs:
           skip-decompress: true
       - name: Install packaging tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm desktop-file-utils squashfs-tools libicu70 libssl3 libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6 xvfb xauth
+          sudo env GITHUB_ACTIONS=true sh scripts/ci-apt-install.sh rpm desktop-file-utils squashfs-tools libicu70 libssl3 libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6 xvfb xauth
       - name: Extract verified publish directory
         run: |
           mkdir -p .artifacts/linux-publish
@@ -351,7 +349,10 @@ jobs:
           $directory = Join-Path $PWD '.artifacts/winui-ui'
           $process = Start-Process -FilePath (Resolve-Path dist/cmc-launcher/CMCLauncher.exe) -ArgumentList @('--verify-cms-ui', ('"{0}"' -f $directory)) -WindowStyle Hidden -PassThru
           if (!$process.WaitForExit(90000)) { $process.Kill(); throw 'WinUI verification timed out' }
-          if ($process.ExitCode -ne 0 -or !(Test-Path "$directory/passed.txt") -or (Test-Path "$directory/failure.txt")) { throw 'WinUI verification failed' }
+          if ($process.ExitCode -ne 0 -or !(Test-Path "$directory/passed.txt") -or (Test-Path "$directory/failure.txt")) {
+            if (Test-Path "$directory/failure.txt") { Get-Content "$directory/failure.txt" }
+            throw "WinUI verification failed (exit code $($process.ExitCode))"
+          }
       - name: Publish single-file WinUI app
         if: matrix.format == 'singlefile'
         shell: pwsh

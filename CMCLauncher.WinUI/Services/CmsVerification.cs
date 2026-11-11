@@ -98,13 +98,10 @@ public sealed partial class MainWindow
         blueprintSource = "cms";
         expandedNavigation = "downloads";
         var rendering = RenderAsync();
-        for (
-            var attempt = 0;
-            attempt < 100 && (cmsNoticeDialog == null || !cmsNoticeDialog.IsLoaded);
-            attempt++
-        )
+        for (var attempt = 0; attempt < 200 && !cmsNoticeOpened; attempt++)
             await Task.Delay(30);
         var notice = cmsNoticeDialog ?? throw new Exception("CMS notice modal did not open");
+        Check(cmsNoticeOpened, "CMS modal has finished opening before interaction");
         Check(
             !notice.IsPrimaryButtonEnabled && handler.Count == 0,
             "CMS modal blocks confirmation and requests before reading"
@@ -115,7 +112,8 @@ public sealed partial class MainWindow
             cmsNoticeDialog == notice,
             "CMS modal cannot be dismissed during its three-second countdown"
         );
-        await Task.Delay(3200);
+        for (var attempt = 0; attempt < 200 && !notice.IsPrimaryButtonEnabled; attempt++)
+            await Task.Delay(30);
         Check(notice.IsPrimaryButtonEnabled, "CMS modal enables confirmation after three seconds");
         var confirm = Descendants(notice).OfType<Button>().First(b => b.Name == "PrimaryButton");
         (
