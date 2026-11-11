@@ -541,10 +541,10 @@ public sealed partial class MainWindow
             var smoothMemory = 0.0;
             perfSysFirst = true;
             var processMemory = Muted(
-                $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB"
+                $"{Ui("Launcher memory")}: {process.WorkingSet64 / 1024 / 1024:N0} MB"
             );
             var processMemoryBar = MiniProgress();
-            var processCpu = Muted($"{Ui("System CPU")}: 0.0%");
+            var processCpu = Muted($"{Ui("CPU usage")}: 0.0%");
             var processCpuBar = MiniProgress();
             var systemMemory = Muted(
                 $"{Ui("System memory")}: {GetSystemMemoryLoad():N0}%"
@@ -569,9 +569,9 @@ public sealed partial class MainWindow
                 smoothCpu = smoothCpu * 0.7 + Math.Min(usage, 100) * 0.3;
                 smoothMemory = smoothMemory * 0.7 + GetSystemMemoryLoad() * 0.3;
                 processMemory.Text =
-                    $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
+                    $"{Ui("Launcher memory")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
                 SetProgress(processMemoryBar, MemoryFraction(latest, process));
-                processCpu.Text = $"{Ui("System CPU")}: {smoothCpu:N1}%";
+                processCpu.Text = $"{Ui("CPU usage")}: {smoothCpu:N1}%";
                 SetProgress(processCpuBar, smoothCpu / 100.0);
                 systemMemory.Text = $"{Ui("System memory")}: {smoothMemory:N0}%";
             };
