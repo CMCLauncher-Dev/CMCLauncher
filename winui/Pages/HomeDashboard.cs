@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -16,8 +17,45 @@ namespace CMCLauncher.WinUI;
 public sealed partial class MainWindow
 {
     bool homeCustomizeMode;
+    DispatcherTimer? homePerformanceTimer;
+    ulong perfSysLastIdle, perfSysLastKernel, perfSysLastUser;
+    bool perfSysFirst;
 
     void Home() => HomeDashboard();
+
+    // 系统总体 CPU 占用率（%），首调返回负值表示需要下一次采样。
+    double GetSystemCpuLoad()
+    {
+        GetSystemTimes(out var idleNow, out var kernelNow, out var userNow);
+        var idle = FileTimeTick(idleNow);
+        var kernel = FileTimeTick(kernelNow);
+        var user = FileTimeTick(userNow);
+        if (perfSysFirst)
+        {
+            perfSysLastIdle = idle;
+            perfSysLastKernel = kernel;
+            perfSysLastUser = user;
+            perfSysFirst = false;
+            return -1;
+        }
+        var di = idle - perfSysLastIdle;
+        var dk = kernel - perfSysLastKernel;
+        var du = user - perfSysLastUser;
+        var total = dk + du;
+        var busy = total > di ? total - di : 0UL;
+        perfSysLastIdle = idle;
+        perfSysLastKernel = kernel;
+        perfSysLastUser = user;
+        return total > 0 ? 100.0 * busy / total : 0;
+    }
+
+    // 系统总体内存占用率（%）。
+    double GetSystemMemoryLoad()
+    {
+        var ms = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
+        GlobalMemoryStatusEx(ref ms);
+        return ms.TotalPhys > 0 ? 100.0 * (ms.TotalPhys - ms.AvailPhys) / ms.TotalPhys : 0;
+    }
 
     void HomeCustomize_Click(object sender, RoutedEventArgs e)
     {
@@ -283,6 +321,42 @@ public sealed partial class MainWindow
             label.Foreground = Brush(lightTheme ? "#73786F" : "#AAAAB7");
             return label;
         }
+        Grid MiniProgress()
+        {
+            // 用双列 Grid 模拟细条进度：填充列用强调色，比例由列宽控制。
+            // 相比 ProgressBar 在 0 值时的"不确定动画"和刷新闪烁，Grid 更稳定。
+            var track = new Grid { Height = 5, CornerRadius = new CornerRadius(2.5) };
+            track.ColumnDefinitions.Add(new ColumnDefinition());
+            track.ColumnDefinitions.Add(new ColumnDefinition());
+            var fill = new Border
+            {
+                Background = Brush(PrimaryColor),
+                CornerRadius = new CornerRadius(2.5),
+            };
+            var rest = new Border
+            {
+                Background = Brush(lightTheme ? "#E4E3ED" : "#3A3B4B"),
+                CornerRadius = new CornerRadius(2.5),
+            };
+            Grid.SetColumn(fill, 0);
+            Grid.SetColumn(rest, 1);
+            track.Children.Add(fill);
+            track.Children.Add(rest);
+            return track;
+        }
+        void SetProgress(Grid track, double fraction)
+        {
+            fraction = Math.Clamp(fraction, 0, 1);
+            track.ColumnDefinitions[0].Width = new GridLength(fraction, GridUnitType.Star);
+            track.ColumnDefinitions[1].Width = new GridLength(1 - fraction, GridUnitType.Star);
+        }
+        double MemoryFraction(GCMemoryInfo info, Process proc)
+        {
+            var total = info.TotalAvailableMemoryBytes;
+            if (total <= 0)
+                return 0;
+            return Math.Clamp((double)proc.WorkingSet64 / total, 0, 1);
+        }
         var stack = new StackPanel { Spacing = 10 };
         if (placement.Id == "account")
         {
@@ -459,31 +533,49 @@ public sealed partial class MainWindow
         }
         else if (placement.Id == "performance")
         {
+            homePerformanceTimer?.Stop();
             stack.Children.Add(Text("性能监视器", 18, true));
             var process = Process.GetCurrentProcess();
             var memory = GC.GetGCMemoryInfo();
+            var smoothCpu = 0.0;
+            var smoothMemory = 0.0;
+            perfSysFirst = true;
             var processMemory = Muted(
-                $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB"
+                $"{Ui("Launcher memory")}: {process.WorkingSet64 / 1024 / 1024:N0} MB"
             );
+            var processMemoryBar = MiniProgress();
+            var processCpu = Muted($"{Ui("CPU usage")}: 0.0%");
+            var processCpuBar = MiniProgress();
             var systemMemory = Muted(
-                $"{Ui("System memory")}: {memory.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}"
+                $"{Ui("System memory")}: {GetSystemMemoryLoad():N0}%"
             );
             stack.Children.Add(processMemory);
+            stack.Children.Add(processMemoryBar);
+            stack.Children.Add(processCpu);
+            stack.Children.Add(processCpuBar);
             stack.Children.Add(systemMemory);
-            stack.Children.Add(
-                Action(
-                    "刷新",
-                    (_, _) =>
-                    {
-                        process.Refresh();
-                        var latest = GC.GetGCMemoryInfo();
-                        processMemory.Text =
-                            $"{Ui("Launcher memory")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
-                        systemMemory.Text =
-                            $"{Ui("System memory")}: {latest.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}";
-                    }
-                )
-            );
+            homePerformanceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(500),
+            };
+            homePerformanceTimer.Tick += (_, _) =>
+            {
+                process.Refresh();
+                var latest = GC.GetGCMemoryInfo();
+                var usage = GetSystemCpuLoad();
+                if (usage < 0)
+                    usage = 0;
+                // 指数移动平均平滑：过滤采样瞬时 0 值和跳变，使数值与条形自然过渡。
+                smoothCpu = smoothCpu * 0.7 + Math.Min(usage, 100) * 0.3;
+                smoothMemory = smoothMemory * 0.7 + GetSystemMemoryLoad() * 0.3;
+                processMemory.Text =
+                    $"{Ui("Launcher memory")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
+                SetProgress(processMemoryBar, MemoryFraction(latest, process));
+                processCpu.Text = $"{Ui("CPU usage")}: {smoothCpu:N1}%";
+                SetProgress(processCpuBar, smoothCpu / 100.0);
+                systemMemory.Text = $"{Ui("System memory")}: {smoothMemory:N0}%";
+            };
+            homePerformanceTimer.Start();
         }
         else if (placement.Id == "note")
         {

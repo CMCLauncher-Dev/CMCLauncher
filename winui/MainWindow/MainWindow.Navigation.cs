@@ -394,6 +394,8 @@ public sealed partial class MainWindow
             return;
         var nextBody = new StackPanel { Spacing = 11 };
         PageBody = nextBody;
+        homePerformanceTimer?.Stop();
+        homePerformanceTimer = null;
         resourceSearch?.Cancel();
         resourceSearch?.Dispose();
         resourceSearch = null;

@@ -20,6 +20,26 @@ public sealed partial class MainWindow
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool GetSystemTimes(out FileTime idle, out FileTime kernel, out FileTime user);
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct OSVersionInfoEx
+    {
+        public uint OSVersionInfoSize;
+        public uint MajorVersion;
+        public uint MinorVersion;
+        public uint BuildNumber;
+        public uint PlatformId;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string ServicePackVersion;
+        public ushort ServicePackMajor;
+        public ushort ServicePackMinor;
+        public ushort SuiteMask;
+        public byte ProductType;
+        public byte Reserved;
+    }
+
+    [DllImport("ntdll.dll")]
+    static extern int RtlGetVersion(ref OSVersionInfoEx versionInfo);
+
     [StructLayout(LayoutKind.Sequential)]
     struct MemoryStatusEx
     {
@@ -111,6 +131,7 @@ public sealed partial class MainWindow
             Card(
                 Section(
                     "System environment",
+                    Text(WindowsName(), 14),
                     Text(RuntimeInformation.OSDescription, 14),
                     Text(
                         $"{RuntimeInformation.OSArchitecture} · {Environment.ProcessorCount} "
@@ -457,6 +478,19 @@ public sealed partial class MainWindow
         row.Children.Add(Text(label, 12, true));
         row.Children.Add(value);
         return row;
+    }
+
+    // 通过 RtlGetVersion 读取真实 OS 版本，构建「Windows 11 Pro」等友好名称。
+    string WindowsName()
+    {
+        var info = new OSVersionInfoEx { OSVersionInfoSize = (uint)Marshal.SizeOf<OSVersionInfoEx>() };
+        if (RtlGetVersion(ref info) != 0)
+            return RuntimeInformation.OSDescription;
+        var version = info.MajorVersion == 10 && info.BuildNumber >= 22000 ? "Windows 11" : "Windows 10";
+        var type = info.ProductType == 1 ? "Client" : "Server";
+        return type == "Client"
+            ? $"{version} · Build {info.BuildNumber}"
+            : $"{version} {type} · Build {info.BuildNumber}";
     }
 
     sealed record StatsGpuAdapter(string Name, double Usage);
