@@ -87,12 +87,20 @@ static class DesktopUpdateTests
             DesktopUpdateInstaller.Apply(brokenStage, target);
             throw new Exception("Update conflict accepted.");
         }
-        catch (IOException) { }
+        // Copying over a directory reports a different filesystem exception on Unix.
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         if (
             await File.ReadAllTextAsync(Path.Combine(target, "CMCLauncher.Avalonia.dll"))
             != "fixture"
         )
             throw new Exception("Desktop update rollback did not restore runtime files.");
+        if (
+            !Directory.Exists(Path.Combine(target, "conflict.bin"))
+            || await File.ReadAllTextAsync(Path.Combine(target, "settings.json")) != "user settings"
+            || await File.ReadAllTextAsync(Path.Combine(target, "themes", "custom.json"))
+                != "user theme"
+        )
+            throw new Exception("Desktop update rollback modified existing user data.");
         if (
             !DesktopUpdateInstaller.Preserve("themes/custom.json")
             || !DesktopUpdateInstaller.Preserve("settings.json")
