@@ -37,10 +37,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check APT recovery helper
+        if: runner.os == 'Linux'
+        run: python -B scripts/test-ci-apt-install.py
       - name: Install Linux UI dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo env GITHUB_ACTIONS=true sh scripts/ci-apt-install.sh xvfb xauth libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6
+          sudo env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT="${{ runner.environment }}" sh scripts/ci-apt-install.sh xvfb xauth libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6
       - name: Configure desktop build credentials
         if: github.event_name != 'pull_request'
         shell: pwsh
@@ -121,7 +124,7 @@ jobs:
           skip-decompress: true
       - name: Install packaging tools
         run: |
-          sudo env GITHUB_ACTIONS=true sh scripts/ci-apt-install.sh rpm desktop-file-utils squashfs-tools libicu70 libssl3 libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6 xvfb xauth
+          sudo env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT="${{ runner.environment }}" sh scripts/ci-apt-install.sh rpm desktop-file-utils squashfs-tools libicu70 libssl3 libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6 xvfb xauth
       - name: Extract verified publish directory
         run: |
           mkdir -p .artifacts/linux-publish
