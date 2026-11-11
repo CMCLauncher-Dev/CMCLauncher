@@ -501,6 +501,8 @@ public sealed partial class MainWindow
             var process = Process.GetCurrentProcess();
             var memory = GC.GetGCMemoryInfo();
             var lastCpu = process.TotalProcessorTime;
+            var smoothCpu = 0.0;
+            var smoothMemory = 0.0;
             var processMemory = Muted(
                 $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB"
             );
@@ -515,7 +517,10 @@ public sealed partial class MainWindow
             stack.Children.Add(processCpu);
             stack.Children.Add(processCpuBar);
             stack.Children.Add(systemMemory);
-            homePerformanceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            homePerformanceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(500),
+            };
             homePerformanceTimer.Tick += (_, _) =>
             {
                 process.Refresh();
@@ -523,15 +528,18 @@ public sealed partial class MainWindow
                 var now = process.TotalProcessorTime;
                 var usage =
                     (now - lastCpu).TotalSeconds
-                    / (1.0 / Environment.ProcessorCount)
+                    / (0.5 / Environment.ProcessorCount)
                     * 100.0;
                 if (usage < 0)
                     usage = 0;
+                // 指数移动平均平滑：过滤采样瞬时 0 值和跳变，使数值与条形自然过渡。
+                smoothCpu = smoothCpu * 0.7 + Math.Min(usage, 100) * 0.3;
+                smoothMemory = smoothMemory * 0.7 + MemoryFraction(latest, process) * 0.3;
                 processMemory.Text =
                     $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
-                SetProgress(processMemoryBar, MemoryFraction(latest, process));
-                processCpu.Text = $"{Ui("CPU")}: {Math.Min(usage, 100):N1}%";
-                SetProgress(processCpuBar, usage / 100.0);
+                SetProgress(processMemoryBar, smoothMemory);
+                processCpu.Text = $"{Ui("CPU")}: {smoothCpu:N1}%";
+                SetProgress(processCpuBar, smoothCpu / 100.0);
                 systemMemory.Text =
                     $"{Ui("System memory")}: {latest.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}";
                 lastCpu = now;
