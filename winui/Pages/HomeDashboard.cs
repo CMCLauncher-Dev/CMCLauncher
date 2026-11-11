@@ -16,6 +16,7 @@ namespace CMCLauncher.WinUI;
 public sealed partial class MainWindow
 {
     bool homeCustomizeMode;
+    DispatcherTimer? homePerformanceTimer;
 
     void Home() => HomeDashboard();
 
@@ -459,31 +460,41 @@ public sealed partial class MainWindow
         }
         else if (placement.Id == "performance")
         {
+            homePerformanceTimer?.Stop();
             stack.Children.Add(Text("性能监视器", 18, true));
             var process = Process.GetCurrentProcess();
             var memory = GC.GetGCMemoryInfo();
+            var lastCpu = process.TotalProcessorTime;
             var processMemory = Muted(
                 $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB"
             );
+            var processCpu = Muted($"{Ui("CPU")}: 0.0%");
             var systemMemory = Muted(
                 $"{Ui("System memory")}: {memory.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}"
             );
             stack.Children.Add(processMemory);
+            stack.Children.Add(processCpu);
             stack.Children.Add(systemMemory);
-            stack.Children.Add(
-                Action(
-                    "刷新",
-                    (_, _) =>
-                    {
-                        process.Refresh();
-                        var latest = GC.GetGCMemoryInfo();
-                        processMemory.Text =
-                            $"{Ui("Launcher memory")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
-                        systemMemory.Text =
-                            $"{Ui("System memory")}: {latest.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}";
-                    }
-                )
-            );
+            homePerformanceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            homePerformanceTimer.Tick += (_, _) =>
+            {
+                process.Refresh();
+                var latest = GC.GetGCMemoryInfo();
+                var now = process.TotalProcessorTime;
+                var usage =
+                    (now - lastCpu).TotalSeconds
+                    / (1.0 / Environment.ProcessorCount)
+                    * 100.0;
+                if (usage < 0)
+                    usage = 0;
+                processMemory.Text =
+                    $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
+                processCpu.Text = $"{Ui("CPU")}: {Math.Min(usage, 100):N1}%";
+                systemMemory.Text =
+                    $"{Ui("System memory")}: {latest.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}";
+                lastCpu = now;
+            };
+            homePerformanceTimer.Start();
         }
         else if (placement.Id == "note")
         {
