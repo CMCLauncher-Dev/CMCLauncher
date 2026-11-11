@@ -95,7 +95,7 @@ public sealed partial class MainWindow
                     );
                     game = launchedGame;
                     runningInstanceId = instance.Id;
-                    // 用户取消启动导致的退出不弹崩溃报告，其他异常退出交给报告逻辑判断。
+                    // 游戏退出后的重启由独立监视进程负责，避免弹窗阻塞退出。
                     var monitoringDone = new TaskCompletionSource(
                         TaskCreationOptions.RunContinuationsAsynchronously
                     );
@@ -202,6 +202,33 @@ public sealed partial class MainWindow
                 Close();
                 break;
         }
+    }
+
+    // 「隐藏并重新打开」：游戏退出后在弹崩溃报告前先行恢复窗口，
+    // 使崩溃对话框有可见的宿主窗口，否则在隐藏窗口上显示会异常或卡住。
+    async Task RestoreLauncherWindowAsync()
+    {
+        if (launcherExitBehavior != "reopen")
+            return;
+        launcherExitBehavior = null;
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            try
+            {
+                if (AppWindow.Presenter is OverlappedPresenter presenter)
+                    AppWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                AddLog("Restore launcher window failed: " + ex.Message);
+            }
+            finally
+            {
+                completion.TrySetResult();
+            }
+        });
+        await completion.Task;
     }
 
     // 游戏退出后按先前选择的可见性设置恢复或关闭启动器窗口。
