@@ -284,17 +284,34 @@ public sealed partial class MainWindow
             label.Foreground = Brush(lightTheme ? "#73786F" : "#AAAAB7");
             return label;
         }
-        ProgressBar MiniProgress()
+        Grid MiniProgress()
         {
-            var bar = new ProgressBar
+            // 用双列 Grid 模拟细条进度：填充列用强调色，比例由列宽控制。
+            // 相比 ProgressBar 在 0 值时的"不确定动画"和刷新闪烁，Grid 更稳定。
+            var track = new Grid { Height = 5, CornerRadius = new CornerRadius(2.5) };
+            track.ColumnDefinitions.Add(new ColumnDefinition());
+            track.ColumnDefinitions.Add(new ColumnDefinition());
+            var fill = new Border
             {
-                Minimum = 0,
-                Maximum = 1,
-                Value = 0,
-                Height = 5,
-                Foreground = Brush(PrimaryColor),
+                Background = Brush(PrimaryColor),
+                CornerRadius = new CornerRadius(2.5),
             };
-            return bar;
+            var rest = new Border
+            {
+                Background = Brush(lightTheme ? "#E4E3ED" : "#3A3B4B"),
+                CornerRadius = new CornerRadius(2.5),
+            };
+            Grid.SetColumn(fill, 0);
+            Grid.SetColumn(rest, 1);
+            track.Children.Add(fill);
+            track.Children.Add(rest);
+            return track;
+        }
+        void SetProgress(Grid track, double fraction)
+        {
+            fraction = Math.Clamp(fraction, 0, 1);
+            track.ColumnDefinitions[0].Width = new GridLength(fraction, GridUnitType.Star);
+            track.ColumnDefinitions[1].Width = new GridLength(1 - fraction, GridUnitType.Star);
         }
         double MemoryFraction(GCMemoryInfo info, Process proc)
         {
@@ -512,9 +529,9 @@ public sealed partial class MainWindow
                     usage = 0;
                 processMemory.Text =
                     $"{Ui("启动器内存占用")}: {process.WorkingSet64 / 1024 / 1024:N0} MB";
-                processMemoryBar.Value = MemoryFraction(latest, process);
+                SetProgress(processMemoryBar, MemoryFraction(latest, process));
                 processCpu.Text = $"{Ui("CPU")}: {Math.Min(usage, 100):N1}%";
-                processCpuBar.Value = Math.Clamp(usage / 100.0, 0, 1);
+                SetProgress(processCpuBar, usage / 100.0);
                 systemMemory.Text =
                     $"{Ui("System memory")}: {latest.TotalAvailableMemoryBytes / 1024 / 1024:N0} MB · CPU {Environment.ProcessorCount} {Ui("cores")}";
                 lastCpu = now;
