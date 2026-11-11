@@ -528,7 +528,7 @@ public sealed partial class MainWindow
                 var now = process.TotalProcessorTime;
                 var usage =
                     (now - lastCpu).TotalSeconds
-                    / (0.5 / Environment.ProcessorCount)
+                    / (0.5 * Environment.ProcessorCount)
                     * 100.0;
                 if (usage < 0)
                     usage = 0;
