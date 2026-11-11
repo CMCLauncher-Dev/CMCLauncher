@@ -246,6 +246,7 @@ public sealed partial class MainWindow
         };
         var output = new ListBox { ItemsSource = session.Logs, MaxHeight = 260 };
         var body = Stack(
+            Btn("Back to toolbox", () => Navigate("toolbox")),
             Card(downloads),
             Card(configs),
             Card(create),

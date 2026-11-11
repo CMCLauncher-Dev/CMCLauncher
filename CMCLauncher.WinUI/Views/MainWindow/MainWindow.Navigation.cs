@@ -99,8 +99,7 @@ public sealed partial class MainWindow
             "more",
             new[]
             {
-                ("frpc", "\uE968", "frpc"),
-                ("MinecraftPFP", "\uE91B", "minecraft-pfp"),
+                ("Toolbox", "\uE912", "toolbox"),
                 ("System status", "\uE9F5", "stats"),
                 ("About", "\uE946", "about"),
             }
@@ -290,7 +289,12 @@ public sealed partial class MainWindow
         };
         var rootKey = "root:" + activeGroup;
         var pageKey =
-            "page:" + (page is "resource-detail" or "blueprint-detail" ? resourceReturnPage : page);
+            "page:"
+            + (
+                page is "resource-detail" or "blueprint-detail" ? resourceReturnPage
+                : page is "frpc" or "terracotta" or "minecraft-pfp" ? "toolbox"
+                : page
+            );
         var keys = navigationButtons.Keys.ToList();
         double Offset(string? oldKey, string newKey) =>
             oldKey != null && keys.Contains(oldKey) && keys.Contains(newKey)
@@ -392,6 +396,7 @@ public sealed partial class MainWindow
         await importedMetadataLoad;
         if (generation != renderVersion)
             return;
+        terracotta.Active = page == "terracotta";
         var nextBody = new StackPanel { Spacing = 11 };
         PageBody = nextBody;
         homePerformanceTimer?.Stop();
@@ -453,7 +458,11 @@ public sealed partial class MainWindow
                     Discover(page[9..]);
                     break;
                 case "more":
+                case "toolbox":
                     MorePage();
+                    break;
+                case "terracotta":
+                    TerracottaPage();
                     break;
                 case "about":
                     AboutPage();

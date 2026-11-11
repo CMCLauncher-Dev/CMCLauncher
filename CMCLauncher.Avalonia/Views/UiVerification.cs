@@ -58,6 +58,8 @@ public sealed partial class MainWindow
                     "java",
                     "accounts",
                     "logs",
+                    "toolbox",
+                    "terracotta",
                     "frpc",
                     "pfp",
                     "stats",
@@ -83,6 +85,11 @@ public sealed partial class MainWindow
             if (verificationTransport.Requests != 0)
                 throw new IOException("Navigation or input unexpectedly issued a request.");
             checks.Add("PASS input and navigation do not search");
+            if (session.Terracotta.Installed != null || session.Terracotta.Connected)
+                throw new IOException(
+                    "Toolbox navigation unexpectedly installed or started Terracotta."
+                );
+            checks.Add("PASS toolbox does not install or start Terracotta");
             var search = pageContent
                 .GetVisualDescendants()
                 .OfType<Button>()

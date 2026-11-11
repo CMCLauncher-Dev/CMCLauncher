@@ -314,8 +314,7 @@ public sealed partial class MainWindow : Window
                 ("Java", "java"),
                 ("Accounts", "accounts"),
                 ("Runtime logs", "logs"),
-                ("frpc", "frpc"),
-                ("MinecraftPFP", "pfp"),
+                ("Toolbox", "toolbox"),
                 ("System status", "stats"),
                 ("Tasks", "tasks"),
                 ("About", "about"),
@@ -362,9 +361,12 @@ public sealed partial class MainWindow : Window
         var token = navigationRequest.Token;
         var revision = ++generation;
         route = target;
+        session.Terracotta.Active = target == "terracotta";
         foreach (var button in navigation.Children.OfType<Button>())
         {
-            var selected = button.Tag?.ToString() == target;
+            var selected =
+                button.Tag?.ToString()
+                == (target is "frpc" or "pfp" or "terracotta" ? "toolbox" : target);
             button.Background = selected ? Accent : Brushes.Transparent;
             button.Foreground = selected ? Brushes.White : Foreground;
         }
@@ -380,6 +382,8 @@ public sealed partial class MainWindow : Window
                 "java" => "Java",
                 "accounts" => "Accounts",
                 "logs" => "Runtime logs",
+                "toolbox" => "Toolbox",
+                "terracotta" => "Terracotta",
                 "frpc" => "frpc",
                 "pfp" => "MinecraftPFP",
                 "stats" => "System status",
@@ -405,6 +409,8 @@ public sealed partial class MainWindow : Window
                 "java" => JavaPage(),
                 "accounts" => AccountsPage(),
                 "logs" => LogsPage(),
+                "toolbox" => ToolboxPage(),
+                "terracotta" => TerracottaPage(),
                 "frpc" => await FrpcPage(token),
                 "pfp" => PfpPage(),
                 "stats" => StatsPage(),

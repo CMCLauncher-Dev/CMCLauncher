@@ -85,6 +85,7 @@ public sealed partial class MainWindow
             );
         }
         await SwitchLanguage("zh_cn");
+        await VerifyToolboxUi(Check, directory);
         store.Config.Settings.Theme = "light";
         store.Config.Settings.ColorPreset = "native";
         ApplyTheme();

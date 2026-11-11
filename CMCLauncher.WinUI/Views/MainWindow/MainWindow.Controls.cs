@@ -312,12 +312,19 @@ public sealed partial class MainWindow
                 or "resource-detail"
                 or "blueprint-detail"
                 or "modpack-export"
+                or "frpc"
+                or "terracotta"
+                or "minecraft-pfp"
             ? Visibility.Visible
             : Visibility.Collapsed;
         PageHeader.ColumnSpacing = PageBackButton.Visibility == Visibility.Visible ? 10 : 0;
         ToolTipService.SetToolTip(
             PageBackButton,
-            Ui(page is "resource-detail" or "blueprint-detail" ? "返回列表" : "返回主页")
+            Ui(
+                page is "resource-detail" or "blueprint-detail" ? "返回列表"
+                : page is "frpc" or "terracotta" or "minecraft-pfp" ? "Back to toolbox"
+                : "返回主页"
+            )
         );
         PageTitle.Text = Ui(title);
         PageSubtitle.Text = Ui(subtitle);
@@ -339,6 +346,8 @@ public sealed partial class MainWindow
     {
         if (page is "resource-detail" or "blueprint-detail")
             page = resourceReturnPage;
+        else if (page is "frpc" or "terracotta" or "minecraft-pfp")
+            page = "toolbox";
         else if (page is "modpack-export")
             page = "version-settings";
         else

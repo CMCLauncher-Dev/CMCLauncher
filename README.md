@@ -50,7 +50,7 @@ Microsoft sign-in requires a Minecraft Java Edition profile. Account availabilit
 - **Community content:** Modrinth and CurseForge search, filters, pagination, project details and compatible file selection. Mod updates keep previous files in `mod-backups`.
 - **Worlds and schematics:** CurseForge map downloads, world backup and restore; schematic import, export, rename and folder browsing. Blueprint downloads from Schematicraft, MCS and CMS can be saved to compatible instances.
 - **Java and downloads:** runtime discovery, Temurin downloads, automatic Java selection, memory allocation, transfer progress and cancellation.
-- **Tools:** Minecraft skin avatars exported as PNG, Frp Client downloads and saved INI/TOML configurations, runtime logs and game error reports.
+- **Toolbox:** Minecraft skin avatars exported as PNG, frpc downloads and saved INI/TOML configurations, and [Terracotta LAN rooms](docs/TERRACOTTA.md). Terracotta is downloaded separately when requested.
 - **Appearance:** light, dark and system modes; JSON theme presets, fonts and scaling. Seven interface languages are included.
 
 Forge and NeoForge compatibility varies by game version. ZIP imports need a recognized manifest. Shaders require an appropriate shader loader, and schematic compatibility depends on the installed mod. CurseForge downloads also depend on application credentials and the author's distribution settings.

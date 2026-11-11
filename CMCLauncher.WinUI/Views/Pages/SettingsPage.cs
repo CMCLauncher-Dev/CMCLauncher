@@ -13,6 +13,7 @@ public sealed class SettingsPage : CMCPage
     {
         Header(Ui("Launcher settings"), "");
         var settings = Store.Config.Settings;
+        PageBody.Children.Add(Window.TerracottaSettingsCard());
 
         var launcherLanguage = new BelowComboBox
         {

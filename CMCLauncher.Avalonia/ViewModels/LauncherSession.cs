@@ -24,6 +24,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
     public CmsBlueprints Cms { get; private set; }
     public BlueprintService Blueprints { get; private set; }
     public FrpcManager Frpc { get; }
+    public TerracottaManager Terracotta { get; }
     public FrpcConfigurations FrpcProfiles { get; }
     public LocalizationCatalog Locales { get; }
     public ThemeCatalog Themes { get; }
@@ -102,6 +103,8 @@ public sealed class LauncherSession : ObservableState, IDisposable
         blueprintHttp = new HttpClient(imageHandler) { Timeout = TimeSpan.FromSeconds(45) };
         Blueprints = new BlueprintService(blueprintHttp);
         Frpc = new FrpcManager(Store, Core);
+        Terracotta = new TerracottaManager(Store, Core);
+        Terracotta.Output += message => Log("TERRACOTTA", message);
         FrpcProfiles = new FrpcConfigurations(Path.Combine(Store.Root, "frpc", "configs"));
         Core.Status += Stage;
         Core.Log += message => Log("GAME", message);
@@ -322,6 +325,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
     public void Dispose()
     {
         task?.Cancel();
+        Terracotta.Dispose();
         Frpc.Dispose();
         Cms.Dispose();
         CurseForge.Dispose();

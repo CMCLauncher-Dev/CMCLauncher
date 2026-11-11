@@ -16,59 +16,7 @@ public sealed partial class MainWindow
         frpcStopButton;
     Task frpcAction = Task.CompletedTask;
 
-    void MorePage()
-    {
-        Header(Ui("More"), Ui("Utilities"));
-        var avatar = new StackPanel { Spacing = 10 };
-        avatar.Children.Add(Text("MinecraftPFP", 18, true));
-        avatar.Children.Add(
-            Text(
-                "Create a profile picture from a Minecraft skin and export it as PNG. Everything stays on your computer.",
-                13
-            )
-        );
-        avatar.Children.Add(
-            Action(
-                "Open MinecraftPFP",
-                (_, _) =>
-                {
-                    page = "minecraft-pfp";
-                    expandedNavigation = "more";
-                    Render();
-                },
-                true
-            )
-        );
-        PageBody.Children.Add(Card(avatar));
-        PageBody.Children.Add(
-            Card(
-                new StackPanel
-                {
-                    Spacing = 10,
-                    Children =
-                    {
-                        Text(Ui("frpc"), 18, true),
-                        Text(
-                            Ui(
-                                "Download official Frp Client and manage connections using INI / TOML configurations."
-                            ),
-                            13
-                        ),
-                        Action(
-                            Ui("Open frpc"),
-                            (_, _) =>
-                            {
-                                page = "frpc";
-                                expandedNavigation = "more";
-                                Render();
-                            },
-                            true
-                        ),
-                    },
-                }
-            )
-        );
-    }
+    void MorePage() => ToolboxPage();
 
     void InitializeFrpc(string? configurationRoot = null)
     {

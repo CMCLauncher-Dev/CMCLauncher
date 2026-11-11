@@ -186,6 +186,7 @@ public sealed partial class MainWindow
         await RenderAsync();
         await VerifyFeedbackAndSchematics(Check, directory);
         await VerifyFrpcPage(Check, directory);
+        await VerifyToolboxUi(Check, directory);
         await VerifyMinecraftPfp(Check, directory);
         await VerifyProxySettings(Check, directory);
         await VerifyJsonLocalization(Check);

@@ -144,6 +144,7 @@ public sealed partial class MainWindow : Window
         );
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "assets", "cmc-logo.ico"));
         core = new LauncherCore(store);
+        InitializeTerracotta();
         importedMetadataLoad = LoadImportedMetadata();
         InitializeFrpc(
             args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui")

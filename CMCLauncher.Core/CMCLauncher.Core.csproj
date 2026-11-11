@@ -41,6 +41,7 @@
     />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="CMCLauncher.Core.Tests" />
     <PackageReference
       Include="AngleSharp"
       Version="1.9.1"

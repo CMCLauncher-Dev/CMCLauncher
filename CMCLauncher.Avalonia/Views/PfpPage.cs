@@ -207,6 +207,7 @@ public sealed partial class MainWindow
             }
         }
         var body = Stack(
+            Btn("Back to toolbox", () => Navigate("toolbox")),
             Row(
                 username,
                 Btn("Load player skin", Player),
