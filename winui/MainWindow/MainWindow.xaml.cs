@@ -339,7 +339,21 @@ public sealed partial class MainWindow : Window
         int width = Math.Clamp(settings.WindowWidth, 800, 3000);
         int height = Math.Clamp(settings.WindowHeight, 500, 2000);
 
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(width, height));
+        var savedPosition = settings.WindowX.HasValue && settings.WindowY.HasValue;
+        var point = new Windows.Graphics.PointInt32(settings.WindowX ?? 0, settings.WindowY ?? 0);
+        var display = savedPosition
+            ? DisplayArea.GetFromPoint(point, DisplayAreaFallback.Nearest)
+            : DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
+        var area = display.WorkArea;
+        width = Math.Min(width, area.Width);
+        height = Math.Min(height, area.Height);
+        var x = savedPosition
+            ? Math.Clamp(point.X, area.X, area.X + area.Width - width)
+            : area.X + (area.Width - width) / 2;
+        var y = savedPosition
+            ? Math.Clamp(point.Y, area.Y, area.Y + area.Height - height)
+            : area.Y + (area.Height - height) / 2;
+        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, width, height));
     }
 
     private void InitializeWindowSizeSaving()
@@ -360,9 +374,36 @@ public sealed partial class MainWindow : Window
             }
         };
 
+        // Flush pending geometry before shutdown, including an immediate close after dragging.
+        var closingSaved = false;
+        var closingSaving = false;
+        AppWindow.Closing += async (_, args) =>
+        {
+            if (closingSaved)
+                return;
+            args.Cancel = true;
+            if (closingSaving)
+                return;
+            closingSaving = true;
+            windowSizeSaveTimer.Stop();
+            try
+            {
+                await store.Save();
+            }
+            catch (Exception ex)
+            {
+                RuntimeLog.Write("ERROR", "Could not save window placement: " + ex);
+            }
+            finally
+            {
+                closingSaved = true;
+                Close();
+            }
+        };
+
         AppWindow.Changed += (sender, args) =>
         {
-            if (!args.DidSizeChange)
+            if (!args.DidSizeChange && !args.DidPositionChange)
                 return;
 
             if (
@@ -378,6 +419,8 @@ public sealed partial class MainWindow : Window
 
             store.Config.Settings.WindowWidth = size.Width;
             store.Config.Settings.WindowHeight = size.Height;
+            store.Config.Settings.WindowX = sender.Position.X;
+            store.Config.Settings.WindowY = sender.Position.Y;
 
             windowSizeSaveTimer.Stop();
             windowSizeSaveTimer.Start();

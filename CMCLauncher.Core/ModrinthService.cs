@@ -889,8 +889,6 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         Func<Instance, CancellationToken, Task>? resolveName = null
     )
     {
-        if (new FileInfo(file).Length > 1024L * 1024 * 1024)
-            throw new Exception("整合包超过 1 GB");
         var (manifest, contentPrefixes) = await Task.Run(
             () => ReadPack(file, Path.GetFileNameWithoutExtension(file)),
             ct
@@ -1042,7 +1040,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
                 ct
             );
             foreach (var prefix in contentPrefixes)
-                await LauncherCore.Extract(zip, stage, prefix, ct: ct);
+                await LauncherCore.Extract(zip, stage, prefix, ct: ct, enforceSizeLimits: false);
             store.PrepareIsolatedInstance(instance);
             var destination = store.GameDirectory(instance);
             Status?.Invoke("Finalizing modpack installation");
@@ -1082,7 +1080,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
     }
 
     // ZIP is a container, not a pack format. Only import game content described by a known manifest.
-    static (JsonNode Manifest, string[] ContentPrefixes) ReadPack(string path, string fallbackName)
+    internal static (JsonNode Manifest, string[] ContentPrefixes) ReadPack(string path, string fallbackName)
     {
         using var zip = ZipFile.OpenRead(path);
         if (zip.Entries.Count > 30000)

@@ -1258,7 +1258,8 @@ public sealed partial class LauncherCore : IDisposable
         string target,
         string prefix = "",
         string[]? exclusions = null,
-        CancellationToken ct = default
+        CancellationToken ct = default,
+        bool enforceSizeLimits = true
     )
     {
         long total = 0;
@@ -1273,9 +1274,19 @@ public sealed partial class LauncherCore : IDisposable
                 continue;
             if (((entry.ExternalAttributes >> 16) & 0xf000) == 0xa000)
                 throw new Exception("压缩包包含符号链接");
-            total += entry.Length;
-            if (entry.Length > 512L * 1024 * 1024 || total > 4L * 1024 * 1024 * 1024)
+            ct.ThrowIfCancellationRequested();
+            total = checked(total + entry.Length);
+            if (
+                enforceSizeLimits
+                && (entry.Length > 512L * 1024 * 1024 || total > 4L * 1024 * 1024 * 1024)
+            )
                 throw new Exception("压缩包展开超过大小上限");
+            if (
+                !enforceSizeLimits
+                && entry.Length
+                    > new DriveInfo(Path.GetPathRoot(Path.GetFullPath(target))!).AvailableFreeSpace
+            )
+                throw new IOException("Not enough disk space to extract this modpack.");
             var file = Store.SafePath(target, name[prefix.Length..]);
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             await using var source = entry.Open();

@@ -311,6 +311,7 @@ public sealed partial class MainWindow
                 or "instances"
                 or "resource-detail"
                 or "blueprint-detail"
+                or "modpack-export"
             ? Visibility.Visible
             : Visibility.Collapsed;
         PageHeader.ColumnSpacing = PageBackButton.Visibility == Visibility.Visible ? 10 : 0;
@@ -338,6 +339,8 @@ public sealed partial class MainWindow
     {
         if (page is "resource-detail" or "blueprint-detail")
             page = resourceReturnPage;
+        else if (page is "modpack-export")
+            page = "version-settings";
         else
         {
             page = "home";

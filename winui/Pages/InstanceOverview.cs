@@ -71,6 +71,14 @@ public sealed partial class MainWindow
         management.Children.Add(Text(Ui("Version management"), 15, true));
         management.Children.Add(
             Buttons(
+                Action(
+                    Ui("Export modpack"),
+                    (_, _) =>
+                    {
+                        page = "modpack-export";
+                        Render();
+                    }
+                ),
                 VersionDeleteButton(
                     Action(
                         Ui("Delete version"),

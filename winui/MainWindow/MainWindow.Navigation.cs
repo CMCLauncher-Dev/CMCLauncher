@@ -273,7 +273,7 @@ public sealed partial class MainWindow
         }
         var activeGroup = page switch
         {
-            "home" or "version-settings" or "instances" => "home",
+            "home" or "version-settings" or "instances" or "modpack-export" => "home",
             "resource-detail"
             or "blueprint-detail"
             or "downloads"
@@ -506,6 +506,9 @@ public sealed partial class MainWindow
                     break;
                 default:
                     new SettingsPage(this).Build();
+                    break;
+                case "modpack-export":
+                    await ModpackExportPage();
                     break;
             }
         }

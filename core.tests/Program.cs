@@ -102,6 +102,10 @@ try
             Console.WriteLine("PASS unsupported binary distribution is rejected");
         }
     }
+    await ModpackExportTests.Run(root);
+    Console.WriteLine(
+        "PASS modpack export metadata, selected content, traversal and cancellation protection"
+    );
     await BlueprintTests.Run(root);
     Console.WriteLine("PASS blueprint HTTP/metadata/download regression suite");
     await CmsTests.Run(root);

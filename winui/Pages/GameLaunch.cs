@@ -88,10 +88,14 @@ public sealed partial class MainWindow
                         ct,
                         progress
                     );
+                    GameExitRestart.Watch(
+                        launchedGame,
+                        LauncherUpdateInstaller.Executable,
+                        Path.Combine(store.Root, "logs", "game-exit-restart.log")
+                    );
                     game = launchedGame;
                     runningInstanceId = instance.Id;
                     // 用户取消启动导致的退出不弹崩溃报告，其他异常退出交给报告逻辑判断。
-                    var cancelledByLauncher = false;
                     var monitoringDone = new TaskCompletionSource(
                         TaskCreationOptions.RunContinuationsAsynchronously
                     );
@@ -103,9 +107,7 @@ public sealed partial class MainWindow
                             // and waits for the redirected output streams to finish.
                             await launchedGame.WaitForExitAsync();
                             await monitoringDone.Task;
-                            Report(instance.Name + "：游戏已退出");
-                            if (!cancelledByLauncher)
-                                await HandleGameExit(instance, launchedGame, launchStarted);
+                            AddLog(instance.Name + "：游戏已退出，正在重启 CMCLauncher");
                         }
                         catch (Exception ex)
                         {
@@ -120,7 +122,8 @@ public sealed partial class MainWindow
                                 runningInstanceId = null;
                             }
                             launchedGame.Dispose();
-                            ApplyLauncherVisibilityOnExit();
+                            launcherExitBehavior = null;
+                            Close();
                         }
                     }
                     _ = ObserveExit();
@@ -155,7 +158,6 @@ public sealed partial class MainWindow
                     }
                     catch (OperationCanceledException)
                     {
-                        cancelledByLauncher = true;
                         if (!launchedGame.HasExited)
                             launchedGame.Kill(true);
                         await launchedGame.WaitForExitAsync();

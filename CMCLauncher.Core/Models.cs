@@ -83,6 +83,8 @@ public sealed class Settings
     public string LauncherVisibility { get; set; } = "keep";
     public int WindowWidth { get; set; } = 1280;
     public int WindowHeight { get; set; } = 820;
+    public int? WindowX { get; set; }
+    public int? WindowY { get; set; }
     public bool ExpandProjectIntroduction { get; set; } = true;
     public string LauncherLanguage { get; set; } = "en_us";
     public bool CheckLauncherUpdates { get; set; } = true;
