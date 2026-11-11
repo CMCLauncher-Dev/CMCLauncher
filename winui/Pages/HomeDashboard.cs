@@ -526,10 +526,7 @@ public sealed partial class MainWindow
                 process.Refresh();
                 var latest = GC.GetGCMemoryInfo();
                 var now = process.TotalProcessorTime;
-                var usage =
-                    (now - lastCpu).TotalSeconds
-                    / (0.5 * Environment.ProcessorCount)
-                    * 100.0;
+                var usage = (now - lastCpu).TotalSeconds / 0.5 * 100.0;
                 if (usage < 0)
                     usage = 0;
                 // 指数移动平均平滑：过滤采样瞬时 0 值和跳变，使数值与条形自然过渡。
