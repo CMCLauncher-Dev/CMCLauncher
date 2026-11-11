@@ -24,6 +24,7 @@ public sealed partial class MainWindow
     string? runningInstanceId;
     bool launching;
     string? launcherExitBehavior;
+    GameDebugWindow? debugWindow;
     TextBlock? launchStatusText;
     ProgressBar? launchCardProgress;
     Button? launchCardCancel;
@@ -36,6 +37,9 @@ public sealed partial class MainWindow
         launching = true;
         launchProgressValue = 0;
         RefreshLaunchCard("正在准备启动…");
+        debugWindow?.CloseSafe();
+        debugWindow = new GameDebugWindow(lightTheme, PrimaryColor, instance.Name);
+        debugWindow.Activate();
         var progress = new Progress<(double Value, string Stage)>(update =>
             UpdateLaunchProgress(update.Value, update.Stage)
         );
@@ -145,6 +149,8 @@ public sealed partial class MainWindow
                             await Task.Delay(250, ct);
                         }
                         UpdateLaunchProgress(100, "游戏窗口已出现");
+                        debugWindow?.CloseSafe();
+                        debugWindow = null;
                         if (!string.IsNullOrWhiteSpace(store.Config.Settings.GameWindowTitle))
                             SetWindowText(
                                 launchedGame.MainWindowHandle,
@@ -177,6 +183,8 @@ public sealed partial class MainWindow
         finally
         {
             launching = false;
+            debugWindow?.CloseSafe();
+            debugWindow = null;
             RefreshLaunchCard();
         }
     }
