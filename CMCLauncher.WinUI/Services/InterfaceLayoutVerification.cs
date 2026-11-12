@@ -176,6 +176,25 @@ public sealed partial class MainWindow
                 !accountActions.Children.OfType<Button>().First().IsEnabled,
                 "task completion preserves account-specific disabled actions"
             );
+            PageViewport.UpdateLayout();
+            var accountLayout = (Grid)accountActions.Parent;
+            var accountCard = (Border)accountLayout.Parent;
+            var identity = (FrameworkElement)accountLayout.Children[0];
+            var infoBottom =
+                identity
+                    .TransformToVisual(accountCard)
+                    .TransformPoint(new Windows.Foundation.Point())
+                    .Y + identity.ActualHeight;
+            var actionTop = accountActions
+                .TransformToVisual(accountCard)
+                .TransformPoint(new Windows.Foundation.Point())
+                .Y;
+            var above = actionTop - infoBottom;
+            var below = accountCard.ActualHeight - actionTop - accountActions.ActualHeight;
+            check(
+                Math.Abs(above - below) <= 2,
+                "account action row has equal visible space above and below"
+            );
             await Capture(Path.Combine(directory, "home-account-standard.png"));
         }
         finally

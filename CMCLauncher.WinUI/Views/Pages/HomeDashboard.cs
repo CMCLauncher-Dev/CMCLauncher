@@ -699,7 +699,12 @@ public sealed partial class MainWindow
             content = layout;
         }
         var card = Card(content);
-        card.Padding = new Thickness(18);
+        // Balance the action row against the visible card edge, rather than an
+        // inner edge with an additional bottom padding below it.
+        card.Padding =
+            placement.Id == "account" && placement.Height >= 2
+                ? new Thickness(18, 18, 18, 0)
+                : new Thickness(18);
         return card;
     }
 
