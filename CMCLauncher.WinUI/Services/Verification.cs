@@ -1,4 +1,4 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Automation.Provider;
@@ -621,9 +621,11 @@ public sealed partial class MainWindow
                 new ButtonAutomationPeer(HomeCustomizeButton).GetPattern(PatternInterface.Invoke)
         ).Invoke();
         await Task.Delay(150);
-        var addPerformance = Descendants(PageBody)
+        OpenHomeCardDrawer(homeAddCardButton!);
+        await Task.Delay(100);
+        var addPerformance = Descendants(CommunityFilterDrawerBody)
             .OfType<Button>()
-            .Single(b => b.Content?.ToString()?.Contains("性能监视器") == true);
+            .Single(b => b.Tag?.ToString() == "home-add:performance");
         (
             (IInvokeProvider)
                 new ButtonAutomationPeer(addPerformance).GetPattern(PatternInterface.Invoke)

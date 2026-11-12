@@ -144,7 +144,17 @@ public sealed partial class MainWindow
         var versions = frpc.Installed();
         if (!versions.Contains(settings.FrpcVersion))
             settings.FrpcVersion = versions.FirstOrDefault() ?? "";
-        BuildFrpcDownloads(settings, versions);
+        PageBody.Children.Add(
+            Action(
+                "Manage downloaded clients",
+                (_, _) =>
+                {
+                    page = "settings";
+                    expandedNavigation = "settings";
+                    Render();
+                }
+            )
+        );
         BuildFrpcConfigurations();
         frpcStatus = Text("", 14, true);
         frpcStartButton = Action(

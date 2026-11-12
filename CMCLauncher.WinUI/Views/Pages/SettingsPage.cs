@@ -13,7 +13,6 @@ public sealed class SettingsPage : CMCPage
     {
         Header(Ui("Launcher settings"), "");
         var settings = Store.Config.Settings;
-        PageBody.Children.Add(Window.TerracottaSettingsCard());
 
         var launcherLanguage = new BelowComboBox
         {
@@ -685,5 +684,6 @@ public sealed class SettingsPage : CMCPage
         PageBody.Children.Add(
             Text(UiFormat("Current version: {0}", LauncherUpdates.CurrentVersion), 12)
         );
+        Window.BuildSettingsClients();
     }
 }

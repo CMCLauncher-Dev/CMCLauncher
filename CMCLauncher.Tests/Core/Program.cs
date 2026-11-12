@@ -123,6 +123,7 @@ try
         }
     }
     await RuntimeArchiveTests.Run(root);
+    await HomeCardLayoutTests.Run(root);
     await TerracottaTests.Run(root);
     await DesktopUpdateTests.Run(root);
     await ModpackExportTests.Run(root);

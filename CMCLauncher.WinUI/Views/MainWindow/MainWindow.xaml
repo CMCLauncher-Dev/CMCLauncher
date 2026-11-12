@@ -197,7 +197,7 @@
           <SplitView.Pane>
             <Grid
               Padding="20"
-              RowDefinitions="Auto,*"
+              RowDefinitions="Auto,*,Auto"
               RowSpacing="18"
             >
               <Grid
@@ -236,6 +236,21 @@
                   Spacing="12"
                 />
               </ScrollViewer>
+              <Button
+                x:Name="TaskLogsButton"
+                Grid.Row="2"
+                HorizontalAlignment="Right"
+                Click="TaskLogs_Click"
+                Padding="10"
+                ToolTipService.ToolTip="Runtime logs"
+                AutomationProperties.Name="Runtime logs"
+              >
+                <FontIcon
+                  Glyph="&#xE8A5;"
+                  FontFamily="Segoe Fluent Icons"
+                  FontSize="20"
+                />
+              </Button>
             </Grid>
           </SplitView.Pane>
           <Grid>

@@ -96,46 +96,12 @@ public sealed partial class MainWindow
         };
         if (homeCustomizeMode)
         {
-            var catalog = new StackPanel { Spacing = 8 };
-            catalog.Children.Add(Text(Ui("Home cards"), 16, true));
-            catalog.Children.Add(
-                Text(
-                    Ui(
-                        "context.homedashboard.change_each_card_s_order_width_and_height_changes_are_saved_auto"
-                    ),
-                    12
-                )
+            homeAddCardButton = Action(
+                "Add cards",
+                (sender, _) => OpenHomeCardDrawer((Button)sender)
             );
-            foreach (
-                var (id, label) in new[]
-                {
-                    ("performance", "性能监视器"),
-                    ("note", "笔记"),
-                    ("news", "Minecraft 新闻"),
-                }
-            )
-            {
-                var exists = settings.HomeCards.Any(c => c.Id == id);
-                var title = Ui(label);
-                var actionTitle = exists
-                    ? title + " (" + Ui("Added") + ")"
-                    : Ui("Add") + " " + title;
-                var add = Action(
-                    actionTitle,
-                    async (_, _) =>
-                    {
-                        if (!exists)
-                        {
-                            settings.HomeCards.Add(new HomeCardPlacement { Id = id, Width = 1 });
-                            await SaveHomeLayout();
-                            Render();
-                        }
-                    }
-                );
-                add.IsEnabled = !exists;
-                catalog.Children.Add(add);
-            }
-            area.Children.Add(Card(catalog));
+            homeAddCardButton.Tag = "home-open-catalog";
+            area.Children.Add(homeAddCardButton);
         }
         var dashboard = new Grid
         {
@@ -147,7 +113,11 @@ public sealed partial class MainWindow
         dashboard.ColumnDefinitions.Add(new ColumnDefinition());
         var rowIndex = 0;
         var columnIndex = 0;
-        foreach (var placement in settings.HomeCards.ToArray())
+        dashboard.AllowDrop = homeCustomizeMode;
+        dashboard.DragOver += HomeCard_DragOver;
+        dashboard.Drop += async (_, args) => await DropHomeCard(args, dashboard, null);
+        var placements = settings.HomeCards.ToArray();
+        foreach (var placement in placements)
         {
             var card = BuildHomeCard(placement);
             FrameworkElement item = card;
@@ -157,12 +127,27 @@ public sealed partial class MainWindow
                     : 105 + (Math.Clamp(placement.Height, 1, 3) - 1) * 65;
             if (homeCustomizeMode)
             {
-                var tools = new StackPanel
+                EnableHomeCardDrag(card, placement.Id);
+                var tools = new Grid
                 {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 6,
-                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Tag = "home-card-tools",
+                    ColumnSpacing = 6,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
                 };
+                foreach (
+                    var size in new[]
+                    {
+                        GridLength.Auto,
+                        GridLength.Auto,
+                        GridLength.Auto,
+                        new GridLength(1, GridUnitType.Star),
+                        new GridLength(1, GridUnitType.Star),
+                        GridLength.Auto,
+                    }
+                )
+                    tools.ColumnDefinitions.Add(new ColumnDefinition { Width = size });
+                var grip = HomeCardDragHandle(placement.Id);
+                tools.Children.Add(grip);
                 var index = settings.HomeCards.IndexOf(placement);
                 var up = HomeCardTool(
                     "\uE74A",
@@ -181,6 +166,7 @@ public sealed partial class MainWindow
                     }
                 );
                 up.IsEnabled = index > 0;
+                Grid.SetColumn(up, 1);
                 tools.Children.Add(up);
                 var down = HomeCardTool(
                     "\uE74B",
@@ -199,13 +185,15 @@ public sealed partial class MainWindow
                     }
                 );
                 down.IsEnabled = index < settings.HomeCards.Count - 1;
+                Grid.SetColumn(down, 2);
                 tools.Children.Add(down);
                 var width = new BelowComboBox
                 {
                     Header = Ui("Width"),
                     ItemsSource = new[] { Ui("Full width"), Ui("Half width") },
                     SelectedIndex = placement.Width == 1 ? 1 : 0,
-                    Width = 125,
+                    MinWidth = 0,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
                 };
                 width.SelectionChanged += async (_, _) =>
                 {
@@ -221,7 +209,8 @@ public sealed partial class MainWindow
                     Header = Ui("Height"),
                     ItemsSource = new[] { Ui("Compact"), Ui("Standard"), Ui("Spacious") },
                     SelectedIndex = Math.Clamp(placement.Height, 1, 3) - 1,
-                    Width = 125,
+                    MinWidth = 0,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
                 };
                 height.SelectionChanged += async (_, _) =>
                 {
@@ -232,22 +221,57 @@ public sealed partial class MainWindow
                         Render();
                     }
                 };
+                Grid.SetColumn(width, 3);
+                Grid.SetColumn(height, 4);
                 tools.Children.Add(width);
                 tools.Children.Add(height);
+                tools.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                tools.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0) });
+                bool? narrowTools = null;
+                tools.SizeChanged += (_, args) =>
+                {
+                    var narrow = args.NewSize.Width < 420;
+                    if (narrowTools == narrow)
+                        return;
+                    narrowTools = narrow;
+                    tools.RowDefinitions[1].Height = narrow ? GridLength.Auto : new GridLength(0);
+                    tools.RowSpacing = narrow ? 6 : 0;
+                    Grid.SetRow(width, narrow ? 1 : 0);
+                    Grid.SetColumn(width, narrow ? 0 : 3);
+                    Grid.SetColumnSpan(width, narrow ? 3 : 1);
+                    Grid.SetRow(height, narrow ? 1 : 0);
+                    Grid.SetColumn(height, narrow ? 3 : 4);
+                    Grid.SetColumnSpan(height, narrow ? 3 : 1);
+                };
                 if (placement.Id is not ("account" or "game"))
-                    tools.Children.Add(
-                        HomeCardTool(
-                            "\uE74D",
-                            "移除卡片",
-                            async () =>
-                            {
-                                settings.HomeCards.Remove(placement);
-                                await SaveHomeLayout();
-                                Render();
-                            }
-                        )
+                {
+                    var remove = HomeCardTool(
+                        "\uE74D",
+                        "移除卡片",
+                        async () =>
+                        {
+                            settings.HomeCards.Remove(placement);
+                            await SaveHomeLayout();
+                            Render();
+                        }
                     );
+                    Grid.SetColumn(remove, 5);
+                    tools.Children.Add(remove);
+                }
                 var wrapper = new StackPanel { Spacing = 8, Children = { tools, card } };
+                wrapper.AllowDrop = true;
+                wrapper.AddHandler(
+                    UIElement.DragOverEvent,
+                    new DragEventHandler(HomeCard_DragOver),
+                    true
+                );
+                wrapper.AddHandler(
+                    UIElement.DropEvent,
+                    new DragEventHandler(
+                        async (_, args) => await DropHomeCard(args, wrapper, placement.Id)
+                    ),
+                    true
+                );
                 item = wrapper;
             }
             // 全宽卡片不能从第二列开始；上一行只占半宽时先换行。
@@ -273,6 +297,39 @@ public sealed partial class MainWindow
         }
         if (columnIndex == 1)
             rowIndex++;
+        bool? singleColumn = null;
+        dashboard.SizeChanged += (_, args) =>
+        {
+            var narrow = args.NewSize.Width < 560;
+            if (singleColumn == narrow)
+                return;
+            singleColumn = narrow;
+            dashboard.RowDefinitions.Clear();
+            var row = 0;
+            var column = 0;
+            for (var i = 0; i < dashboard.Children.Count; i++)
+            {
+                var element = (FrameworkElement)dashboard.Children[i];
+                var full = narrow || placements[i].Width != 1;
+                if (full && column == 1)
+                {
+                    row++;
+                    column = 0;
+                }
+                while (dashboard.RowDefinitions.Count <= row)
+                    dashboard.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                Grid.SetRow(element, row);
+                Grid.SetColumn(element, column);
+                Grid.SetColumnSpan(element, full ? 2 : 1);
+                if (full || column == 1)
+                {
+                    row++;
+                    column = 0;
+                }
+                else
+                    column = 1;
+            }
+        };
         area.Children.Add(dashboard);
         PageBody.Children.Add(area);
     }
@@ -289,6 +346,7 @@ public sealed partial class MainWindow
             },
             Width = 32,
             Height = 32,
+            VerticalAlignment = VerticalAlignment.Bottom,
             Padding = new Thickness(0),
             MinWidth = 32,
         };
@@ -404,6 +462,8 @@ public sealed partial class MainWindow
             Grid.SetColumn(manage, 2);
             row.Children.Add(manage);
             stack.Children.Add(row);
+            if (placement.Height >= 2)
+                stack.Children.Add(HomeAccountActions(account));
         }
         else if (placement.Id == "game")
         {
@@ -621,7 +681,24 @@ public sealed partial class MainWindow
                 )
             );
         }
-        var card = Card(stack);
+        UIElement content = stack;
+        if (placement.Id == "account" && placement.Height >= 2)
+        {
+            var identity = stack.Children[0];
+            var actions = (FrameworkElement)stack.Children[1];
+            stack.Children.Clear();
+            var layout = new Grid();
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            layout.RowDefinitions.Add(
+                new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }
+            );
+            layout.Children.Add(identity);
+            actions.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetRow(actions, 1);
+            layout.Children.Add(actions);
+            content = layout;
+        }
+        var card = Card(content);
         card.Padding = new Thickness(18);
         return card;
     }

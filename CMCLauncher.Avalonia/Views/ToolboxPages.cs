@@ -73,16 +73,7 @@ public sealed partial class MainWindow
                         T(
                             "The component is downloaded from the official release only when you click Download. The launcher does not include it."
                         ),
-                        Btn(
-                            "Download Terracotta",
-                            async () =>
-                            {
-                                await session.Run("Download Terracotta", client.Install);
-                                if (route == "terracotta")
-                                    await Navigate("terracotta");
-                            },
-                            true
-                        )
+                        Btn("Manage downloaded clients", () => Navigate("settings"), true)
                     )
                 )
             );
@@ -444,6 +435,17 @@ public sealed partial class MainWindow
                 session.Terracotta.Installed is { } value
                     ? "Terracotta " + value.Version
                     : "Terracotta is not downloaded."
+            )
+        );
+        panel.Children.Add(
+            Btn(
+                "Download Terracotta",
+                async () =>
+                {
+                    await session.Run("Download Terracotta", session.Terracotta.Install);
+                    await Navigate("settings");
+                },
+                true
             )
         );
         if (session.Terracotta.Installed != null || Directory.Exists(session.Terracotta.Root))

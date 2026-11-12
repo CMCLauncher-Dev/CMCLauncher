@@ -167,7 +167,6 @@ public sealed class MicrosoftAuth(LauncherCore core)
     public const string OfflineLockedMessage =
         "请先通过 Microsoft 登录并验证 Minecraft Java Edition 正版档案，才能使用离线身份。";
 
-
     // Use system region information, not the launcher's selected UI language.
     public static bool IsMainlandEnvironment(string zone, string region, int geoId) =>
         zone is "Asia/Shanghai" or "Asia/Urumqi"
@@ -224,7 +223,12 @@ public sealed class MicrosoftAuth(LauncherCore core)
     }
 
     // 尚有一分钟有效期则复用会话，否则重新换取 Minecraft 令牌并验证玩家档案。
-    public async Task<Account> Refresh(Account account, string clientId, CancellationToken ct)
+    public async Task<Account> Refresh(
+        Account account,
+        string clientId,
+        CancellationToken ct,
+        bool force = false
+    )
     {
         var credentials = CredentialVault.Read(account);
         if (credentials.S("source") == "pcl")
@@ -236,7 +240,8 @@ public sealed class MicrosoftAuth(LauncherCore core)
                 "此 Microsoft 账号尚未验证 Minecraft Java Edition 档案，请重新登录并确认账号拥有 Java 版游戏。"
             );
         if (
-            long.TryParse(credentials.S("expiresAt"), out var expiry)
+            !force
+            && long.TryParse(credentials.S("expiresAt"), out var expiry)
             && expiry > DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 60
         )
             return account;

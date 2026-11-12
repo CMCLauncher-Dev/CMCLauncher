@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls;
 
 namespace CMCLauncher.WinUI;
 
@@ -7,6 +7,11 @@ public sealed partial class MainWindow
     // 这些控件不会随正文重建，切换语言时要主动更新文字和辅助功能名称。
     void LocalizeStaticChrome()
     {
+        ToolTipService.SetToolTip(TaskLogsButton, Ui("Runtime logs"));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(
+            TaskLogsButton,
+            Ui("Runtime logs")
+        );
         TaskDrawerTitle.Text = Ui("Tasks in progress");
         TaskManagerLabel.Text = Ui("Tasks");
         StatusText.Text = Ui("Ready");

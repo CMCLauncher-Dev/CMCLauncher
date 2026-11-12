@@ -45,29 +45,73 @@ public sealed partial class MainWindow
         identity.Children.Add(details);
         PageBody.Children.Add(Card(identity));
         PageBody.Children.Add(BuildLauncherUpdateSettings());
-        var contributors = new StackPanel { Spacing = 12 };
-        contributors.Children.Add(Text("Contributors", 18, true));
-        contributors.Children.Add(Text("Ctoy · Fuzhu", 14));
-        contributors.Children.Add(
-            new HyperlinkButton
-            {
-                Content = Ui("View all contributors"),
-                NavigateUri = new Uri("https://github.com/com-in/CMCLauncher/graphs/contributors"),
-                HorizontalAlignment = HorizontalAlignment.Left,
-            }
+        PageBody.Children.Add(
+            AcknowledgementCards("Contributors", AboutAcknowledgements.Contributors, true)
         );
-        PageBody.Children.Add(Card(contributors));
-        var services = new StackPanel { Spacing = 8 };
-        services.Children.Add(Text("Download services", 18, true));
-        services.Children.Add(
-            new HyperlinkButton
-            {
-                Content = Ui("Download mirror provided by BMCLAPI · bangbang93"),
-                NavigateUri = new Uri("https://bmclapidoc.bangbang93.com/"),
-                HorizontalAlignment = HorizontalAlignment.Left,
-            }
+        PageBody.Children.Add(
+            AcknowledgementCards(
+                "Open-source projects and services",
+                AboutAcknowledgements.Projects,
+                false
+            )
         );
-        PageBody.Children.Add(Card(services));
+    }
+
+    Border AcknowledgementCards(string title, IReadOnlyList<Acknowledgement> entries, bool compact)
+    {
+        var body = new StackPanel { Spacing = 12 };
+        body.Children.Add(Text(title, 18, true));
+        var cards = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
+        var columns = compact ? 3 : 2;
+        for (var i = 0; i < columns; i++)
+            cards.ColumnDefinitions.Add(
+                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
+            );
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (i % columns == 0)
+                cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var entry = entries[i];
+            var content = new Grid { ColumnSpacing = 12, MinHeight = compact ? 32 : 46 };
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            content.ColumnDefinitions.Add(
+                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
+            );
+            content.Children.Add(
+                new Image
+                {
+                    Source = new BitmapImage(
+                        new Uri(
+                            Path.Combine(AppContext.BaseDirectory, "assets", "about", entry.Image)
+                        )
+                    ),
+                    Width = compact ? 30 : 40,
+                    Height = compact ? 30 : 40,
+                }
+            );
+            var label = Text("", compact ? 14 : 16, true);
+            label.Text = entry.Name;
+            label.TextWrapping = TextWrapping.NoWrap;
+            label.TextTrimming = TextTrimming.CharacterEllipsis;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(label, 1);
+            content.Children.Add(label);
+            var link = new HyperlinkButton
+            {
+                Content = content,
+                NavigateUri = new Uri(entry.Url),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Padding = new Thickness(0),
+            };
+            ToolTipService.SetToolTip(link, entry.Name);
+            var card = CompactCard(link);
+            Grid.SetRow(card, i / columns);
+            Grid.SetColumn(card, i % columns);
+            cards.Children.Add(card);
+        }
+        body.Children.Add(cards);
+        return Card(body);
     }
 
     string Labeled(string label, string value) => Ui(label) + "  " + value;

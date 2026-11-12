@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace CMCLauncher.WinUI;
@@ -30,13 +30,18 @@ public sealed partial class MainWindow
             await RenderAsync();
             await frpcConfigurationLoad;
             await frpcVersionsLoad;
+            page = "settings";
+            await RenderAsync();
+            var initialDownloads = Descendants(PageBody)
+                .OfType<Expander>()
+                .Single(e => e.Tag?.ToString() == "frpc-download-panel");
             check(
-                Descendants(PageBody)
-                    .OfType<Expander>()
-                    .Single(e => e.Tag?.ToString() == "frpc-download-panel")
-                    .IsExpanded,
-                "download section opens by default when frpc is not installed"
+                !initialDownloads.IsExpanded,
+                "frpc client management is collapsed at the end of settings"
             );
+            initialDownloads.IsExpanded = true;
+            await Task.Delay(100);
+            await frpcVersionsLoad;
             var moreReleases = Descendants(PageBody)
                 .OfType<Button>()
                 .Single(b => b.Content?.ToString() == Ui("Load more releases"));
@@ -52,6 +57,9 @@ public sealed partial class MainWindow
                 frpcOnlineVersions.Count == 3,
                 "frpc historical version button loads the next online release page"
             );
+            page = "frpc";
+            await RenderAsync();
+            await frpcConfigurationLoad;
             check(
                 frpcConfigs.Contains(store.Config.Settings.FrpcConfigPath)
                     && store.Config.Settings.FrpcConfigPath != source,
@@ -71,8 +79,9 @@ public sealed partial class MainWindow
                 "multiple copied and manually saved frpc profiles coexist"
             );
             check(
-                navigationButtons.ContainsKey("page:frpc"),
-                "More navigation exposes the frpc client"
+                navigationButtons.ContainsKey("page:toolbox")
+                    && !navigationButtons.ContainsKey("page:frpc"),
+                "toolbox provides the frpc entry"
             );
             if (!File.Exists(fixtureExe))
             {
@@ -90,9 +99,6 @@ public sealed partial class MainWindow
                 await frpcConfigurationLoad;
                 await frpcVersionsLoad;
                 await Task.Delay(350);
-                var downloads = Descendants(PageBody)
-                    .OfType<Expander>()
-                    .Single(e => e.Tag?.ToString() == "frpc-download-panel");
                 var imports = Descendants(PageBody)
                     .OfType<Expander>()
                     .Single(e => e.Tag?.ToString() == "frpc-import-panel");
@@ -100,7 +106,7 @@ public sealed partial class MainWindow
                     .OfType<Expander>()
                     .Single(e => e.Tag?.ToString() == "frpc-new-panel");
                 check(
-                    !downloads.IsExpanded && !imports.IsExpanded && !newConfiguration.IsExpanded,
+                    !imports.IsExpanded && !newConfiguration.IsExpanded,
                     "installed frpc defaults to collapsed download, new and import panels "
                         + language
                         + " "
@@ -131,7 +137,6 @@ public sealed partial class MainWindow
                         + width
                 );
                 await Capture(Path.Combine(directory, $"frpc-main-{language}-{width}.png"));
-                downloads.IsExpanded = true;
                 imports.IsExpanded = true;
                 newConfiguration.IsExpanded = true;
                 await Task.Delay(350);
@@ -164,11 +169,11 @@ public sealed partial class MainWindow
                     "frpc import, editor and log fields " + language + " " + width
                 );
                 check(
-                    Descendants(PageBody)
-                        .OfType<ComboBox>()
-                        .Single(c => c.Tag?.ToString() == "frpc-download-version")
-                        .Items.Count == 3,
-                    "frpc download versions come from the online catalog " + language + " " + width
+                    frpcOnlineVersions.Count == 3,
+                    "frpc release catalog is retained across settings and tool navigation "
+                        + language
+                        + " "
+                        + width
                 );
                 check(
                     !frpc.Running && frpcStopButton?.IsEnabled == false,
@@ -180,7 +185,6 @@ public sealed partial class MainWindow
                     "frpc fields fit narrow and wide layouts " + language + " " + width
                 );
                 await Capture(Path.Combine(directory, $"frpc-{language}-{width}.png"));
-                downloads.IsExpanded = false;
                 imports.IsExpanded = false;
                 newConfiguration.IsExpanded = false;
                 await Task.Delay(400);

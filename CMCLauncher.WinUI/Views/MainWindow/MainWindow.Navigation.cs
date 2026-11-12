@@ -90,7 +90,6 @@ public sealed partial class MainWindow
                 ("个性化", "\uE790", "personalization"),
                 ("Java 管理", "\uE950", "java"),
                 ("账号管理", "\uE77B", "accounts"),
-                ("运行日志", "\uE9D9", "logs"),
             }
         );
         AddNavGroup(

@@ -121,6 +121,12 @@ public sealed partial class MainWindow
                     )
                 )
             ),
+            AcknowledgementCards("Contributors", AboutAcknowledgements.Contributors, true),
+            AcknowledgementCards(
+                "Open-source projects and services",
+                AboutAcknowledgements.Projects,
+                false
+            ),
             Card(
                 Stack(
                     T("Launcher updates", 18, true),
@@ -128,4 +134,65 @@ public sealed partial class MainWindow
                 )
             )
         );
+
+    Control AcknowledgementCards(string title, IReadOnlyList<Acknowledgement> entries, bool compact)
+    {
+        var cards = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions(compact ? "*,*,*" : "*,*"),
+            ColumnSpacing = 10,
+            RowSpacing = 10,
+        };
+        var columns = compact ? 3 : 2;
+        for (var i = 0; i < entries.Count; i++)
+        {
+            if (i % columns == 0)
+                cards.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            var entry = entries[i];
+            var content = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+                ColumnSpacing = 12,
+                MinHeight = compact ? 32 : 46,
+            };
+            content.Children.Add(
+                new Image
+                {
+                    Source = new global::Avalonia.Media.Imaging.Bitmap(
+                        Path.Combine(AppContext.BaseDirectory, "assets", "about", entry.Image)
+                    ),
+                    Width = compact ? 30 : 40,
+                    Height = compact ? 30 : 40,
+                }
+            );
+            var label = T("", compact ? 14 : 16, true);
+            label.Text = entry.Name;
+            label.TextWrapping = global::Avalonia.Media.TextWrapping.NoWrap;
+            label.TextTrimming = global::Avalonia.Media.TextTrimming.CharacterEllipsis;
+            label.VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Center;
+            Grid.SetColumn(label, 1);
+            content.Children.Add(label);
+            var link = Btn(
+                "",
+                () =>
+                {
+                    Open(entry.Url);
+                    return Task.CompletedTask;
+                }
+            );
+            link.Content = content;
+            link.HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
+            link.HorizontalContentAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
+            ToolTip.SetTip(link, entry.Name);
+            Grid.SetColumn(link, i % columns);
+            Grid.SetRow(link, i / columns);
+            cards.Children.Add(link);
+            link.DetachedFromVisualTree += (_, _) =>
+            {
+                if (((Image)content.Children[0]).Source is IDisposable bitmap)
+                    bitmap.Dispose();
+            };
+        }
+        return Card(Stack(T(title, 18, true), cards));
+    }
 }

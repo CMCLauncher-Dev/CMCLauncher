@@ -13,7 +13,7 @@ public sealed partial class MainWindow
     string? frpcCatalogSource;
     Task frpcVersionsLoad = Task.CompletedTask;
 
-    void BuildFrpcDownloads(Settings settings, string[] versions)
+    void BuildFrpcDownloads(Settings settings, string[] versions, bool expandWhenMissing = true)
     {
         var generation = renderVersion;
         var cancellation = new CancellationTokenSource();
@@ -158,19 +158,34 @@ public sealed partial class MainWindow
                 }
             )
         );
-        var deleteVersion = Action("Delete downloaded version", async (sender, _) =>
-        {
-            if (installed.SelectedItem is not string version) return;
-            if (!await ConfirmPop((FrameworkElement)sender, Ui("Delete downloaded version?"), version, Ui("Remove"))) return;
-            await Run(async ct =>
+        var deleteVersion = Action(
+            "Delete downloaded version",
+            async (sender, _) =>
             {
-                await frpc.Remove(version, ct);
-                if (settings.FrpcVersion == version)
-                    settings.FrpcVersion = frpc.Installed().FirstOrDefault() ?? "";
-                await store.Save();
-            }, Ui("Delete downloaded version"));
-            Render();
-        });
+                if (installed.SelectedItem is not string version)
+                    return;
+                if (
+                    !await ConfirmPop(
+                        (FrameworkElement)sender,
+                        Ui("Delete downloaded version?"),
+                        version,
+                        Ui("Remove")
+                    )
+                )
+                    return;
+                await Run(
+                    async ct =>
+                    {
+                        await frpc.Remove(version, ct);
+                        if (settings.FrpcVersion == version)
+                            settings.FrpcVersion = frpc.Installed().FirstOrDefault() ?? "";
+                        await store.Save();
+                    },
+                    Ui("Delete downloaded version")
+                );
+                Render();
+            }
+        );
         deleteVersion.IsEnabled = versions.Length > 0 && !frpc.Running;
         actions.Children.Add(deleteVersion);
         var fields = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
@@ -195,15 +210,11 @@ public sealed partial class MainWindow
         };
         var panel = new Expander
         {
-            Header = new StackPanel
-            {
-                Spacing = 3,
-                Children = { Text(Ui("Client downloads"), 15, true), summary },
-            },
+            Header = new StackPanel { Spacing = 3, Children = { Text("frpc", 15, true), summary } },
             Content = new StackPanel { Spacing = 12, Children = { fields, actions, status } },
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            IsExpanded = versions.Length == 0,
+            IsExpanded = expandWhenMissing && versions.Length == 0,
             Tag = "frpc-download-panel",
         };
         panel.Unloaded += (_, _) => cancellation.Cancel();

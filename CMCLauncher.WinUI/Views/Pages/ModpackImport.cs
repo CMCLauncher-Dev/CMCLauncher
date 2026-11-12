@@ -134,6 +134,8 @@ public sealed partial class MainWindow
 
     void Modpack_DragOver(object sender, DragEventArgs e)
     {
+        if (IsHomeCardDrag(e.DataView))
+            return;
         e.Handled = true;
         e.AcceptedOperation = DataPackageOperation.None;
         if (
@@ -152,6 +154,8 @@ public sealed partial class MainWindow
     // 读取拖放数据期间持有 deferral，读完先结束系统拖放，再排队弹出确认界面。
     async void Modpack_Drop(object sender, DragEventArgs e)
     {
+        if (IsHomeCardDrag(e.DataView))
+            return;
         e.Handled = true;
         if (
             task != null

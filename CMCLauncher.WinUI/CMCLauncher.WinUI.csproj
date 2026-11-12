@@ -252,4 +252,10 @@
       Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\scripts\organize-winui-languages.ps1&quot; -PublishDir ."
     />
   </Target>
+  <ItemGroup>
+    <Content
+      Include="assets/about/*.png"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+  </ItemGroup>
 </Project>

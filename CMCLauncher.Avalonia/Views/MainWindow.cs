@@ -313,7 +313,6 @@ public sealed partial class MainWindow : Window
                 ("Appearance", "appearance"),
                 ("Java", "java"),
                 ("Accounts", "accounts"),
-                ("Runtime logs", "logs"),
                 ("Toolbox", "toolbox"),
                 ("System status", "stats"),
                 ("Tasks", "tasks"),
@@ -350,7 +349,24 @@ public sealed partial class MainWindow : Window
                 TasksPage()
             );
             tasks.Margin = new Thickness(16);
-            drawer.Pane = new ScrollViewer { Content = tasks };
+            var pane = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
+            pane.Children.Add(new ScrollViewer { Content = tasks });
+            var logs = Btn("", () => Navigate("logs"));
+            logs.Content = new global::Avalonia.Controls.Shapes.Path
+            {
+                Data = global::Avalonia.Media.Geometry.Parse(
+                    "M3,1 L13,1 L17,5 L17,19 L3,19 Z M13,1 L13,5 L17,5 M6,9 L14,9 M6,12 L14,12 M6,15 L12,15"
+                ),
+                Width = 18,
+                Height = 20,
+            };
+            ToolTip.SetTip(logs, Ui("Runtime logs"));
+            global::Avalonia.Automation.AutomationProperties.SetName(logs, Ui("Runtime logs"));
+            logs.HorizontalAlignment = HorizontalAlignment.Right;
+            logs.Margin = new Thickness(12);
+            Grid.SetRow(logs, 1);
+            pane.Children.Add(logs);
+            drawer.Pane = pane;
             drawer.IsPaneOpen = true;
             return;
         }

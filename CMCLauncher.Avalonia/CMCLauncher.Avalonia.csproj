@@ -49,4 +49,11 @@
   >
     <Error Text="Windows releases use CMCLauncher.WinUI. Publish Avalonia for Linux or macOS." />
   </Target>
+  <ItemGroup>
+    <Content
+      Include="../CMCLauncher.WinUI/assets/about/*.png"
+      Link="assets/about/%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+  </ItemGroup>
 </Project>

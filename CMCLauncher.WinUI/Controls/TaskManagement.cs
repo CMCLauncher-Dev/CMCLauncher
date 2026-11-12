@@ -87,6 +87,14 @@ public sealed partial class MainWindow
         TaskDrawer.IsPaneOpen = !TaskDrawer.IsPaneOpen;
     }
 
+    void TaskLogs_Click(object sender, RoutedEventArgs e)
+    {
+        TaskDrawer.IsPaneOpen = false;
+        page = "logs";
+        expandedNavigation = "settings";
+        Render();
+    }
+
     void TaskDrawer_Close(object sender, RoutedEventArgs e) => TaskDrawer.IsPaneOpen = false;
 
     void TaskDrawerScrim_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
@@ -360,6 +368,6 @@ public sealed partial class MainWindow
     void SetTaskButtonsEnabled(bool enabled)
     {
         foreach (var button in taskButtons)
-            button.IsEnabled = enabled;
+            button.IsEnabled = enabled && HomeButtonAvailable(button);
     }
 }

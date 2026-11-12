@@ -85,6 +85,7 @@ public sealed partial class MainWindow
         communityFilterGeneration = renderVersion;
         CommunityFilterDrawerBody.Content = content;
         CommunityFilterDrawerScroll.ChangeView(null, 0, null, true);
+        CommunityFilterDrawerFooter.Visibility = Visibility.Visible;
         CommunityFilterDrawerTitle.Text = Ui("More filters");
         CommunityFilterDrawerHint.Text = Ui("Combine filters to narrow down resources.");
         CommunityFilterResetButton.Content = Ui("Reset");

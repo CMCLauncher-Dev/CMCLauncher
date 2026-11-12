@@ -121,7 +121,7 @@ public sealed partial class MainWindow
             }
             finally
             {
-                button.IsEnabled = task == null;
+                button.IsEnabled = task == null && HomeButtonAvailable(button);
             }
         };
         taskButtons.Add(button);

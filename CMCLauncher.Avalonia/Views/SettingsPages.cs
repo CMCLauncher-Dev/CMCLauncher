@@ -97,7 +97,6 @@ public sealed partial class MainWindow
             IsChecked = settings.ExpandProjectIntroduction,
         };
         return Stack(
-            TerracottaSettingsCard(),
             Card(
                 Stack(
                     Field("Language", language),
@@ -189,7 +188,9 @@ public sealed partial class MainWindow
                     await Navigate("settings");
                 },
                 true
-            )
+            ),
+            FrpcClientSettings(),
+            TerracottaSettingsCard()
         );
     }
 

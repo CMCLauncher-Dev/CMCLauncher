@@ -118,12 +118,12 @@ public sealed partial class MainWindow
             );
             download.Children.Add(
                 Action(
-                    "Download Terracotta",
-                    async (_, _) =>
+                    "Manage downloaded clients",
+                    (_, _) =>
                     {
-                        await Run(terracotta.Install, "Download Terracotta");
-                        if (page == "terracotta")
-                            Render();
+                        page = "settings";
+                        expandedNavigation = "settings";
+                        Render();
                     },
                     true
                 )
@@ -385,6 +385,16 @@ public sealed partial class MainWindow
         );
     }
 
+    internal void BuildSettingsClients()
+    {
+        var versions = frpc.Installed();
+        if (!versions.Contains(store.Config.Settings.FrpcVersion))
+            store.Config.Settings.FrpcVersion = versions.FirstOrDefault() ?? "";
+        BuildFrpcDownloads(store.Config.Settings, versions, false);
+        PageBody.Children.Add(TerracottaSettingsCard());
+        RefreshFrpcPalette();
+    }
+
     internal Border TerracottaSettingsCard()
     {
         var panel = new StackPanel { Spacing = 10 };
@@ -394,6 +404,17 @@ public sealed partial class MainWindow
                 terracotta.Installed is { } value
                     ? "Terracotta " + value.Version
                     : "Terracotta is not downloaded."
+            )
+        );
+        panel.Children.Add(
+            Action(
+                "Download Terracotta",
+                async (_, _) =>
+                {
+                    await Run(terracotta.Install, "Download Terracotta");
+                    Render();
+                },
+                true
             )
         );
         if (terracotta.Installed != null || Directory.Exists(terracotta.Root))
