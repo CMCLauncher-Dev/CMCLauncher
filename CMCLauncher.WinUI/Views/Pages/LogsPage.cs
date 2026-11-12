@@ -33,7 +33,10 @@ public sealed class LogsPage : CMCPage
             Store.Config.Settings.DebugLogging = debug.IsOn;
             RuntimeLog.DebugEnabled = debug.IsOn;
             await Store.Save();
-            RuntimeLog.Write("INFO", "DEBUG " + (debug.IsOn ? "enabled" : "disabled"));
+            RuntimeLog.Write(
+                "INFO",
+                debug.IsOn ? "[按钮:DEBUG] 已开启调试日志" : "[按钮:DEBUG] 已关闭调试日志"
+            );
             RuntimeLog.Debug(
                 $"Environment: OS={Environment.OSVersion}; .NET={Environment.Version}; processors={Environment.ProcessorCount}; memory={Environment.WorkingSet / 1048576}MB; downloads={Store.Config.Settings.DownloadThreads}; SSL override={Store.Config.Settings.IgnoreSslErrors}"
             );
@@ -49,6 +52,7 @@ public sealed class LogsPage : CMCPage
             Ui("Refresh"),
             (_, _) =>
             {
+                RuntimeLog.Write("INFO", "[按钮:刷新日志] 手动刷新日志内容");
                 if (LogView != null)
                     LogView.Text = RuntimeLog.ReadTail();
             }
@@ -57,6 +61,7 @@ public sealed class LogsPage : CMCPage
             Ui("Open log folder"),
             (_, _) =>
             {
+                RuntimeLog.Write("INFO", "[按钮:打开日志文件夹] 打开日志目录");
                 var path = Path.Combine(Program.UserDirectory, "logs");
                 Directory.CreateDirectory(path);
                 System.Diagnostics.Process.Start(
