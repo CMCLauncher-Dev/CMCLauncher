@@ -8,7 +8,7 @@ dist/
 **/bin/
 **/obj/
 CMCLauncher.WinUI/artifacts/
-CMCLauncher.WinUI/CompanionData.g.cs
+**/CompanionData.g.cs
 test-extract/
 .vscode/
 scripts/clean-project.ps1

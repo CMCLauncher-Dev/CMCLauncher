@@ -25,7 +25,19 @@ internal static class ContentInspectionCache
         string,
         (long Length, long Modified, string Hash)
     > Fingerprints = new(StringComparer.OrdinalIgnoreCase);
+    // 运行期常驻缓存无界增长会导致内存持续攀升，达到阈值后整体收敛以限定内存上界。
+    const int MaxEntries = 4096;
     internal static int InspectionCount;
+
+    internal static void Tighten()
+    {
+        if (Pending.Count > MaxEntries)
+            Pending.Clear();
+        if (Icons.Count > MaxEntries)
+            Icons.Clear();
+        if (Fingerprints.Count > MaxEntries)
+            Fingerprints.Clear();
+    }
 
     internal static void ClearMemory()
     {
@@ -155,6 +167,7 @@ internal static class ContentInspectionCache
         );
         var hash = Convert.ToHexString(await SHA256.HashDataAsync(stream)).ToLowerInvariant();
         Fingerprints[file] = (length, modified, hash);
+        Tighten();
         return hash;
     }
 
