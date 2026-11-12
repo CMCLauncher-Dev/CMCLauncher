@@ -2,6 +2,13 @@
   "code": "ru_ru",
   "displayName": "Русский",
   "strings": {
+    "Used: {0:N1} / {1:N1} GB": "Использовано: {0:N1} / {1:N1} ГБ",
+    "Game allocation: {0:N1} GB": "Для игры: {0:N1} ГБ",
+    "Current version:": "Текущая версия:",
+    "Drag to choose the maximum memory.": "Перетащите ползунок для выбора максимальной памяти.",
+    "Automatically recalculated every second.": "Пересчитывается каждую секунду с учётом доступной памяти.",
+    "Allocated: {0:N0} MB": "Выделено: {0:N0} МБ",
+    "Manage third-party applications": "Управление сторонними приложениями",
     "Redeem code": "Активировать код",
     "Refresh account": "Обновить аккаунт",
     "Change player name": "Изменить имя игрока",
@@ -822,6 +829,8 @@
     "Current": "Текущий",
     "Directory unavailable": "Папка недоступна",
     "{0} versions": "{0} версий",
-    "User data directory": "Каталог данных пользователя"
+    "User data directory": "Каталог данных пользователя",
+    "Manage port forwarding connections.": "Управляйте перенаправлением портов.",
+    "Create a profile picture from a Minecraft skin and export it as PNG.": "Создайте аватар из скина Minecraft и экспортируйте в PNG."
   }
 }

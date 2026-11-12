@@ -42,31 +42,23 @@ public sealed partial class MainWindow
         foreach (
             var (title, description, route) in new[]
             {
-                (
-                    "frpc",
-                    "Download official frpc and manage connections using INI / TOML configurations.",
-                    "frpc"
-                ),
-                (
-                    "Terracotta",
-                    "Create or join a Minecraft LAN room. Download Terracotta when you need it.",
-                    "terracotta"
-                ),
+                ("frpc", "Manage port forwarding connections.", "frpc"),
+                ("Terracotta", "Create or join a Minecraft LAN room.", "terracotta"),
                 (
                     "MinecraftPFP",
-                    "Create a profile picture from a Minecraft skin and export it as PNG. Everything stays on your computer.",
+                    "Create a profile picture from a Minecraft skin and export it as PNG.",
                     "minecraft-pfp"
                 ),
             }
         )
         {
-            var content = new Grid { RowSpacing = 10 };
+            var content = new Grid { RowSpacing = 6 };
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             content.RowDefinitions.Add(
                 new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }
             );
             content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            content.Children.Add(Text(title, 18, true));
+            content.Children.Add(Text(title, 16, true));
             var summary = Text(description);
             Grid.SetRow(summary, 1);
             content.Children.Add(summary);
@@ -83,7 +75,7 @@ public sealed partial class MainWindow
             Grid.SetRow(open, 2);
             open.HorizontalAlignment = HorizontalAlignment.Left;
             content.Children.Add(open);
-            var card = Card(content);
+            var card = CompactCard(content);
             Grid.SetColumn(card, cards.Children.Count);
             cards.Children.Add(card);
         }
@@ -132,8 +124,8 @@ public sealed partial class MainWindow
             return;
         }
 
-        var ready = new StackPanel { Spacing = 10 };
-        terracottaHeading = Text("Multiplayer component ready", 18, true);
+        var ready = new StackPanel { Spacing = 6 };
+        terracottaHeading = Text("Multiplayer component ready", 15, true);
         ready.Children.Add(terracottaHeading);
         terracottaProgress = new ProgressBar
         {
@@ -201,7 +193,7 @@ public sealed partial class MainWindow
             )
         );
         ready.Children.Add(terracottaActions);
-        PageBody.Children.Add(Card(ready));
+        PageBody.Children.Add(CreateCard(ready, new Thickness(12, 10, 12, 10), 6));
         var players = new StackPanel { Spacing = 12 };
         players.Children.Add(Text("Players", 18, true));
         players.Children.Add(terracottaMembers);
@@ -277,20 +269,20 @@ public sealed partial class MainWindow
         button.Tag = view;
         button.HorizontalAlignment = HorizontalAlignment.Stretch;
         button.HorizontalContentAlignment = HorizontalAlignment.Stretch;
-        button.Padding = new Thickness(16);
-        var row = new Grid { ColumnSpacing = 16 };
+        button.Padding = new Thickness(12, 8, 12, 8);
+        var row = new Grid { ColumnSpacing = 12 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(
             new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
         );
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.Children.Add(new FontIcon { Glyph = glyph, FontSize = 26 });
-        var labels = new StackPanel { Spacing = 4 };
-        labels.Children.Add(Text(title, 20, true));
-        labels.Children.Add(Text(subtitle, 13));
+        row.Children.Add(new FontIcon { Glyph = glyph, FontSize = 20 });
+        var labels = new StackPanel { Spacing = 2 };
+        labels.Children.Add(Text(title, 16, true));
+        labels.Children.Add(Text(subtitle, 12));
         Grid.SetColumn(labels, 1);
         row.Children.Add(labels);
-        var arrow = new FontIcon { Glyph = "\uE72A", FontSize = 22 };
+        var arrow = new FontIcon { Glyph = "\uE72A", FontSize = 18 };
         Grid.SetColumn(arrow, 2);
         row.Children.Add(arrow);
         button.Content = row;
@@ -391,7 +383,19 @@ public sealed partial class MainWindow
         if (!versions.Contains(store.Config.Settings.FrpcVersion))
             store.Config.Settings.FrpcVersion = versions.FirstOrDefault() ?? "";
         BuildFrpcDownloads(store.Config.Settings, versions, false);
-        PageBody.Children.Add(TerracottaSettingsCard());
+        var frpcPanel = PageBody.Children[^1];
+        PageBody.Children.Remove(frpcPanel);
+        var terracottaPanel = TerracottaSettingsCard();
+        var terracottaContent = terracottaPanel.Child;
+        terracottaPanel.Child = null;
+        themeCards.Remove(terracottaPanel);
+        var applications = new StackPanel { Spacing = 16 };
+        applications.Children.Add(Text("Manage third-party applications", 18, true));
+        applications.Children.Add(frpcPanel);
+        applications.Children.Add(terracottaContent);
+        var card = Card(applications);
+        card.Tag = "third-party-apps";
+        PageBody.Children.Add(card);
         RefreshFrpcPalette();
     }
 

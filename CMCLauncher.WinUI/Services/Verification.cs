@@ -1874,8 +1874,8 @@ public sealed partial class MainWindow
         windowMode.SelectedIndex = 1;
         introPreference.IsOn = false;
         var manualMemory = Descendants(PageBody)
-            .OfType<NumberBox>()
-            .Single(c => c.Header?.ToString() == "最大内存 / MB");
+            .OfType<Slider>()
+            .Single(c => c.Tag?.ToString() == "settings-memory-slider");
         var downloadThreads = Descendants(PageBody)
             .OfType<NumberBox>()
             .Single(c => c.Header?.ToString() == "同时下载线程数");

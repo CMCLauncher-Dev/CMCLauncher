@@ -58,14 +58,23 @@ public sealed class SettingsPage : CMCPage
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
 
-        var memory = new NumberBox
+        var memory = new Slider
         {
-            Header = Ui("Maximum memory / MB"),
-            Value = settings.MemoryMb,
             Minimum = 512,
-            Maximum = 65536,
-            SmallChange = 512,
-            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+            Maximum = Math.Clamp(
+                Math.Max(
+                    LauncherPlatform.Current.PhysicalMemory()?.TotalMb ?? 65536,
+                    settings.MemoryMb
+                ),
+                512,
+                65536
+            ),
+            Value = settings.MemoryMb,
+            SmallChange = 256,
+            LargeChange = 1024,
+            StepFrequency = 1,
+            Tag = "settings-memory-slider",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
         };
         var downloadThreads = new NumberBox
         {
@@ -83,21 +92,158 @@ public sealed class SettingsPage : CMCPage
             OnContent = Ui("Automatic [context 467]"),
             OffContent = Ui("Manual"),
             IsOn = settings.AutoMemory,
+            Tag = "settings-memory-auto",
         };
-        var memoryHint = Text("", 12);
+        var usedMemory = Text("", 13);
+        var memoryValue = Text("", 16, true);
+        memoryValue.Tag = "settings-memory-value";
+        var memoryProgress = new Border
+        {
+            Height = 10,
+            MinWidth = 0,
+            Background = MainWindow.ComboAccentBrush,
+            Tag = "settings-memory-progress",
+        };
+        var memoryTrack = new Grid
+        {
+            ColumnSpacing = 0,
+            Height = 10,
+            Tag = "settings-memory-track",
+        };
+        for (var i = 0; i < 3; i++)
+            memoryTrack.ColumnDefinitions.Add(new ColumnDefinition());
+        var usedSegment = new Border
+        {
+            Background = MainWindow.ComboAccentBrush,
+            Opacity = .45,
+            CornerRadius = new CornerRadius(3),
+        };
+        var freeSegment = new Border
+        {
+            Background = MainWindow.ComboBorderBrush,
+            CornerRadius = new CornerRadius(3),
+        };
+        Grid.SetColumn(memoryProgress, 1);
+        Grid.SetColumn(freeSegment, 2);
+        memoryTrack.Children.Add(usedSegment);
+        memoryTrack.Children.Add(memoryProgress);
+        memoryTrack.Children.Add(freeSegment);
+        var memoryLegend = new Grid();
+        memoryLegend.ColumnDefinitions.Add(new ColumnDefinition());
+        memoryLegend.ColumnDefinitions.Add(new ColumnDefinition());
+        memoryValue.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(memoryValue, 1);
+        memoryLegend.Children.Add(usedMemory);
+        memoryLegend.Children.Add(memoryValue);
+        if (settings.ColorPreset != "native")
+        {
+            memoryProgress.Background = MainWindow.ComboAccentBrush;
+            foreach (
+                var key in new[]
+                {
+                    "SliderTrackValueFill",
+                    "SliderTrackValueFillPointerOver",
+                    "SliderTrackValueFillPressed",
+                    "SliderThumbBackground",
+                    "SliderThumbBackgroundPointerOver",
+                    "SliderThumbBackgroundPressed",
+                }
+            )
+                memory.Resources[key] = MainWindow.ComboAccentBrush;
+        }
+        var memoryPanel = new StackPanel
+        {
+            Spacing = 6,
+            Children = { Text("Maximum memory / MB"), memoryLegend, memoryTrack, memory },
+        };
+        var memoryAnimation = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        var animationClock = new System.Diagnostics.Stopwatch();
+        double[] animationStart = new double[3],
+            animationTarget = new double[3];
+        bool memoryDrawn = false;
+        void DrawMemory(double[] values)
+        {
+            for (var i = 0; i < 3; i++)
+                memoryTrack.ColumnDefinitions[i].Width = new GridLength(
+                    values[i],
+                    GridUnitType.Star
+                );
+        }
+        memoryAnimation.Tick += (_, _) =>
+        {
+            var t = Math.Clamp(animationClock.Elapsed.TotalMilliseconds / 450, 0, 1);
+            var eased = 1 - Math.Pow(1 - t, 3);
+            DrawMemory(
+                Enumerable
+                    .Range(0, 3)
+                    .Select(i =>
+                        animationStart[i] + (animationTarget[i] - animationStart[i]) * eased
+                    )
+                    .ToArray()
+            );
+            if (t >= 1)
+                memoryAnimation.Stop();
+        };
+        void AnimateMemory((double Used, double Allocated, double Free) distribution)
+        {
+            var next = new[] { distribution.Used, distribution.Allocated, distribution.Free };
+            // Retarget from the displayed widths when another update arrives during an animation.
+            memoryAnimation.Stop();
+            animationStart = memoryTrack.ColumnDefinitions.Select(c => c.Width.Value).ToArray();
+            animationTarget = next;
+            if (
+                !memoryDrawn
+                || !memoryPanel.IsLoaded
+                || !new Windows.UI.ViewManagement.UISettings().AnimationsEnabled
+            )
+                DrawMemory(next);
+            else
+            {
+                animationClock.Restart();
+                memoryAnimation.Start();
+            }
+            memoryDrawn = true;
+        }
+        var memoryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         void RefreshMemory()
         {
-            memory.IsEnabled = !automaticMemory.IsOn;
-            memoryHint.Text = automaticMemory.IsOn
-                ? (
-                    UiFormat(
-                        "Recommended: {0:N0} MB. Recalculated at each launch based on physical and available memory.",
-                        GameMemory.Resolve(new Settings())
-                    )
-                )
-                : Ui("Set the maximum Java heap size manually.");
+            var automatic = automaticMemory.IsOn;
+            memory.IsEnabled = !automatic;
+            memory.Visibility = automatic ? Visibility.Collapsed : Visibility.Visible;
+            var physical = LauncherPlatform.Current.PhysicalMemory();
+            var total = Math.Max(1, physical?.TotalMb ?? (long)memory.Maximum);
+            var available = Math.Clamp(physical?.AvailableMb ?? total, 0, total);
+            var used = total - available;
+            usedMemory.Text = UiFormat("Used: {0:N1} / {1:N1} GB", used / 1024d, total / 1024d);
+            var allocation = automatic
+                ? Window.calculateAutomaticMemory()
+                : (int)Math.Round(memory.Value);
+            var distribution = GameMemory.Distribution(total, available, allocation);
+            AnimateMemory(distribution);
+            usedSegment.Visibility = used > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            memoryValue.Text = UiFormat("Game allocation: {0:N1} GB", allocation / 1024d);
         }
-        automaticMemory.Toggled += (_, _) => RefreshMemory();
+        memoryTimer.Tick += (_, _) => RefreshMemory();
+        memoryPanel.Loaded += (_, _) =>
+        {
+            RefreshMemory();
+            if (automaticMemory.IsOn)
+                memoryTimer.Start();
+        };
+        memoryPanel.Unloaded += (_, _) =>
+        {
+            memoryTimer.Stop();
+            memoryAnimation.Stop();
+        };
+        automaticMemory.Toggled += (_, _) =>
+        {
+            RefreshMemory();
+            if (automaticMemory.IsOn && memoryPanel.IsLoaded)
+                memoryTimer.Start();
+            else
+                memoryTimer.Stop();
+        };
         RefreshMemory();
 
         var customJvmArgs = new TextBox
@@ -550,7 +696,7 @@ public sealed class SettingsPage : CMCPage
             ),
             gamePriority
         );
-        Section("Memory and Java", automaticMemory, memory, memoryHint, customJvmArgs, jvmHint);
+        Section("Memory and Java", automaticMemory, memoryPanel, customJvmArgs, jvmHint);
         var advancedNetwork = new StackPanel { Spacing = 12 };
         advancedNetwork.Children.Add(proxyUser);
         advancedNetwork.Children.Add(proxyPassword);
@@ -623,9 +769,15 @@ public sealed class SettingsPage : CMCPage
         };
         memory.ValueChanged += async (_, _) =>
         {
-            if (double.IsNaN(memory.Value) || memory.Value < 512 || memory.Value > 65536)
+            if (
+                automaticMemory.IsOn
+                || double.IsNaN(memory.Value)
+                || memory.Value < 512
+                || memory.Value > 65536
+            )
                 return;
-            settings.MemoryMb = (int)memory.Value;
+            settings.MemoryMb = (int)Math.Round(memory.Value);
+            RefreshMemory();
             await PersistSettings();
         };
         downloadThreads.ValueChanged += async (_, _) =>
@@ -681,9 +833,14 @@ public sealed class SettingsPage : CMCPage
             await PersistSettings();
         };
 
+        Window.BuildSettingsClients();
         PageBody.Children.Add(
             Text(UiFormat("Current version: {0}", LauncherUpdates.CurrentVersion), 12)
         );
-        Window.BuildSettingsClients();
     }
+}
+
+public sealed partial class MainWindow
+{
+    internal Func<int> calculateAutomaticMemory = () => GameMemory.Resolve(new Settings());
 }

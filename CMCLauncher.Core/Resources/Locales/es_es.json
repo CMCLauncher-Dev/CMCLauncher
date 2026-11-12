@@ -2,6 +2,13 @@
   "code": "es_es",
   "displayName": "Español",
   "strings": {
+    "Used: {0:N1} / {1:N1} GB": "En uso: {0:N1} / {1:N1} GB",
+    "Game allocation: {0:N1} GB": "Juego: {0:N1} GB",
+    "Current version:": "Versión actual:",
+    "Drag to choose the maximum memory.": "Arrastra para elegir la memoria máxima.",
+    "Automatically recalculated every second.": "Se recalcula cada segundo según la memoria disponible.",
+    "Allocated: {0:N0} MB": "Asignado: {0:N0} MB",
+    "Manage third-party applications": "Administrar aplicaciones de terceros",
     "Redeem code": "Canjear código",
     "Refresh account": "Actualizar cuenta",
     "Change player name": "Cambiar nombre",
@@ -822,6 +829,8 @@
     "Current": "Actual",
     "Directory unavailable": "Carpeta no disponible",
     "{0} versions": "{0} versiones",
-    "User data directory": "Directorio de datos del usuario"
+    "User data directory": "Directorio de datos del usuario",
+    "Manage port forwarding connections.": "Gestiona las conexiones de reenvío de puertos.",
+    "Create a profile picture from a Minecraft skin and export it as PNG.": "Crea un avatar a partir de una skin de Minecraft y expórtalo como PNG."
   }
 }

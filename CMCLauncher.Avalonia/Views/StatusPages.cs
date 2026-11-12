@@ -139,11 +139,11 @@ public sealed partial class MainWindow
     {
         var cards = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions(compact ? "*,*,*" : "*,*"),
-            ColumnSpacing = 10,
-            RowSpacing = 10,
+            ColumnDefinitions = new ColumnDefinitions(compact ? "*,*,*,*" : "*,*,*"),
+            ColumnSpacing = 8,
+            RowSpacing = 8,
         };
-        var columns = compact ? 3 : 2;
+        var columns = compact ? 4 : 3;
         for (var i = 0; i < entries.Count; i++)
         {
             if (i % columns == 0)
@@ -152,8 +152,8 @@ public sealed partial class MainWindow
             var content = new Grid
             {
                 ColumnDefinitions = new ColumnDefinitions("Auto,*"),
-                ColumnSpacing = 12,
-                MinHeight = compact ? 32 : 46,
+                ColumnSpacing = 8,
+                MinHeight = compact ? 24 : 30,
             };
             content.Children.Add(
                 new Image
@@ -161,11 +161,11 @@ public sealed partial class MainWindow
                     Source = new global::Avalonia.Media.Imaging.Bitmap(
                         Path.Combine(AppContext.BaseDirectory, "assets", "about", entry.Image)
                     ),
-                    Width = compact ? 30 : 40,
-                    Height = compact ? 30 : 40,
+                    Width = compact ? 24 : 28,
+                    Height = compact ? 24 : 28,
                 }
             );
-            var label = T("", compact ? 14 : 16, true);
+            var label = T("", 14, true);
             label.Text = entry.Name;
             label.TextWrapping = global::Avalonia.Media.TextWrapping.NoWrap;
             label.TextTrimming = global::Avalonia.Media.TextTrimming.CharacterEllipsis;
@@ -181,6 +181,8 @@ public sealed partial class MainWindow
                 }
             );
             link.Content = content;
+            link.Padding = new global::Avalonia.Thickness(8, 6);
+            link.MinHeight = compact ? 34 : 40;
             link.HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
             link.HorizontalContentAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
             ToolTip.SetTip(link, entry.Name);

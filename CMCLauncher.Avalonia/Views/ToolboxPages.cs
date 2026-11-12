@@ -17,19 +17,11 @@ public sealed partial class MainWindow
         foreach (
             var (title, description, target) in new[]
             {
-                (
-                    "frpc",
-                    "Download official frpc and manage connections using INI / TOML configurations.",
-                    "frpc"
-                ),
-                (
-                    "Terracotta",
-                    "Create or join a Minecraft LAN room. Download Terracotta when you need it.",
-                    "terracotta"
-                ),
+                ("frpc", "Manage port forwarding connections.", "frpc"),
+                ("Terracotta", "Create or join a Minecraft LAN room.", "terracotta"),
                 (
                     "MinecraftPFP",
-                    "Create a profile picture from a Minecraft skin and export it as PNG. Everything stays on your computer.",
+                    "Create a profile picture from a Minecraft skin and export it as PNG.",
                     "pfp"
                 ),
             }
@@ -38,9 +30,9 @@ public sealed partial class MainWindow
             var content = new Grid
             {
                 RowDefinitions = new RowDefinitions("Auto,*,Auto"),
-                RowSpacing = 10,
+                RowSpacing = 6,
             };
-            content.Children.Add(T(title, 18, true));
+            content.Children.Add(T(title, 16, true));
             var summary = T(description);
             Grid.SetRow(summary, 1);
             content.Children.Add(summary);
@@ -48,6 +40,7 @@ public sealed partial class MainWindow
             Grid.SetRow(open, 2);
             content.Children.Add(open);
             var card = Card(content);
+            card.Padding = new global::Avalonia.Thickness(11, 7);
             Grid.SetColumn(card, cards.Children.Count);
             cards.Children.Add(card);
         }
@@ -78,7 +71,7 @@ public sealed partial class MainWindow
                 )
             );
         }
-        var heading = T("Multiplayer component ready", 18, true);
+        var heading = T("Multiplayer component ready", 15, true);
         var progress = new ProgressBar
         {
             Height = 4,
@@ -194,6 +187,7 @@ public sealed partial class MainWindow
             }
         }
         var ready = Stack(heading, progress, scanHint, status, codeRow);
+        ready.Spacing = 6;
         actions = new StackPanel
         {
             Orientation = global::Avalonia.Layout.Orientation.Horizontal,
@@ -209,10 +203,12 @@ public sealed partial class MainWindow
             )
         );
         ready.Children.Add(actions);
+        var statusCard = Card(ready);
+        statusCard.Padding = new global::Avalonia.Thickness(12, 10);
         var body = Stack(
             Btn("Back to toolbox", () => Navigate("toolbox")),
             T("Multiplayer lobby", 20, true),
-            Card(ready),
+            statusCard,
             membersCard
         );
         {
@@ -259,6 +255,7 @@ public sealed partial class MainWindow
                             await JoinTerracottaDialog();
                     }
                 );
+                button.Padding = new global::Avalonia.Thickness(12, 8);
                 button.HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
                 button.HorizontalContentAlignment = global::Avalonia
                     .Layout
@@ -267,13 +264,14 @@ public sealed partial class MainWindow
                 var row = new Grid
                 {
                     ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
-                    ColumnSpacing = 16,
+                    ColumnSpacing = 12,
                 };
-                row.Children.Add(T(view == "host" ? "▣" : "⊕", 28));
-                var labels = Stack(T(title, 20, true), T(subtitle, 13));
+                row.Children.Add(T(view == "host" ? "▣" : "⊕", 20));
+                var labels = Stack(T(title, 16, true), T(subtitle, 12));
+                labels.Spacing = 2;
                 Grid.SetColumn(labels, 1);
                 row.Children.Add(labels);
-                var arrow = T("→", 26);
+                var arrow = T("→", 18);
                 Grid.SetColumn(arrow, 2);
                 row.Children.Add(arrow);
                 button.Content = row;

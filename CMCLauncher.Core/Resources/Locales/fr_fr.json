@@ -2,6 +2,13 @@
   "code": "fr_fr",
   "displayName": "Français",
   "strings": {
+    "Used: {0:N1} / {1:N1} GB": "Utilisée : {0:N1} / {1:N1} Go",
+    "Game allocation: {0:N1} GB": "Jeu : {0:N1} Go",
+    "Current version:": "Version actuelle :",
+    "Drag to choose the maximum memory.": "Déplacez le curseur pour choisir la mémoire maximale.",
+    "Automatically recalculated every second.": "Recalculée chaque seconde selon la mémoire disponible.",
+    "Allocated: {0:N0} MB": "Mémoire allouée : {0:N0} Mo",
+    "Manage third-party applications": "Gérer les applications tierces",
     "Redeem code": "Utiliser un code",
     "Refresh account": "Actualiser le compte",
     "Change player name": "Changer de pseudo",
@@ -822,6 +829,8 @@
     "Current": "Actuel",
     "Directory unavailable": "Dossier indisponible",
     "{0} versions": "{0} versions",
-    "User data directory": "Dossier des données utilisateur"
+    "User data directory": "Dossier des données utilisateur",
+    "Manage port forwarding connections.": "Gérez les connexions de redirection de ports.",
+    "Create a profile picture from a Minecraft skin and export it as PNG.": "Créez un avatar à partir d’un skin Minecraft et exportez-le en PNG."
   }
 }

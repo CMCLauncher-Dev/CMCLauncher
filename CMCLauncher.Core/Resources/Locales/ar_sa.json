@@ -2,6 +2,13 @@
   "code": "ar_sa",
   "displayName": "العربية",
   "strings": {
+    "Used: {0:N1} / {1:N1} GB": "المستخدم: {0:N1} / {1:N1} GB",
+    "Game allocation: {0:N1} GB": "للعبة: {0:N1} GB",
+    "Current version:": "الإصدار الحالي:",
+    "Drag to choose the maximum memory.": "اسحب لتحديد الحد الأقصى للذاكرة.",
+    "Automatically recalculated every second.": "تُعاد الحسابات كل ثانية حسب الذاكرة المتاحة.",
+    "Allocated: {0:N0} MB": "المخصّص: {0:N0} ميغابايت",
+    "Manage third-party applications": "إدارة تطبيقات الطرف الثالث",
     "Redeem code": "استرداد رمز",
     "Refresh account": "تحديث الحساب",
     "Change player name": "تغيير اسم اللاعب",
@@ -822,6 +829,8 @@
     "Current": "الحالي",
     "Directory unavailable": "المجلد غير متاح",
     "{0} versions": "{0} إصدارات",
-    "User data directory": "مجلد بيانات المستخدم"
+    "User data directory": "مجلد بيانات المستخدم",
+    "Manage port forwarding connections.": "إدارة اتصالات إعادة توجيه المنافذ.",
+    "Create a profile picture from a Minecraft skin and export it as PNG.": "أنشئ صورة شخصية من مظهر Minecraft وصدّرها بصيغة PNG."
   }
 }

@@ -2,6 +2,14 @@
   "code": "ja_jp",
   "displayName": "日本語",
   "strings": {
+    "Used: {0:N1} / {1:N1} GB": "使用中：{0:N1} / {1:N1} GB",
+    "Game allocation: {0:N1} GB": "ゲーム割り当て：{0:N1} GB",
+    "Create a profile picture from a Minecraft skin and export it as PNG.": "Minecraft スキンからプロフィール画像を作成し、PNG で書き出します。",
+    "Current version:": "現在のバージョン：",
+    "Drag to choose the maximum memory.": "スライダーで最大メモリを設定します。",
+    "Automatically recalculated every second.": "メモリの状態に応じて毎秒更新します。",
+    "Allocated: {0:N0} MB": "割り当て：{0:N0} MB",
+    "Manage third-party applications": "外部アプリを管理",
     "Redeem code": "コードを引き換え",
     "Refresh account": "アカウントを更新",
     "Change player name": "プレイヤー名を変更",
@@ -958,6 +966,7 @@
     "Current": "現在",
     "Directory unavailable": "ディレクトリを利用できません",
     "{0} versions": "{0} バージョン",
-    "User data directory": "ユーザーデータディレクトリ"
+    "User data directory": "ユーザーデータディレクトリ",
+    "Manage port forwarding connections.": "ポート転送接続を管理します。"
   }
 }

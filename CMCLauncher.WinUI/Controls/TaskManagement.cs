@@ -91,7 +91,6 @@ public sealed partial class MainWindow
     {
         TaskDrawer.IsPaneOpen = false;
         page = "logs";
-        expandedNavigation = "settings";
         Render();
     }
 

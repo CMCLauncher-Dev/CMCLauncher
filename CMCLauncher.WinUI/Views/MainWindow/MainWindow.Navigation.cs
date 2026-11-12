@@ -283,7 +283,8 @@ public sealed partial class MainWindow
             or "download-shader"
             or "download-world"
             or "download-blueprint" => "downloads",
-            "settings" or "personalization" or "java" or "accounts" or "logs" => "settings",
+            "logs" => "",
+            "settings" or "personalization" or "java" or "accounts" => "settings",
             _ => "more",
         };
         var rootKey = "root:" + activeGroup;
@@ -303,7 +304,7 @@ public sealed partial class MainWindow
         var pageOffset = Offset(selectedPageIndicator, pageKey);
         foreach (var (key, button) in navigationButtons)
         {
-            var selected = key == pageKey || key == rootKey;
+            var selected = page != "logs" && (key == pageKey || key == rootKey);
             var palette = navigationButtonPalettes[key];
             palette.Selected = selected;
             RefreshNavigationButtonPalette(palette);
@@ -333,8 +334,8 @@ public sealed partial class MainWindow
                     );
             }
         }
-        selectedRootIndicator = rootKey;
-        selectedPageIndicator = pageKey;
+        selectedRootIndicator = page == "logs" ? null : rootKey;
+        selectedPageIndicator = page == "logs" ? null : pageKey;
         foreach (var group in new[] { "downloads", "settings", "more" })
             if (
                 navigationButtons.TryGetValue("root:" + group, out var root)

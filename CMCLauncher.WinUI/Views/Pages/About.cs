@@ -61,8 +61,8 @@ public sealed partial class MainWindow
     {
         var body = new StackPanel { Spacing = 12 };
         body.Children.Add(Text(title, 18, true));
-        var cards = new Grid { ColumnSpacing = 10, RowSpacing = 10 };
-        var columns = compact ? 3 : 2;
+        var cards = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
+        var columns = compact ? 4 : 3;
         for (var i = 0; i < columns; i++)
             cards.ColumnDefinitions.Add(
                 new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
@@ -72,7 +72,7 @@ public sealed partial class MainWindow
             if (i % columns == 0)
                 cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var entry = entries[i];
-            var content = new Grid { ColumnSpacing = 12, MinHeight = compact ? 32 : 46 };
+            var content = new Grid { ColumnSpacing = 8, MinHeight = compact ? 24 : 30 };
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             content.ColumnDefinitions.Add(
                 new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
@@ -85,11 +85,11 @@ public sealed partial class MainWindow
                             Path.Combine(AppContext.BaseDirectory, "assets", "about", entry.Image)
                         )
                     ),
-                    Width = compact ? 30 : 40,
-                    Height = compact ? 30 : 40,
+                    Width = compact ? 24 : 28,
+                    Height = compact ? 24 : 28,
                 }
             );
-            var label = Text("", compact ? 14 : 16, true);
+            var label = Text("", 14, true);
             label.Text = entry.Name;
             label.TextWrapping = TextWrapping.NoWrap;
             label.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -105,7 +105,7 @@ public sealed partial class MainWindow
                 Padding = new Thickness(0),
             };
             ToolTipService.SetToolTip(link, entry.Name);
-            var card = CompactCard(link);
+            var card = CreateCard(link, new Thickness(8, 6, 8, 6), 5);
             Grid.SetRow(card, i / columns);
             Grid.SetColumn(card, i % columns);
             cards.Children.Add(card);

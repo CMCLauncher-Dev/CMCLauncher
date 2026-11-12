@@ -561,9 +561,9 @@ internal static class Program
             "bad world archive left partial files"
         );
         Pass("game-version Java matching and safe world archive import/export");
-        Check(GameMemory.Calculate(8192, 6144) == 4096, "8 GB memory budget");
-        Check(GameMemory.Calculate(16384, 4096) == 2560, "available memory limits heap");
-        Check(GameMemory.Calculate(65536, 60000) == 16384, "automatic heap cap");
+        Check(GameMemory.Calculate(8192, 6144) == 4710, "8 GB memory budget");
+        Check(GameMemory.Calculate(16384, 4096) == 3072, "available memory limits heap");
+        Check(GameMemory.Calculate(65536, 60000) == 18502, "automatic heap cap");
         Check(
             GameMemory.Resolve(new Settings { AutoMemory = false, MemoryMb = 3072 }) == 3072,
             "manual memory preserved"

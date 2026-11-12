@@ -11,12 +11,17 @@ public sealed partial class MainWindow
         page = "settings";
         await RenderAsync();
         check(
-            PageBody.Children[^2] is Expander { Tag: "frpc-download-panel", IsExpanded: false }
-                && Descendants(PageBody.Children[^1])
+            PageBody.Children[^2] is Border { Tag: "third-party-apps" }
+                && PageBody.Children[^1] is TextBlock
+                && Descendants(PageBody.Children[^2])
                     .OfType<Button>()
-                    .Any(b => b.Content?.ToString() == Ui("Download Terracotta")),
-            "frpc and Terracotta management are the final settings sections"
+                    .Any(b => b.Content?.ToString() == Ui("Download Terracotta"))
+                && Descendants(PageBody.Children[^2])
+                    .OfType<Expander>()
+                    .Any(e => e.Tag?.ToString() == "frpc-download-panel"),
+            "third-party client management is combined immediately before the current version"
         );
+        await VerifyMemoryAllocation(check, directory);
         check(
             !navigationButtons.ContainsKey("page:logs"),
             "runtime logs are absent from the sidebar"
@@ -32,6 +37,12 @@ public sealed partial class MainWindow
         check(
             page == "logs" && !TaskDrawer.IsPaneOpen,
             "drawer logs button opens logs and closes the drawer"
+        );
+        check(
+            navigationButtonPalettes.Values.All(p => !p.Selected)
+                && selectedRootIndicator == null
+                && selectedPageIndicator == null,
+            "logs leaves every sidebar menu and indicator unselected"
         );
         page = "about";
         await RenderAsync();

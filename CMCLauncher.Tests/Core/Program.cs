@@ -85,6 +85,25 @@ try
         "memory capability injection"
     );
     LauncherPlatform.Current = portable;
+    Check(GameMemory.Calculate(8192, 6144) == 4710, "HMCL low memory tier");
+    Check(GameMemory.Calculate(32768, 16384) == 9728, "HMCL middle memory tier");
+    Check(GameMemory.Calculate(65536, 60000) == 18502, "HMCL high memory tier");
+    Check(GameMemory.Calculate(262144, 260000) == 24576, "HMCL 24 GiB ceiling");
+    Check(GameMemory.Calculate(32768, 16000, false) == 768, "32-bit heap ceiling");
+    Check(
+        GameMemory.Calculate(8192, 0) == 512 && GameMemory.Calculate(8192, -1) == 2048,
+        "low memory and unavailable probe fallback"
+    );
+    var segments = GameMemory.Distribution(32768, 18432, 8192);
+    Check(
+        segments == (.4375, .25, .3125),
+        "memory segments use total physical memory as denominator"
+    );
+    var overflow = GameMemory.Distribution(8192, 1024, 4096);
+    Check(
+        overflow == (.875, .125, 0),
+        "over-allocation clips at available RAM without rescaling used memory"
+    );
     var catalog = new ThemeCatalog(Path.Combine(root, "themes"));
     Check(catalog.IsBuiltIn("craft"), "embedded theme belongs to core");
     var languages = new LocalizationCatalog(Path.Combine(root, "locales"));

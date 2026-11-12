@@ -26,12 +26,160 @@ public sealed partial class MainWindow
             languages,
             languages.FirstOrDefault(l => l.Code == settings.LauncherLanguage)
         );
-        var memory = Number(settings.MemoryMb, 512, 65536, 256);
+        var memory = new Slider
+        {
+            Minimum = 512,
+            Maximum = Math.Clamp(
+                Math.Max(
+                    LauncherPlatform.Current.PhysicalMemory()?.TotalMb ?? 65536,
+                    settings.MemoryMb
+                ),
+                512,
+                65536
+            ),
+            Value = settings.MemoryMb,
+            SmallChange = 256,
+            LargeChange = 1024,
+            TickFrequency = 1,
+            IsSnapToTickEnabled = true,
+        };
+        var memoryValue = T("", 16, true);
+        var memoryProgress = new Border
+        {
+            Height = 10,
+            MinWidth = 0,
+            Background = Accent,
+        };
+        var usedMemory = T("", 13);
+        var memoryTrack = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*,*"),
+            ColumnSpacing = 0,
+            Height = 10,
+        };
+        var usedSegment = new Border
+        {
+            Background = Accent,
+            Opacity = .45,
+            CornerRadius = new CornerRadius(3),
+        };
+        var freeSegment = new Border
+        {
+            Background = Accent,
+            Opacity = .12,
+            CornerRadius = new CornerRadius(3),
+        };
+        Grid.SetColumn(memoryProgress, 1);
+        Grid.SetColumn(freeSegment, 2);
+        memoryTrack.Children.Add(usedSegment);
+        memoryTrack.Children.Add(memoryProgress);
+        memoryTrack.Children.Add(freeSegment);
+        var memoryLegend = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*") };
+        memoryValue.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(memoryValue, 1);
+        memoryLegend.Children.Add(usedMemory);
+        memoryLegend.Children.Add(memoryValue);
         var autoMemory = new CheckBox
         {
             Content = Ui("Automatic memory allocation"),
             IsChecked = settings.AutoMemory,
         };
+        var memoryPanel = Stack(T("Memory / MiB"), memoryLegend, memoryTrack, memory);
+        var memoryAnimation = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        var animationClock = new System.Diagnostics.Stopwatch();
+        double[] animationStart = new double[3],
+            animationTarget = new double[3];
+        bool memoryDrawn = false;
+        void DrawMemory(double[] values)
+        {
+            for (var i = 0; i < 3; i++)
+                memoryTrack.ColumnDefinitions[i].Width = new GridLength(
+                    values[i],
+                    GridUnitType.Star
+                );
+        }
+        memoryAnimation.Tick += (_, _) =>
+        {
+            var t = Math.Clamp(animationClock.Elapsed.TotalMilliseconds / 450, 0, 1);
+            var eased = 1 - Math.Pow(1 - t, 3);
+            DrawMemory(
+                Enumerable
+                    .Range(0, 3)
+                    .Select(i =>
+                        animationStart[i] + (animationTarget[i] - animationStart[i]) * eased
+                    )
+                    .ToArray()
+            );
+            if (t >= 1)
+                memoryAnimation.Stop();
+        };
+        void AnimateMemory((double Used, double Allocated, double Free) distribution)
+        {
+            var next = new[] { distribution.Used, distribution.Allocated, distribution.Free };
+            // Retarget from the displayed widths when another update arrives during an animation.
+            memoryAnimation.Stop();
+            animationStart = memoryTrack.ColumnDefinitions.Select(c => c.Width.Value).ToArray();
+            animationTarget = next;
+            if (!memoryDrawn || !memoryPanel.IsLoaded)
+                DrawMemory(next);
+            else
+            {
+                animationClock.Restart();
+                memoryAnimation.Start();
+            }
+            memoryDrawn = true;
+        }
+        var memoryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        void RefreshMemory()
+        {
+            var automatic = autoMemory.IsChecked == true;
+            memory.IsEnabled = !automatic;
+            memory.IsVisible = !automatic;
+            var physical = LauncherPlatform.Current.PhysicalMemory();
+            var total = Math.Max(1, physical?.TotalMb ?? (long)memory.Maximum);
+            var available = Math.Clamp(physical?.AvailableMb ?? total, 0, total);
+            var used = total - available;
+            usedMemory.Text = session.Locales.Format(
+                settings.LauncherLanguage,
+                "Used: {0:N1} / {1:N1} GB",
+                used / 1024d,
+                total / 1024d
+            );
+            var allocation = automatic
+                ? GameMemory.Resolve(new Settings())
+                : (int)Math.Round(memory.Value);
+            var distribution = GameMemory.Distribution(total, available, allocation);
+            AnimateMemory(distribution);
+            usedSegment.IsVisible = used > 0;
+
+            memoryValue.Text = session.Locales.Format(
+                settings.LauncherLanguage,
+                "Game allocation: {0:N1} GB",
+                allocation / 1024d
+            );
+        }
+        memoryTimer.Tick += (_, _) => RefreshMemory();
+        memoryPanel.AttachedToVisualTree += (_, _) =>
+        {
+            RefreshMemory();
+            if (autoMemory.IsChecked == true)
+                memoryTimer.Start();
+        };
+        memoryPanel.DetachedFromVisualTree += (_, _) =>
+        {
+            memoryTimer.Stop();
+            memoryAnimation.Stop();
+        };
+        autoMemory.IsCheckedChanged += (_, _) =>
+        {
+            RefreshMemory();
+            if (autoMemory.IsChecked == true && memoryPanel.IsLoaded)
+                memoryTimer.Start();
+            else
+                memoryTimer.Stop();
+        };
+        memory.ValueChanged += (_, _) => RefreshMemory();
+        RefreshMemory();
         var threads = Number(settings.DownloadThreads, 1, 256);
         var source = Choice(
             new[] { "official", "auto", "mirror" },
@@ -112,7 +260,7 @@ public sealed partial class MainWindow
                 Stack(
                     T("Game", 18, true),
                     autoMemory,
-                    Field("Memory / MiB", memory),
+                    memoryPanel,
                     Field("Game language", gameLanguage),
                     Field("Java arguments", jvm),
                     Field("Game window title", windowTitle),
@@ -152,7 +300,7 @@ public sealed partial class MainWindow
                         _ = NetworkProxy.Address(address.Text ?? "");
                     settings.LauncherLanguage =
                         (language.SelectedItem as InterfaceLanguage)?.Code ?? "en_us";
-                    settings.MemoryMb = (int)(memory.Value ?? 2048);
+                    settings.MemoryMb = (int)Math.Round(memory.Value);
                     settings.AutoMemory = autoMemory.IsChecked == true;
                     settings.DownloadThreads = (int)(threads.Value ?? 16);
                     settings.GameDownloadSource = source.SelectedItem?.ToString() ?? "official";
@@ -189,8 +337,21 @@ public sealed partial class MainWindow
                 },
                 true
             ),
-            FrpcClientSettings(),
-            TerracottaSettingsCard()
+            ThirdPartyApplicationsCard(),
+            T(Ui("Current version:") + " " + LauncherUpdates.CurrentVersion, 12)
+        );
+    }
+
+    Control ThirdPartyApplicationsCard()
+    {
+        var frpc = (Border)FrpcClientSettings();
+        var frpcContent = frpc.Child!;
+        frpc.Child = null;
+        var terracotta = (Border)TerracottaSettingsCard();
+        var terracottaContent = terracotta.Child!;
+        terracotta.Child = null;
+        return Card(
+            Stack(T("Manage third-party applications", 18, true), frpcContent, terracottaContent)
         );
     }
 
