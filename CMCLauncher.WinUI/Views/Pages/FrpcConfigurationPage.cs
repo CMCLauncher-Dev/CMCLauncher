@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Storage.Pickers;
@@ -215,12 +215,9 @@ public sealed partial class MainWindow
                 Ui("Choose folder"),
                 async (_, _) =>
                 {
-                    var picker = new FolderPicker();
-                    InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-                    picker.FileTypeFilter.Add("*");
-                    var folder = await picker.PickSingleFolderAsync();
+                    var folder = await Task.FromResult(FolderPickerNative.PickFolder(this));
                     if (folder != null)
-                        await Import(folder.Path);
+                        await Import(folder);
                 }
             )
         );

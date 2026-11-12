@@ -786,10 +786,8 @@ public sealed partial class MainWindow
 
     async Task<string?> PickMinecraftFolder()
     {
-        var picker = new FolderPicker();
-        picker.FileTypeFilter.Add("*");
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-        return (await picker.PickSingleFolderAsync())?.Path;
+        // unpackaged 下 FolderPicker 抛 E_FAIL，改用 Win32 经典对话框。
+        return await Task.FromResult(FolderPickerNative.PickFolder(this));
     }
 
     // 扫描只登记已有版本，不移动原目录；单个损坏版本不会中断其他版本导入。

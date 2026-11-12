@@ -392,13 +392,10 @@ public sealed partial class MainWindow
                         await SchematicManager.Import(destination!, new[] { downloaded }, ct);
                     else
                     {
-                        var picker = new FolderPicker();
-                        picker.FileTypeFilter.Add("*");
-                        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-                        var folder = await picker.PickSingleFolderAsync();
+                        var folder = FolderPickerNative.PickFolder(this);
                         if (folder == null)
                             throw new OperationCanceledException();
-                        var output = Store.SafePath(folder.Path, Path.GetFileName(downloaded));
+                        var output = Store.SafePath(folder, Path.GetFileName(downloaded));
                         if (File.Exists(output))
                             throw new IOException(
                                 "A file with this name already exists. Choose a new name."
