@@ -86,7 +86,7 @@ def rpm(publish, work, output, version):
 Version: {base}
 Release: {release}
 Summary: Minecraft launcher
-License: GPL-3.0-only
+License: AGPL-3.0-only
 URL: https://github.com/com-in/CMCLauncher
 BuildArch: x86_64
 AutoReqProv: no

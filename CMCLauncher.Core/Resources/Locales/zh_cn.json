@@ -915,7 +915,7 @@
     "Choose a game version to install to": "要安装到哪个游戏版本？",
     "Write a note…": "记录一些内容…",
     "License": "许可证",
-    "GNU GPL v3": "GNU 通用公共许可证（GPL v3）",
+    "GNU AGPL v3": "GNU Affero 通用公共许可证（AGPL v3）",
     "Device code copied. Paste it in your browser to continue.": "设备代码已复制，请在浏览器中粘贴并提交。",
     "Device code copied automatically. Paste it in your browser to continue.": "设备代码已自动复制，请在浏览器中粘贴并提交。",
     "Available system memory": "设备可用内存",

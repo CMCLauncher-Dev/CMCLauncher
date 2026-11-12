@@ -40,7 +40,7 @@ public sealed partial class MainWindow
         );
         details.Children.Add(Text(Labeled("Build time", LauncherBuildInfo.BuildTime), 12));
         details.Children.Add(Text(Labeled("Commit", LauncherBuildInfo.GitCommit), 12));
-        details.Children.Add(Text(Labeled("License", Ui("GNU GPL v3")), 12));
+        details.Children.Add(Text(Labeled("License", Ui("GNU AGPL v3")), 12));
         Grid.SetColumn(details, 1);
         identity.Children.Add(details);
         PageBody.Children.Add(Card(identity));
