@@ -121,9 +121,9 @@ public sealed partial class MainWindow
                     )
                 )
             ),
-            AcknowledgementCards("Contributors", AboutAcknowledgements.Contributors, true),
+            AcknowledgementCards(Ui("Contributors"), AboutAcknowledgements.Contributors, true),
             AcknowledgementCards(
-                "Open-source projects and services",
+                Ui("Open-source projects and services"),
                 AboutAcknowledgements.Projects,
                 false
             ),
