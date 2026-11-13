@@ -7,6 +7,7 @@ public sealed class SystemStatusState : IDisposable
     CancellationTokenSource? lifetime;
     public double? Cpu { get; private set; }
     public string Memory { get; private set; } = "";
+    public Queue<double> MemoryHistory { get; } = new();
     public IReadOnlyList<GraphicsUsage> Graphics { get; private set; } = [];
     public Queue<double> History { get; } = new();
     public event Action? Updated;
@@ -54,6 +55,18 @@ public sealed class SystemStatusState : IDisposable
                     Memory = memory is { } pair
                         ? $"{pair.TotalMb - pair.AvailableMb:N0} / {pair.TotalMb:N0} MiB"
                         : "Unavailable";
+                    if (memory is { TotalMb: > 0 } sample)
+                    {
+                        MemoryHistory.Enqueue(
+                            Math.Clamp(
+                                100.0 * (sample.TotalMb - sample.AvailableMb) / sample.TotalMb,
+                                0,
+                                100
+                            )
+                        );
+                        while (MemoryHistory.Count > 60)
+                            MemoryHistory.Dequeue();
+                    }
                     if (graphics != null)
                         Graphics = graphics;
                     Updated?.Invoke();

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using CMCLauncher.Avalonia.ViewModels;
 
@@ -15,63 +16,241 @@ public sealed partial class MainWindow
         var cpu = T("");
         var memory = T("");
         var graphics = Stack();
-        var disks = Stack();
-        var continuous = new CheckBox
+        var process = T("");
+        var runtime = T("");
+        var budget = T("");
+        var library = T("");
+        var uptime = T("");
+        var disk = T("");
+        var diskBar = new ProgressBar
+        {
+            Minimum = 0,
+            Maximum = 100,
+            Height = 5,
+        };
+        var continuous = new ToggleSwitch
         {
             Content = Ui("Continuous sampling"),
             IsChecked = session.Store.Config.Settings.ContinuousStatsSampling,
         };
-        var chart = new global::Avalonia.Controls.Shapes.Polyline
+        (Control View, global::Avalonia.Controls.Shapes.Polyline Line) Trend()
         {
-            Height = 100,
-            Stroke = Accent,
-            StrokeThickness = 2,
-        };
+            var line = new global::Avalonia.Controls.Shapes.Polyline
+            {
+                Stroke = Accent,
+                StrokeThickness = 2,
+            };
+            var canvas = new Canvas
+            {
+                Width = 600,
+                Height = 100,
+                ClipToBounds = true,
+            };
+            foreach (var level in new[] { 0d, 25, 50, 75, 100 })
+                canvas.Children.Add(
+                    new global::Avalonia.Controls.Shapes.Line
+                    {
+                        StartPoint = new Point(0, level),
+                        EndPoint = new Point(600, level),
+                        Stroke = borderBrush,
+                        StrokeThickness = .5,
+                    }
+                );
+            canvas.Children.Add(line);
+            return (
+                new Viewbox
+                {
+                    Height = 100,
+                    Stretch = global::Avalonia.Media.Stretch.Fill,
+                    Child = canvas,
+                },
+                line
+            );
+        }
+        void Draw(global::Avalonia.Controls.Shapes.Polyline line, IEnumerable<double> samples)
+        {
+            var points = samples.TakeLast(60).ToArray();
+            line.Points = new Points(
+                points.Select(
+                    (value, index) => new Point(index * 600d / 59, 100 - Math.Clamp(value, 0, 100))
+                )
+            );
+        }
+        Control StatRow(string title, TextBlock value)
+        {
+            var row = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                ColumnSpacing = 12,
+            };
+            row.Children.Add(T(title, 12));
+            value.MaxLines = 1;
+            value.TextTrimming = global::Avalonia.Media.TextTrimming.CharacterEllipsis;
+            value.HorizontalAlignment = HorizontalAlignment.Right;
+            Grid.SetColumn(value, 1);
+            row.Children.Add(value);
+            return row;
+        }
+        var cpuTrend = Trend();
+        var memoryTrend = Trend();
+        var graphicsHistory = new Dictionary<string, Queue<double>>(StringComparer.Ordinal);
         void Update()
         {
             cpu.Text = telemetry.Cpu is double load ? $"{load:N1}%" : Ui("Unavailable");
-            memory.Text = telemetry.Memory;
-            chart.Points = new Points(
-                telemetry.History.Select((value, index) => new Point(index * 7, 100 - value))
-            );
+            memory.Text = telemetry.Memory.Length > 0 ? telemetry.Memory : Ui("Unavailable");
+            Draw(cpuTrend.Line, telemetry.History);
+            Draw(memoryTrend.Line, telemetry.MemoryHistory);
             graphics.Children.Clear();
             foreach (var gpu in telemetry.Graphics)
-                graphics.Children.Add(T(gpu.Name + (gpu.Usage >= 0 ? $" · {gpu.Usage:N1}%" : "")));
+            {
+                var panel = Stack(
+                    T(gpu.Name, 15, true),
+                    T(gpu.Usage >= 0 ? $"{gpu.Usage:N1}%" : Ui("Unavailable"))
+                );
+                if (gpu.Usage >= 0)
+                {
+                    if (!graphicsHistory.TryGetValue(gpu.Name, out var history))
+                        graphicsHistory[gpu.Name] = history = new();
+                    history.Enqueue(gpu.Usage);
+                    while (history.Count > 60)
+                        history.Dequeue();
+                    var trend = Trend();
+                    Draw(trend.Line, history);
+                    panel.Children.Add(trend.View);
+                }
+                graphics.Children.Add(panel);
+            }
             if (telemetry.Graphics.Count == 0)
                 graphics.Children.Add(T("GPU telemetry is unavailable on this host."));
+            using var current = Process.GetCurrentProcess();
+            process.Text = $"{current.WorkingSet64 / 1048576d:N1} MiB · PID {current.Id}";
+            runtime.Text = (DateTime.Now - current.StartTime).ToString(@"d\.hh\:mm\:ss");
+            uptime.Text = TimeSpan
+                .FromMilliseconds(Environment.TickCount64)
+                .ToString(@"d\.hh\:mm\:ss");
+            budget.Text = $"{GameMemory.Resolve(session.Store.Config.Settings):N0} MB";
+            library.Text = session.Store.Config.Instances.Count + " " + Ui("versions");
+            try
+            {
+                var root = Path.GetFullPath(session.Store.MinecraftRoot);
+                var drive = DriveInfo
+                    .GetDrives()
+                    .Where(d =>
+                        d.IsReady
+                        && root.StartsWith(d.RootDirectory.FullName, StringComparison.Ordinal)
+                    )
+                    .OrderByDescending(d => d.RootDirectory.FullName.Length)
+                    .FirstOrDefault();
+                if (drive is { TotalSize: > 0 })
+                {
+                    disk.Text =
+                        $"{drive.AvailableFreeSpace / 1073741824d:N1} / {drive.TotalSize / 1073741824d:N1} GiB";
+                    diskBar.Value =
+                        100d * (drive.TotalSize - drive.AvailableFreeSpace) / drive.TotalSize;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                disk.Text = Ui("Unavailable");
+            }
         }
-        continuous.IsCheckedChanged += async (_, _) =>
+        var cards = new[]
         {
-            session.Store.Config.Settings.ContinuousStatsSampling = continuous.IsChecked == true;
-            await session.Save();
-        };
-        foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady && d.TotalSize > 0))
-            disks.Children.Add(
-                Card(
-                    Stack(
-                        T(drive.Name),
-                        T(
-                            $"{drive.AvailableFreeSpace / 1073741824.0:N1} / {drive.TotalSize / 1073741824.0:N1} GiB"
-                        )
+            Card(Stack(T("CPU usage", 18, true), cpu, cpuTrend.View)),
+            Card(Stack(T("Memory usage", 18, true), memory, memoryTrend.View)),
+            Card(Stack(T("Graphics", 18, true), graphics)),
+            Card(
+                Stack(
+                    T("System environment", 18, true),
+                    T(System.Runtime.InteropServices.RuntimeInformation.OSDescription),
+                    T(
+                        System.Runtime.InteropServices.RuntimeInformation.OSArchitecture
+                            + " · "
+                            + Environment.ProcessorCount
+                            + " "
+                            + Ui("Logical processors")
+                    ),
+                    T(System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription),
+                    StatRow("System uptime", uptime)
+                )
+            ),
+            Card(
+                Stack(
+                    T("Launcher runtime", 18, true),
+                    StatRow("Launcher process", process),
+                    StatRow("Running time", runtime),
+                    StatRow("Game memory budget", budget),
+                    StatRow("Library summary", library)
+                )
+            ),
+            Card(
+                Stack(
+                    T("Game storage", 18, true),
+                    T(session.Store.MinecraftRoot, 12),
+                    disk,
+                    diskBar,
+                    Btn(
+                        "Open folder",
+                        () =>
+                        {
+                            Directory.CreateDirectory(session.Store.MinecraftRoot);
+                            Open(session.Store.MinecraftRoot);
+                            return Task.CompletedTask;
+                        }
                     )
                 )
-            );
-        var body = Stack(
-            continuous,
-            T(System.Runtime.InteropServices.RuntimeInformation.OSDescription),
-            Card(Stack(T("CPU usage", 18, true), cpu, chart)),
-            Card(Stack(T("Memory", 18, true), memory)),
-            Card(Stack(T("Graphics", 18, true), graphics)),
-            disks
-        );
-        body.AttachedToVisualTree += (_, _) =>
+            ),
+        };
+        var dashboard = new Grid
         {
-            telemetry.Updated += Update;
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            ColumnSpacing = 12,
+            RowSpacing = 12,
+            Tag = "stats-dashboard",
+        };
+        foreach (var card in cards)
+        {
+            dashboard.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            dashboard.Children.Add(card);
+        }
+        void Layout()
+        {
+            var columns = dashboard.Bounds.Width >= 700 ? 2 : 1;
+            var rows = (cards.Length + columns - 1) / columns;
+            while (dashboard.RowDefinitions.Count > rows)
+                dashboard.RowDefinitions.RemoveAt(dashboard.RowDefinitions.Count - 1);
+            while (dashboard.RowDefinitions.Count < rows)
+                dashboard.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            for (var i = 0; i < cards.Length; i++)
+            {
+                Grid.SetColumn(cards[i], i % columns);
+                Grid.SetRow(cards[i], i / columns);
+                Grid.SetColumnSpan(cards[i], columns == 1 ? 2 : 1);
+            }
+        }
+        dashboard.SizeChanged += (_, _) => Layout();
+        Layout();
+        void Start() =>
             telemetry.Start(
                 action => Dispatcher.UIThread.Post(action),
                 Path.Combine(session.Store.Root, "cache", "gpu-adapters.json"),
                 Verifying
             );
+        continuous.IsCheckedChanged += async (_, _) =>
+        {
+            session.Store.Config.Settings.ContinuousStatsSampling = continuous.IsChecked == true;
+            if (continuous.IsChecked == true)
+                Start();
+            else
+                telemetry.Stop();
+            await session.Save();
+        };
+        var body = Stack(continuous, dashboard);
+        body.AttachedToVisualTree += (_, _) =>
+        {
+            telemetry.Updated += Update;
+            if (continuous.IsChecked == true)
+                Start();
             Update();
         };
         body.DetachedFromVisualTree += (_, _) =>
