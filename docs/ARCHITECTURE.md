@@ -53,6 +53,8 @@ dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Relea
 dotnet build CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64
 ```
 
+Navigation catalogs, installed-content inspection caches and account skin fetching are shared Core services. [Frontend coverage](FRONTEND_PARITY.md) records the corresponding views and test boundaries.
+
 Language files: `CMCLauncher.Core/Resources/Locales/`. Theme presets: `CMCLauncher.Core/Resources/Themes/`. WinUI still copies editable packs to `locales/` and `themes/` beside the application; the source move does not change published user-data paths.
 
 Frontend selection is fixed by platform: Windows uses WinUI; Linux/macOS use Avalonia. Avalonia has no Windows adapter reference and rejects Windows publishing/execution. Windows build helpers and ZIP/EXE release jobs continue to target WinUI.

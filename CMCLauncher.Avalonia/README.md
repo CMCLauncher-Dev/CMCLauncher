@@ -16,7 +16,7 @@ dotnet publish CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -c Release -r li
 
 Pages cover instances and directories, game installation, community resources/maps/blueprints, content, mod updates, world backups, modpack export, accounts, Java, appearance, network, frpc, portraits, logs, tasks and status. Shared Core services handle installation, authentication, caching and archive safety. CMS retains its global request gate and three-second access notice.
 
-Views own controls and dialogs; ViewModels own session, task state and export selection. Language and theme JSON are shared with WinUI.
+Views own controls and dialogs; ViewModels own session, task state and export selection. Language and theme JSON are shared with WinUI. Navigation also uses a shared Core catalog. Home cards read and write the same layout model, and installed content/account skins reuse the same caches. See [frontend coverage](../docs/FRONTEND_PARITY.md) for the implemented routes and verification boundary.
 
 Linux credentials require an installed, unlocked Secret Service and `secret-tool`; trash requires `gio`. macOS uses Keychain and Finder trash. Neither falls back to plaintext credentials. Credentials encrypted on another OS require signing in again.
 

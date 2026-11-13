@@ -11,113 +11,142 @@ public sealed partial class MainWindow
 {
     GameRelease[]? gameCatalog;
 
+    string gameReleaseCategory = "正式版";
+    string gameVersionQuery = "";
+
     async Task<Control> DownloadsPage(CancellationToken ct)
     {
-        var body = Stack();
-        var snapshots = new CheckBox { Content = Ui("Show snapshots") };
-        var april = new CheckBox { Content = Ui("Show April Fools") };
-        var search = Input("", "Search game versions");
-        var versions = Stack();
-        body.Children.Add(Row(snapshots, april));
-        body.Children.Add(search);
-        body.Children.Add(versions);
-        async Task Draw()
+        var search = Input(gameVersionQuery, "Find a version, e.g. 1.21");
+        var categories = new Grid
         {
-            versions.Children.Clear();
-            gameCatalog ??= (await session.Core.VersionCatalog(ct)).ToArray();
-            foreach (
-                var version in gameCatalog
-                    .Where(v =>
-                        (
-                            v.Type == "release" && !GameRelease.IsAprilFoolsVersion(v.Id)
-                            || snapshots.IsChecked == true
-                                && v.Type != "release"
-                                && !GameRelease.IsAprilFoolsVersion(v.Id)
-                            || april.IsChecked == true && GameRelease.IsAprilFoolsVersion(v.Id)
-                        )
-                        && (
-                            string.IsNullOrWhiteSpace(search.Text)
-                            || v.Id.Contains(search.Text, StringComparison.OrdinalIgnoreCase)
-                        )
-                    )
-                    .Take(100)
-            )
-                versions.Children.Add(
-                    Card(
-                        Row(
-                            T(version.Id, 16, true),
-                            Btn("Install options", () => GameInstallOptions(version.Id))
-                        )
-                    )
-                );
+            ColumnDefinitions = new ColumnDefinitions("*,*,*"),
+            ColumnSpacing = 6,
+        };
+        var versions = new ListBox
+        {
+            MinHeight = 240,
+            MaxHeight = 400,
+            Name = "GameVersionList",
+        };
+        var status = T("Fetching official version list…", 12);
+        var empty = T("No matching versions. Try a different version number or release type.", 12);
+        empty.IsVisible = false;
+        void Draw()
+        {
+            var values = (gameCatalog ?? [])
+                .Where(v =>
+                    v.Category == gameReleaseCategory
+                    && v.Id.Contains(search.Text ?? "", StringComparison.OrdinalIgnoreCase)
+                )
+                .Select(v => v.Id)
+                .ToArray();
+            versions.ItemsSource = values;
+            status.Text = Ui(gameReleaseCategory) + " · " + values.Length + " " + Ui("versions");
+            empty.IsVisible = values.Length == 0;
         }
-        snapshots.IsCheckedChanged += async (_, _) =>
+        foreach (var category in new[] { "正式版", "快照版", "愚人节版" })
         {
-            try
+            var button = new RadioButton
             {
-                await Draw();
-            }
-            catch (OperationCanceledException) { }
-        };
-        april.IsCheckedChanged += async (_, _) =>
+                Content = Ui(category),
+                GroupName = "MinecraftVersionCategory",
+                IsChecked = category == gameReleaseCategory,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                MinWidth = 0,
+                Padding = new Thickness(6, 7),
+            };
+            button.IsCheckedChanged += (_, _) =>
+            {
+                if (button.IsChecked == true)
+                {
+                    gameReleaseCategory = category;
+                    Draw();
+                }
+            };
+            Grid.SetColumn(button, categories.Children.Count);
+            categories.Children.Add(button);
+        }
+        search.TextChanged += (_, _) =>
         {
-            try
-            {
-                await Draw();
-            }
-            catch (OperationCanceledException) { }
+            gameVersionQuery = search.Text ?? "";
+            Draw();
         };
-        search.TextChanged += async (_, _) =>
+        versions.SelectionChanged += async (_, _) =>
         {
-            try
-            {
-                await Draw();
-            }
-            catch (OperationCanceledException) { }
+            if (versions.SelectedItem is string version)
+                await GameInstallOptions(version);
         };
-        await Draw();
+        var body = Card(Stack(categories, search, versions, empty, status));
+        if (gameCatalog == null)
+            gameCatalog = (await session.Core.VersionCatalog(ct)).ToArray();
+        ct.ThrowIfCancellationRequested();
+        Draw();
         return body;
     }
 
     Task GameInstallOptions(string gameVersion)
     {
-        pageTitle.Text = "Minecraft " + gameVersion;
+        pageTitle.Text = Ui("Install options") + " · Minecraft " + gameVersion;
         var name = Input(gameVersion);
-        var loader = Choice(new[] { "vanilla", "fabric", "quilt", "forge", "neoforge" });
+        var loader = Choice(new[] { "vanilla", "fabric", "forge", "neoforge", "quilt" });
         var builds = Choice(Array.Empty<string>());
+        builds.IsEnabled = false;
+        var loaderStatus = T("", 12);
+        var buildField = Field("Loader version", builds);
+        buildField.IsVisible = false;
         long loaderRevision = 0;
+        Button retry = null!;
+        retry = Btn("Retry loader lookup", async () => await LoadBuilds());
+        retry.IsVisible = false;
         var body = Stack(
             Row(Btn("Back", () => Navigate("downloads"))),
             Field("Instance name", name),
             Field("Loader", loader),
-            Field("Loader version", builds)
+            buildField,
+            loaderStatus
         );
-        loader.SelectionChanged += async (_, _) =>
+        async Task LoadBuilds()
         {
             var request = ++loaderRevision;
             builds.ItemsSource = Array.Empty<string>();
+            builds.IsEnabled = false;
+            loaderStatus.Text = "";
+            retry.IsVisible = false;
+            buildField.IsVisible = loader.SelectedItem?.ToString() != "vanilla";
+            if (loader.SelectedItem is not string selected || selected == "vanilla")
+                return;
+            loaderStatus.Text = Ui("Loading…");
+            using var lookup = CancellationTokenSource.CreateLinkedTokenSource(
+                navigationRequest?.Token ?? default
+            );
+            lookup.CancelAfter(TimeSpan.FromSeconds(15));
             try
             {
-                if (loader.SelectedItem is not string selected || selected == "vanilla")
-                {
-                    builds.ItemsSource = Array.Empty<string>();
-                    return;
-                }
-                var values = await session.Core.LoaderBuilds(
-                    gameVersion,
-                    selected,
-                    navigationRequest?.Token ?? default
-                );
-                if (request != loaderRevision)
+                var values = await session.Core.LoaderBuilds(gameVersion, selected, lookup.Token);
+                if (request != loaderRevision || navigationRequest?.IsCancellationRequested == true)
                     return;
                 builds.ItemsSource = values;
                 builds.SelectedIndex = 0;
+                builds.IsEnabled = values.Count > 0;
+                retry.IsVisible = values.Count == 0;
+                loaderStatus.Text =
+                    values.Count > 0 ? "" : Ui("No compatible loader versions found.");
             }
             catch (Exception ex)
             {
-                await Error(ex);
+                if (request != loaderRevision || navigationRequest?.IsCancellationRequested == true)
+                    return;
+                retry.IsVisible = true;
+                loaderStatus.Text = Ui(
+                    ex is OperationCanceledException
+                        ? "Loader lookup timed out. Select the loader again to retry."
+                        : "Failed to load loader versions."
+                );
+                session.Log("ERROR", ex.ToString());
             }
-        };
+        }
+        loader.SelectionChanged += async (_, _) => await LoadBuilds();
+        body.Children.Add(retry);
         body.Children.Add(
             Btn(
                 "Install",
@@ -601,6 +630,58 @@ public sealed partial class MainWindow
         void Append(IEnumerable<CommunityVersion> added)
         {
             foreach (var version in added)
+            {
+                var dependencies = Stack();
+                dependencies.IsVisible = false;
+                var showDependencies = Btn(
+                    "Show dependencies",
+                    async () =>
+                    {
+                        dependencies.IsVisible = !dependencies.IsVisible;
+                        if (!dependencies.IsVisible)
+                            return;
+                        dependencies.Children.Clear();
+                        dependencies.Children.Add(T("Loading dependencies…", 12));
+                        using var request = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        request.CancelAfter(TimeSpan.FromSeconds(30));
+                        try
+                        {
+                            var values = await session.Community.Dependencies(
+                                item.Id,
+                                version.Id,
+                                request.Token
+                            );
+                            if (ct.IsCancellationRequested)
+                                return;
+                            dependencies.Children.Clear();
+                            if (values.Count == 0)
+                                dependencies.Children.Add(T("No dependencies declared.", 12));
+                            foreach (var value in values)
+                                dependencies.Children.Add(
+                                    T(
+                                        value.Name
+                                            + " · "
+                                            + Ui(value.Relation)
+                                            + (
+                                                value.Version.Length > 0
+                                                    ? " · " + value.Version
+                                                    : ""
+                                            ),
+                                        12
+                                    )
+                                );
+                        }
+                        catch (Exception ex)
+                        {
+                            if (ct.IsCancellationRequested)
+                                return;
+                            dependencies.Children.Clear();
+                            dependencies.Children.Add(
+                                T(Ui("Could not load dependencies: ") + ex.Message, 12)
+                            );
+                        }
+                    }
+                );
                 shown.Children.Add(
                     Card(
                         Stack(
@@ -612,40 +693,15 @@ public sealed partial class MainWindow
                                 12
                             ),
                             Row(
-                                Btn(
-                                    "Show dependencies",
-                                    async () =>
-                                    {
-                                        var dependencies = await session.Community.Dependencies(
-                                            item.Id,
-                                            version.Id,
-                                            ct
-                                        );
-                                        await Dialog(
-                                            "Dependencies",
-                                            Stack(
-                                                dependencies
-                                                    .Select(d =>
-                                                        (Control)T(
-                                                            d.Name
-                                                                + " · "
-                                                                + d.Relation
-                                                                + " · "
-                                                                + d.Version
-                                                        )
-                                                    )
-                                                    .ToArray()
-                                            ),
-                                            false
-                                        );
-                                    }
-                                ),
+                                showDependencies,
                                 Btn("Download file", () => DownloadResourceFile(item, version)),
                                 Btn("Install", () => InstallResource(item, version), true)
-                            )
+                            ),
+                            dependencies
                         )
                     )
                 );
+            }
         }
         Append(versions.Take(50));
         Button moreButton = null!;

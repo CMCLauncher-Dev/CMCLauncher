@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -144,7 +143,10 @@ public sealed partial class MainWindow
             if (!System.Text.RegularExpressions.Regex.IsMatch(name, "^[A-Za-z0-9_]{1,16}$"))
                 throw new IOException("Enter a Minecraft Java username.");
             info.Text = Ui("Loading player skin…");
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
+                navigationRequest?.Token ?? default
+            );
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
             try
             {
                 var identity = await session.Core.Json(
@@ -154,48 +156,18 @@ public sealed partial class MainWindow
                 );
                 if (!Guid.TryParse(identity.S("id"), out var uuid))
                     throw new IOException("Minecraft Java player not found.");
-                var profile = await session.Core.Json(
-                    "https://sessionserver.mojang.com/session/minecraft/profile/"
-                        + uuid.ToString("N"),
-                    timeout.Token
+                avatarSkins ??= new MinecraftSkins(
+                    session.Core,
+                    session.Store.Root,
+                    message => session.Log("WARN", message)
                 );
-                var texture =
-                    profile["properties"]
-                        .Items()
-                        .FirstOrDefault(p => p.S("name") == "textures")
-                        ?.S("value")
-                    ?? throw new IOException("No skin found.");
-                var decoded = JsonNode.Parse(
-                    System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(texture))
-                )!;
-                var url = decoded["textures"]?["SKIN"]?.S("url") ?? "";
-                if (
-                    !Uri.TryCreate(url, UriKind.Absolute, out var uri)
-                    || uri.Host != "textures.minecraft.net"
-                    || uri.UserInfo.Length > 0
-                    || !uri.IsDefaultPort
-                )
-                    throw new IOException("Invalid skin URL.");
-                using var response = await session.ImageHttp.GetAsync(
-                    new UriBuilder(uri) { Scheme = "https", Port = 443 }.Uri,
-                    System.Net.Http.HttpCompletionOption.ResponseHeadersRead,
-                    timeout.Token
-                );
-                response.EnsureSuccessStatusCode();
-                if (response.Content.Headers.ContentLength > 8 * 1024 * 1024)
-                    throw new IOException("Skin is too large.");
-                await using var input = await response.Content.ReadAsStreamAsync(timeout.Token);
-                using var output = new MemoryStream();
-                var buffer = new byte[81920];
-                int count;
-                while ((count = await input.ReadAsync(buffer, timeout.Token)) > 0)
-                {
-                    if (output.Length + count > 8 * 1024 * 1024)
-                        throw new IOException("Skin is too large.");
-                    output.Write(buffer, 0, count);
-                }
-                slim.IsChecked = decoded["textures"]?["SKIN"]?["metadata"].S("model") == "slim";
-                await Load(output.ToArray());
+                var skin =
+                    await avatarSkins.Get(uuid.ToString("N")).WaitAsync(timeout.Token)
+                    ?? throw new IOException(
+                        Ui("Could not load this player's skin. Try again or upload a PNG skin.")
+                    );
+                timeout.Token.ThrowIfCancellationRequested();
+                await Load(skin);
                 info.Text = name;
             }
             catch

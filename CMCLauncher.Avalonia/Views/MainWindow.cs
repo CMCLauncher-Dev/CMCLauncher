@@ -26,7 +26,7 @@ public sealed partial class MainWindow : Window
         PanePlacement = SplitViewPanePlacement.Right,
         OpenPaneLength = 380,
     };
-    readonly StackPanel navigation = new() { Spacing = 4 };
+    readonly StackPanel navigation = new() { Spacing = 3 };
     readonly TextBlock pageTitle = new() { FontSize = 26, FontWeight = FontWeight.SemiBold };
     readonly TextBlock status = new()
     {
@@ -53,19 +53,20 @@ public sealed partial class MainWindow : Window
     bool closing,
         closeSaved;
 
-    string Palette(string token, string fallback)
+    string Palette(string token, string fallback, bool? lightOverride = null)
     {
         var settings = session.Store.Config.Settings;
-        var custom = Light ? settings.CustomLightColors : settings.CustomDarkColors;
+        var light = lightOverride ?? Light;
+        var custom = light ? settings.CustomLightColors : settings.CustomDarkColors;
         var role = token.Replace("Light", "").Replace("Dark", "") switch
         {
-            "Bg" => "background",
+            "Bg" or "BgAlt" => "background",
             "Sidebar" => "sidebar",
-            "Surface" => "surface",
-            "Text" => "text",
-            "Accent" => "accent",
+            "Surface" or "SurfaceAlt" => "surface",
+            "Text" or "TextCaption" => "text",
+            "Accent" or "AccentText" => "accent",
             "Border" => "border",
-            "Muted" => "muted",
+            "Muted" or "MutedAlt" or "TextSub" => "muted",
             _ => token,
         };
         if (
@@ -74,18 +75,28 @@ public sealed partial class MainWindow : Window
             && Color.TryParse(value, out _)
         )
             return value;
-        return session.Themes.Resolve(settings.ColorPreset, token, Light, fallback);
+        return session.Themes.Resolve(settings.ColorPreset, token, light, fallback);
     }
 
     public bool Verifying { get; }
     public string? VerificationDirectory { get; }
-    IBrush Accent =>
-        new SolidColorBrush(
-            session.Store.Config.Settings.ColorPreset == "native"
-                ? Application.Current?.PlatformSettings?.GetColorValues().AccentColor1
-                    ?? Color.Parse("#0078D4")
-                : Color.Parse(Palette(Light ? "LightAccent" : "DarkAccent", "#4C8150"))
-        );
+    readonly SolidColorBrush backgroundBrush = new(Color.Parse("#F6F7F9"));
+    readonly SolidColorBrush sidebarBrush = new(Color.Parse("#EBEFF3"));
+    readonly SolidColorBrush textBrush = new(Color.Parse("#202124"));
+    readonly SolidColorBrush accentBrush = new(Color.Parse("#0078D4"));
+    readonly SolidColorBrush surfaceBrush = new(Color.Parse("#FFFFFF"));
+    readonly SolidColorBrush borderBrush = new(Color.Parse("#E6E8F0"));
+    bool applyingTheme;
+    IBrush Accent => accentBrush;
+
+    Color AccentColor(bool light) =>
+        session.Store.Config.Settings.ColorPreset == "native"
+            ? Application.Current?.PlatformSettings?.GetColorValues().AccentColor1
+                ?? Color.Parse("#0078D4")
+            : Color.Parse(
+                Palette(light ? "LightAccent" : "DarkAccent", light ? "#416D37" : "#536DBD", light)
+            );
+
     bool Light =>
         session.Store.Config.Settings.Theme == "light"
         || session.Store.Config.Settings.Theme == "system"
@@ -127,12 +138,8 @@ public sealed partial class MainWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
         if (session.Store.Config.Settings.StartMaximized)
             WindowState = WindowState.Maximized;
-        var shell = new Grid { ColumnDefinitions = new ColumnDefinitions("220,*") };
-        sidebar = new Border
-        {
-            Padding = new Thickness(12),
-            Child = new ScrollViewer { Content = navigation },
-        };
+        var shell = new Grid { ColumnDefinitions = new ColumnDefinitions("204,*") };
+        sidebar = new Border { Padding = new Thickness(12), Child = NavigationLayout() };
         shell.Children.Add(sidebar);
         var body = new Grid
         {
@@ -234,6 +241,26 @@ public sealed partial class MainWindow : Window
         };
         ApplyTheme();
         BuildNavigation();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == ActualThemeVariantProperty && !applyingTheme)
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!closing)
+                        ApplyTheme();
+                });
+        };
+        if (Application.Current?.PlatformSettings is { } platformSettings)
+        {
+            EventHandler<global::Avalonia.Platform.PlatformColorValues> changed = (_, _) =>
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!closing)
+                        ApplyTheme();
+                });
+            platformSettings.ColorValuesChanged += changed;
+            Closed += (_, _) => platformSettings.ColorValuesChanged -= changed;
+        }
         Opened += async (_, _) =>
         {
             try
@@ -292,46 +319,6 @@ public sealed partial class MainWindow : Window
         settings.WindowHeight = (int)Height;
     }
 
-    void BuildNavigation()
-    {
-        navigation.Children.Clear();
-        navigation.Children.Add(T("CMCLauncher", 21, true));
-        foreach (
-            var entry in new (string Title, string Route)[]
-            {
-                ("Home", "home"),
-                ("Instances", "instances"),
-                ("Downloads", "downloads"),
-                ("Mods", "mod"),
-                ("Modpacks", "modpack"),
-                ("Data packs", "datapack"),
-                ("Resource packs", "resourcepack"),
-                ("Shaders", "shader"),
-                ("Maps", "world"),
-                ("Blueprints", "blueprints"),
-                ("Settings", "settings"),
-                ("Appearance", "appearance"),
-                ("Java", "java"),
-                ("Accounts", "accounts"),
-                ("Toolbox", "toolbox"),
-                ("System status", "stats"),
-                ("Tasks", "tasks"),
-                ("About", "about"),
-            }
-        )
-        {
-            var button = Btn(entry.Title, () => Navigate(entry.Route));
-            button.Tag = entry.Route;
-            button.FontSize =
-                session.Store.Config.Settings.UiFontSize
-                * session.Store.Config.Settings.UiMenuScale;
-            button.Background = entry.Route == route ? Accent : Brushes.Transparent;
-            button.HorizontalAlignment = HorizontalAlignment.Stretch;
-            button.HorizontalContentAlignment = HorizontalAlignment.Left;
-            navigation.Children.Add(button);
-        }
-    }
-
     async Task Navigate(string target)
     {
         if (target == "tasks")
@@ -378,14 +365,7 @@ public sealed partial class MainWindow : Window
         var revision = ++generation;
         route = target;
         session.Terracotta.Active = target == "terracotta";
-        foreach (var button in navigation.Children.OfType<Button>())
-        {
-            var selected =
-                button.Tag?.ToString()
-                == (target is "frpc" or "pfp" or "terracotta" ? "toolbox" : target);
-            button.Background = selected ? Accent : Brushes.Transparent;
-            button.Foreground = selected ? Brushes.White : Foreground;
-        }
+        SyncNavigation(expandForRoute: true);
         pageTitle.Text = Ui(
             target switch
             {
@@ -419,7 +399,7 @@ public sealed partial class MainWindow : Window
                 "downloads" => await DownloadsPage(token),
                 "mod" or "modpack" or "datapack" or "resourcepack" or "shader" or "world" =>
                     CommunityPage(target),
-                "blueprints" => BlueprintsPage(),
+                "blueprints" => await BlueprintsPage(),
                 "settings" => SettingsPage(),
                 "appearance" => AppearancePage(),
                 "java" => JavaPage(),
@@ -448,46 +428,106 @@ public sealed partial class MainWindow : Window
 
     void ApplyTheme()
     {
-        var settings = session.Store.Config.Settings;
-        RequestedThemeVariant =
-            settings.Theme == "light" ? ThemeVariant.Light
-            : settings.Theme == "dark" ? ThemeVariant.Dark
-            : ThemeVariant.Default;
-        string ColorValue(string token, string fallback) => Palette(token, fallback);
-        Background = new SolidColorBrush(
-            Color.Parse(ColorValue(Light ? "LightBg" : "DarkBg", Light ? "#F6F7F9" : "#17191F"))
-        );
-        Foreground = new SolidColorBrush(
-            Color.Parse(Palette(Light ? "LightText" : "DarkText", Light ? "#202124" : "#F0F0F0"))
-        );
-        sidebar.Background = new SolidColorBrush(
-            Color.Parse(
-                ColorValue(Light ? "LightSidebar" : "DarkSidebar", Light ? "#EBEFF3" : "#20232B")
-            )
-        );
-        FontSize = Math.Clamp(settings.UiFontSize, 10, 24);
-        if (!string.IsNullOrWhiteSpace(settings.UiFontFamily))
-            FontFamily = new FontFamily(settings.UiFontFamily);
-        scaling.LayoutTransform = new ScaleTransform(settings.UiScale, settings.UiScale);
-        Resources["SystemAccentColor"] = ((SolidColorBrush)Accent).Color;
-        Resources["SystemControlHighlightAccentBrush"] = Accent;
-        if (
-            Application
-                .Current?.Styles.OfType<global::Avalonia.Themes.Fluent.FluentTheme>()
-                .FirstOrDefault() is
-            { } fluent
-        )
+        if (applyingTheme)
+            return;
+        applyingTheme = true;
+        try
         {
-            foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+            var settings = session.Store.Config.Settings;
+            RequestedThemeVariant =
+                settings.Theme == "light" ? ThemeVariant.Light
+                : settings.Theme == "dark" ? ThemeVariant.Dark
+                : ThemeVariant.Default;
+            accentBrush.Color = AccentColor(Light);
+            surfaceBrush.Color = Color.Parse(
+                Palette(Light ? "LightSurface" : "DarkSurface", Light ? "#FFFFFF" : "#242730")
+            );
+            borderBrush.Color = Color.Parse(
+                Palette(Light ? "LightBorder" : "DarkBorder", Light ? "#E6E8F0" : "#3A3B4B")
+            );
+            string ColorValue(string token, string fallback) => Palette(token, fallback);
+            backgroundBrush.Color = Color.Parse(
+                ColorValue(Light ? "LightBg" : "DarkBg", Light ? "#F6F7F9" : "#17191F")
+            );
+            textBrush.Color = Color.Parse(
+                Palette(Light ? "LightText" : "DarkText", Light ? "#202124" : "#F0F0F0")
+            );
+            sidebarBrush.Color = Color.Parse(
+                ColorValue(Light ? "LightSidebar" : "DarkSidebar", Light ? "#EBEFF3" : "#20232B")
+            );
+            Background = backgroundBrush;
+            Foreground = textBrush;
+            sidebar.Background = sidebarBrush;
+            FontSize = Math.Clamp(settings.UiFontSize, 10, 24);
+            if (!string.IsNullOrWhiteSpace(settings.UiFontFamily))
+                FontFamily = new FontFamily(settings.UiFontFamily);
+            scaling.LayoutTransform = new ScaleTransform(settings.UiScale, settings.UiScale);
+            Resources["SystemAccentColor"] = ((SolidColorBrush)Accent).Color;
+            Resources["SystemControlHighlightAccentBrush"] = Accent;
+            if (
+                Application
+                    .Current?.Styles.OfType<global::Avalonia.Themes.Fluent.FluentTheme>()
+                    .FirstOrDefault() is
+                { } fluent
+            )
             {
-                var palette = new global::Avalonia.Themes.Fluent.ColorPaletteResources
+                foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
                 {
-                    Accent = ((SolidColorBrush)Accent).Color,
-                };
-                fluent.Palettes[variant] = palette;
+                    var light = variant == ThemeVariant.Light;
+                    Color Token(string role, string fallback) =>
+                        Color.Parse(Palette((light ? "Light" : "Dark") + role, fallback, light));
+                    var palette = new global::Avalonia.Themes.Fluent.ColorPaletteResources
+                    {
+                        Accent = AccentColor(light),
+                    };
+                    if (settings.ColorPreset != "native")
+                    {
+                        var surface = Token("Surface", light ? "#FFFFFF" : "#242730");
+                        var alternate = Token("SurfaceAlt", light ? "#F1F2F5" : "#343044");
+                        var border = Token("Border", light ? "#E6E8F0" : "#3A3B4B");
+                        palette.RegionColor = surface;
+                        palette.ChromeLow = Token("Bg", light ? "#F6F7F9" : "#17191F");
+                        palette.ChromeMediumLow = alternate;
+                        palette.ChromeMedium = surface;
+                        palette.ChromeHigh = border;
+                        palette.ChromeWhite = surface;
+                        palette.BaseHigh = Token("Text", light ? "#202124" : "#F0F0F0");
+                        palette.BaseMedium = Token("TextSub", light ? "#4A4B58" : "#D1D1DC");
+                        palette.ListLow = alternate;
+                        palette.ListMedium = Token("Selection", light ? "#DDE8D6" : "#2C3550");
+                    }
+                    fluent.Palettes[variant] = palette;
+                }
+            }
+
+            sidebar.BorderBrush = new SolidColorBrush(
+                Color.Parse(
+                    Palette(Light ? "LightBorder" : "DarkBorder", Light ? "#E6E8F0" : "#30313E")
+                )
+            );
+            if (
+                sidebar.Child is DockPanel navLayout
+                && navLayout.Children[0] is Button { Content: Grid taskRow }
+            )
+            {
+                foreach (
+                    var icon in taskRow.Children.OfType<global::Avalonia.Controls.Shapes.Path>()
+                )
+                    icon.Stroke = Foreground;
+                foreach (var text in taskRow.Children.OfType<TextBlock>())
+                    text.Foreground = Foreground;
+            }
+            toast.Background = Accent;
+            if (navigationButtons.Count > 0)
+            {
+                ApplyNavigationMetrics();
+                SyncNavigation();
             }
         }
-        toast.Background = Accent;
+        finally
+        {
+            applyingTheme = false;
+        }
     }
 
     TextBlock T(string text, double size = 14, bool bold = false) =>
@@ -523,16 +563,10 @@ public sealed partial class MainWindow : Window
         {
             Child = child,
             Padding = new Thickness(16),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(6),
             BorderThickness = new Thickness(1),
-            BorderBrush = Light
-                ? new SolidColorBrush(Color.Parse("#D9DEE3"))
-                : new SolidColorBrush(Color.Parse("#3C414B")),
-            Background = new SolidColorBrush(
-                Color.Parse(
-                    Palette(Light ? "LightSurface" : "DarkSurface", Light ? "#FFFFFF" : "#242730")
-                )
-            ),
+            BorderBrush = borderBrush,
+            Background = surfaceBrush,
         };
 
     TextBox Input(string text = "", string? watermark = null, bool multiline = false) =>
@@ -571,6 +605,41 @@ public sealed partial class MainWindow : Window
                                     : account.Type == "microsoft" ? "Microsoft"
                                     : account.AuthServer
                                 ),
+                            string option => option switch
+                            {
+                                "vanilla" => Ui("Vanilla"),
+                                "fabric" => "Fabric",
+                                "forge" => "Forge",
+                                "neoforge" => "NeoForge",
+                                "quilt" => "Quilt",
+                                "modrinth" => "Modrinth",
+                                "curseforge" => "CurseForge",
+                                "system" => Ui("System default"),
+                                "direct" => Ui("No proxy"),
+                                "custom" => Ui("Custom"),
+                                "official" => Ui("Official sources only"),
+                                "auto" => Ui("Automatic"),
+                                "zh_cn" => Ui("Simplified Chinese"),
+                                "zh_tw" => Ui("Traditional Chinese"),
+                                "en_us" => "English",
+                                "ja_jp" => Ui("Japanese"),
+                                "preserve" => Ui("context.settingspage.keep_current"),
+                                "mirror" => Ui("Prefer mirrors"),
+                                "light" => Ui("Light"),
+                                "dark" => Ui("Dark"),
+                                "normal" => Ui("Normal"),
+                                "high" => Ui("High"),
+                                "above" => Ui("Above normal"),
+                                "below" => Ui("Below normal"),
+                                "idle" => Ui("Idle"),
+                                "realtime" => Ui("Realtime"),
+                                "keep" => Ui("Keep launcher visible"),
+                                "minimize" => Ui("Minimize launcher"),
+                                "hide_reopen" => Ui("Hide and reopen after the game exits"),
+                                "hide_close" => Ui("Hide and close after the game exits"),
+                                "close" => Ui("Close launcher"),
+                                _ => option,
+                            },
                             _ => value?.ToString() ?? "",
                         }
                     )
@@ -582,6 +651,11 @@ public sealed partial class MainWindow : Window
             combo.SelectedIndex = 0;
         return combo;
     }
+
+    readonly System.Runtime.CompilerServices.ConditionalWeakTable<
+        Button,
+        Func<bool>
+    > buttonAvailability = new();
 
     Button Btn(string title, Func<Task> action, bool primary = false)
     {
@@ -613,7 +687,9 @@ public sealed partial class MainWindow : Window
             }
             finally
             {
-                button.IsEnabled = true;
+                button.IsEnabled = buttonAvailability.TryGetValue(button, out var available)
+                    ? available()
+                    : true;
             }
         };
         return button;
@@ -628,7 +704,7 @@ public sealed partial class MainWindow : Window
     async Task<bool> Confirm(string title, string message) =>
         await Dialog(title, Stack(T(message)), true);
 
-    async Task<bool> Dialog(string title, Control content, bool confirm)
+    async Task<bool> Dialog(string title, Control content, bool confirm, bool danger = false)
     {
         var window = new Window
         {
@@ -642,30 +718,69 @@ public sealed partial class MainWindow : Window
             Background = Background,
             Foreground = Foreground,
         };
-        var panel = Stack(T(title, 20, true), content);
-        panel.Margin = new Thickness(22);
-        panel.Children.Add(
-            Row(
-                Btn(
-                    confirm ? "Confirm" : "OK",
-                    () =>
-                    {
-                        window.Close(true);
-                        return Task.CompletedTask;
-                    },
-                    true
-                ),
-                Btn(
-                    "Cancel",
-                    () =>
-                    {
-                        window.Close(false);
-                        return Task.CompletedTask;
-                    }
-                )
-            )
+        window.MaxHeight = Math.Max(240, Math.Min(700, Bounds.Height - 40));
+        var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto") };
+        var heading = T(title, 20, true);
+        heading.Margin = new Thickness(22, 22, 22, 14);
+        layout.Children.Add(heading);
+        var scroll = new ScrollViewer { Content = content, Margin = new Thickness(22, 0, 22, 20) };
+        Grid.SetRow(scroll, 1);
+        layout.Children.Add(scroll);
+        var buttons = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            ColumnSpacing = 10,
+        };
+        var approve = Btn(
+            confirm ? "Confirm" : "OK",
+            () =>
+            {
+                window.Close(true);
+                return Task.CompletedTask;
+            },
+            !danger
         );
-        window.Content = new ScrollViewer { Content = panel };
+        approve.HorizontalAlignment = HorizontalAlignment.Stretch;
+        if (danger)
+        {
+            approve.Foreground = new SolidColorBrush(Color.Parse("#E85A64"));
+            approve.BorderBrush = approve.Foreground;
+            approve.BorderThickness = new Thickness(1);
+            approve.Background = new SolidColorBrush(Color.Parse(Light ? "#FFF0F1" : "#391D25"));
+        }
+        buttons.Children.Add(approve);
+        if (confirm)
+        {
+            var cancel = Btn(
+                "Cancel",
+                () =>
+                {
+                    window.Close(false);
+                    return Task.CompletedTask;
+                }
+            );
+            cancel.HorizontalAlignment = HorizontalAlignment.Stretch;
+            Grid.SetColumn(cancel, 1);
+            buttons.Children.Add(cancel);
+        }
+        else
+            Grid.SetColumnSpan(approve, 2);
+        var footer = new Border
+        {
+            Child = buttons,
+            Padding = new Thickness(22, 16),
+            Background = new SolidColorBrush(
+                Color.Parse(
+                    Palette(
+                        Light ? "LightSurfaceAlt" : "DarkSurfaceAlt",
+                        Light ? "#F1F2F5" : "#242530"
+                    )
+                )
+            ),
+        };
+        Grid.SetRow(footer, 2);
+        layout.Children.Add(footer);
+        window.Content = layout;
         return await window.ShowDialog<bool>(this);
     }
 

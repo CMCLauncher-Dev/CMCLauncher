@@ -64,45 +64,15 @@ public sealed partial class MainWindow
                 }
             )
         );
-        AddNavGroup(
-            "下载",
-            "\uE896",
-            "downloads",
-            new[]
-            {
-                ("原版游戏", "\uE7C1", "downloads"),
-                ("Mod", "\uE90F", "download-mod"),
-                ("整合包", "\uE8FD", "packs"),
-                ("数据包", "\uE8FD", "download-datapack"),
-                ("资源包", "\uE8B9", "download-resourcepack"),
-                ("光影包", "\uE706", "download-shader"),
-                ("Maps", "\uE80F", "download-world"),
-                ("Blueprints", "\uE8A5", "download-blueprint"),
-            }
-        );
-        AddNavGroup(
-            "设置",
-            "\uE713",
-            "settings",
-            new[]
-            {
-                ("常规设置", "\uE713", "settings"),
-                ("个性化", "\uE790", "personalization"),
-                ("Java 管理", "\uE950", "java"),
-                ("账号管理", "\uE77B", "accounts"),
-            }
-        );
-        AddNavGroup(
-            "更多",
-            "\uE712",
-            "more",
-            new[]
-            {
-                ("Toolbox", "\uE912", "toolbox"),
-                ("System status", "\uE9F5", "stats"),
-                ("About", "\uE946", "about"),
-            }
-        );
+        foreach (var group in LauncherNavigation.Groups)
+            AddNavGroup(
+                group.Title,
+                group.Glyph,
+                group.Key,
+                group
+                    .Entries.Select(entry => (entry.Title, entry.Glyph, entry.WinUIRoute))
+                    .ToArray()
+            );
         SyncNavigation();
     }
 

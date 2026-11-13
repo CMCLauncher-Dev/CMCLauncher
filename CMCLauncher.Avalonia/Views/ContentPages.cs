@@ -4,12 +4,17 @@ using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Layout;
+using Avalonia.Styling;
+using Avalonia.VisualTree;
 using CMCLauncher.Avalonia.ViewModels;
 
 namespace CMCLauncher.Avalonia.Views;
 
 public sealed partial class MainWindow
 {
+    string installedModQuery = "";
+    int installedModFilter;
+
     async Task ContentPage(Instance instance, string kind, string? world = null)
     {
         var root = session.Store.GameDirectory(instance);
@@ -67,21 +72,203 @@ public sealed partial class MainWindow
                     }
                 )
             );
-            pageContent.Content = body;
+            await ShowInstancePage(instance, kind, body);
             return;
         }
         if (kind == "mod")
             body.Children.Add(Btn("Check for updates", () => CheckModUpdates(instance)));
-        var items = await Task.Run(() => ContentManager.List(root, kind, world));
-        foreach (var item in items)
+        var loading = T("Loading…", 12);
+        body.Children.Add(loading);
+        await ShowInstancePage(instance, kind, body);
+        var viewRevision = instanceViewRevision;
+        var items = await Task.Run(() => ContentManager.ListFiles(root, kind, world));
+        if (viewRevision != instanceViewRevision || route != "instance-settings")
+            return;
+        body.Children.Remove(loading);
+        if (items.Count == 0)
         {
-            var path = ContentManager.Locate(root, kind, world, item.File);
-            body.Children.Add(
-                Card(
+            body.Children.Add(T("No content found."));
+            return;
+        }
+        var list = new ListBox
+        {
+            ItemsSource = items,
+            MaxHeight = 540,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        list.Styles.Add(
+            new global::Avalonia.Styling.Style(selector => selector.OfType<ListBoxItem>())
+            {
+                Setters =
+                {
+                    new Setter(
+                        ListBoxItem.HorizontalContentAlignmentProperty,
+                        HorizontalAlignment.Stretch
+                    ),
+                },
+            }
+        );
+        if (kind == "mod")
+        {
+            var category = Choice(
+                new[]
+                {
+                    "All Mods",
+                    "Recognized",
+                    "context.installedcontent.unrecognized",
+                    "Fabric",
+                    "Quilt",
+                    "Forge",
+                    "NeoForge",
+                }
+            );
+            category.SelectedIndex = Math.Clamp(installedModFilter, 0, 6);
+            var search = Input(installedModQuery, "Search names, versions, or files");
+            search.Name = "InstalledModSearch";
+            CancellationTokenSource? filterRequest = null;
+            body.DetachedFromVisualTree += (_, _) => filterRequest?.Cancel();
+            var status = T("", 12);
+            async Task ApplyFilter()
+            {
+                filterRequest?.Cancel();
+                filterRequest?.Dispose();
+                filterRequest = new CancellationTokenSource();
+                var token = filterRequest.Token;
+                var filter = Math.Clamp(category.SelectedIndex, 0, 6);
+                var query = (search.Text ?? "").Trim();
+                installedModQuery = query;
+                installedModFilter = filter;
+                if (query.Length == 0 && filter == 0)
+                {
+                    list.ItemsSource = items;
+                    status.Text = "";
+                    return;
+                }
+                status.Text = Ui("Loading…");
+                try
+                {
+                    using var gate = new SemaphoreSlim(4);
+                    var resolved = await Task.WhenAll(
+                        items.Select(async item =>
+                        {
+                            await gate.WaitAsync(token);
+                            try
+                            {
+                                var result = await ContentInspectionCache
+                                    .GetAsync(
+                                        ContentManager.Locate(root, kind, world, item.File),
+                                        kind,
+                                        item.Enabled,
+                                        session.Store.Root
+                                    )
+                                    .WaitAsync(token);
+                                return result.Item with { File = item.File };
+                            }
+                            catch (Exception ex) when (ex is IOException or InvalidDataException)
+                            {
+                                return item;
+                            }
+                            finally
+                            {
+                                gate.Release();
+                            }
+                        })
+                    );
+                    if (token.IsCancellationRequested || viewRevision != instanceViewRevision)
+                        return;
+                    var loader = new[] { "", "", "", "Fabric", "Quilt", "Forge", "NeoForge" }[
+                        filter
+                    ];
+                    list.ItemsSource = resolved
+                        .Where(item =>
+                            (
+                                filter == 0
+                                || filter == 1 && item.Recognized
+                                || filter == 2 && !item.Recognized
+                                || filter >= 3
+                                    && item.Loader.Contains(
+                                        loader,
+                                        StringComparison.OrdinalIgnoreCase
+                                    )
+                            )
+                            && (
+                                item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+                                || item.Version.Contains(query, StringComparison.OrdinalIgnoreCase)
+                                || item.File.Contains(query, StringComparison.OrdinalIgnoreCase)
+                            )
+                        )
+                        .ToArray();
+                    status.Text = "";
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    if (!token.IsCancellationRequested)
+                    {
+                        status.Text = ex.Message;
+                        session.Log("ERROR", ex.ToString());
+                    }
+                }
+            }
+            category.SelectionChanged += async (_, _) => await ApplyFilter();
+            search.KeyDown += async (_, e) =>
+            {
+                if (e.Key == global::Avalonia.Input.Key.Enter)
+                {
+                    e.Handled = true;
+                    await ApplyFilter();
+                }
+            };
+            var filters = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("180,*,Auto"),
+                ColumnSpacing = 8,
+            };
+            category.MinWidth = search.MinWidth = 0;
+            filters.Children.Add(category);
+            Grid.SetColumn(search, 1);
+            filters.Children.Add(search);
+            var find = Btn("Search", ApplyFilter);
+            find.Name = "InstalledModSearchButton";
+            Grid.SetColumn(find, 2);
+            filters.Children.Add(find);
+            body.Children.Add(filters);
+            body.Children.Add(status);
+            if (installedModQuery.Length > 0 || installedModFilter != 0)
+                await ApplyFilter();
+        }
+        list.ItemTemplate = new FuncDataTemplate<ContentItem>(
+            (item, _) =>
+            {
+                var path = ContentManager.Locate(root, kind, world, item.File);
+                var title = T(item.Name, 16, true);
+                title.MaxLines = 1;
+                title.TextTrimming = global::Avalonia.Media.TextTrimming.CharacterEllipsis;
+                var metadata = T(item.Version + " · " + item.Loader, 12);
+                var description = T(
+                    System.Text.RegularExpressions.Regex.Replace(item.Description, @"\s+", " "),
+                    12
+                );
+                description.MaxLines = 1;
+                description.TextTrimming = global::Avalonia.Media.TextTrimming.CharacterEllipsis;
+                var icon = new Image
+                {
+                    Width = 40,
+                    Height = 40,
+                    IsVisible = false,
+                };
+                var summary = new Grid
+                {
+                    ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+                    ColumnSpacing = 12,
+                };
+                summary.Children.Add(icon);
+                var labels = Stack(title, metadata, description);
+                Grid.SetColumn(labels, 1);
+                summary.Children.Add(labels);
+                var row = Card(
                     Stack(
-                        T(item.Name, 16, true),
-                        T(item.Version + " · " + item.Loader, 12),
-                        T(item.Description, 12),
+                        summary,
                         Row(
                             Btn(
                                 item.Enabled ? "Disable" : "Enable",
@@ -95,44 +282,66 @@ public sealed partial class MainWindow
                             DeleteFile(path, () => ContentPage(instance, kind, world))
                         )
                     )
-                )
-            );
-        }
-        if (items.Count == 0)
-            body.Children.Add(T("No content found."));
-        pageContent.Content = body;
+                );
+                global::Avalonia.Media.Imaging.Bitmap? bitmap = null;
+                var lifetime = 0;
+                row.AttachedToVisualTree += async (_, _) =>
+                {
+                    var revision = ++lifetime;
+                    try
+                    {
+                        var resolved = await ContentInspectionCache.GetAsync(
+                            path,
+                            kind,
+                            item.Enabled,
+                            session.Store.Root
+                        );
+                        if (revision != lifetime || !row.IsAttachedToVisualTree())
+                            return;
+                        title.Text = resolved.Item.Name;
+                        metadata.Text = resolved.Item.Version + " · " + resolved.Item.Loader;
+                        description.Text = System.Text.RegularExpressions.Regex.Replace(
+                            resolved.Item.Description,
+                            @"\s+",
+                            " "
+                        );
+                        if (resolved.Icon is { Length: > 0 })
+                        {
+                            using var data = new MemoryStream(resolved.Icon);
+                            bitmap = global::Avalonia.Media.Imaging.Bitmap.DecodeToWidth(data, 80);
+                            icon.Source = bitmap;
+                            icon.IsVisible = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        session.Log("DEBUG", ex.Message);
+                    }
+                };
+                row.DetachedFromVisualTree += (_, _) =>
+                {
+                    lifetime++;
+                    icon.Source = null;
+                    bitmap?.Dispose();
+                    bitmap = null;
+                };
+                return row;
+            }
+        );
+        body.Children.Add(list);
     }
 
-    Button DeleteFile(string path, Func<Task> refresh)
-    {
-        var button = new Button { Content = Ui("Delete") };
-        var flyout = new Flyout();
-        flyout.Content = Stack(
-            T("Delete this file?"),
-            Row(
-                DangerButton(
-                    "Delete",
-                    async () =>
-                    {
-                        session.EnsureFilesIdle();
-                        await Trash(path);
-                        flyout.Hide();
-                        await refresh();
-                    }
-                ),
-                Btn(
-                    "Cancel",
-                    () =>
-                    {
-                        flyout.Hide();
-                        return Task.CompletedTask;
-                    }
-                )
-            )
+    Button DeleteFile(string path, Func<Task> refresh) =>
+        ConfirmationButton(
+            "Delete",
+            "Delete this file?",
+            async () =>
+            {
+                session.EnsureFilesIdle();
+                await Trash(path);
+                await refresh();
+            }
         );
-        button.Flyout = flyout;
-        return button;
-    }
 
     async Task CheckModUpdates(Instance instance)
     {
@@ -216,7 +425,7 @@ public sealed partial class MainWindow
         pageContent.Content = Stack(Btn("Back", () => ContentPage(instance, "mod")), updates);
     }
 
-    Task WorldsPage(Instance instance)
+    async Task WorldsPage(Instance instance)
     {
         var game = session.Store.GameDirectory(instance);
         var body = Stack(
@@ -288,8 +497,7 @@ public sealed partial class MainWindow
                 )
             );
         }
-        pageContent.Content = body;
-        return Task.CompletedTask;
+        await ShowInstancePage(instance, "worlds", body);
     }
 
     static string WorldArchiveRoot(string file)
@@ -307,9 +515,13 @@ public sealed partial class MainWindow
         return level.FullName.Split('/')[0];
     }
 
+    string schematicQuery = "";
+
     async Task SchematicsPage(Instance instance)
     {
-        var directory = SchematicManager.EnsureDirectory(session.Store, instance);
+        var directory = await Task.Run(() =>
+            SchematicManager.EnsureDirectory(session.Store, instance)
+        );
         if (directory == null)
         {
             await Dialog(
@@ -359,70 +571,123 @@ public sealed partial class MainWindow
         );
         var folders = new List<string>();
         var files = await Task.Run(() => SchematicManager.List(directory, folders));
-        var groups = new Dictionary<string, StackPanel> { [""] = body };
-        foreach (var folder in folders.OrderBy(f => f.Count(c => c == Path.DirectorySeparatorChar)))
+        var search = Input(schematicQuery, "Search schematic files");
+        var tree = Stack();
+        body.Children.Add(search);
+        body.Children.Add(tree);
+        void Draw()
         {
-            var parent = Path.GetDirectoryName(folder) ?? "";
-            var nested = Stack();
-            var expander = new Expander
-            {
-                Header = Path.GetFileName(folder),
-                Content = nested,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-            };
-            groups.GetValueOrDefault(parent, body).Children.Add(Card(expander));
-            groups[folder] = nested;
-        }
-        foreach (var file in files)
-        {
-            var relative = file.RelativePath;
-            var row = Row(
-                Btn(
-                    "Export",
-                    async () =>
-                    {
-                        var target = await SaveFile(
-                            Path.GetFileName(relative),
-                            Path.GetExtension(relative)
-                        );
-                        if (target != null)
-                            await session.Run(
-                                "Export schematic",
-                                ct => SchematicManager.Export(directory, relative, target, ct)
-                            );
-                    }
-                ),
-                Btn(
-                    "Rename",
-                    async () =>
-                    {
-                        session.EnsureFilesIdle();
-                        var name = Input(Path.GetFileNameWithoutExtension(relative));
-                        if (await Dialog("Rename", name, true))
-                        {
-                            SchematicManager.Rename(directory, relative, name.Text!);
-                            await SchematicsPage(instance);
-                        }
-                    }
-                ),
-                DeleteFile(
-                    SchematicManager.ExistingFile(directory, relative),
-                    () => SchematicsPage(instance)
+            tree.Children.Clear();
+            var query = (search.Text ?? "").Trim();
+            schematicQuery = query;
+            var filtered = files
+                .Where(file =>
+                    file.RelativePath.Contains(query, StringComparison.OrdinalIgnoreCase)
                 )
-            );
-            groups
-                .GetValueOrDefault(Path.GetDirectoryName(relative) ?? "", body)
-                .Children.Add(
-                    Card(
-                        Stack(
-                            T(Path.GetFileName(relative), 14, true),
-                            T($"{file.Size / 1024.0:N1} KiB", 11),
-                            row
+                .ToArray();
+            var groups = new Dictionary<string, StackPanel> { [""] = tree };
+            foreach (
+                var folder in folders
+                    .Where(folder =>
+                        query.Length == 0
+                        || filtered.Any(file =>
+                            file.RelativePath.StartsWith(
+                                folder + Path.DirectorySeparatorChar,
+                                StringComparison.OrdinalIgnoreCase
+                            )
                         )
                     )
+                    .OrderBy(f => f.Count(c => c == Path.DirectorySeparatorChar))
+            )
+            {
+                var parent = Path.GetDirectoryName(folder) ?? "";
+                var nested = Stack();
+                var expander = new Expander
+                {
+                    Header = Path.GetFileName(folder),
+                    Content = nested,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    IsExpanded = query.Length > 0,
+                };
+                var folderCard = Card(expander);
+                folderCard.Padding = new Thickness(11, 7);
+                folderCard.MinHeight = 64;
+                groups.GetValueOrDefault(parent, tree).Children.Add(folderCard);
+                groups[folder] = nested;
+            }
+            foreach (var file in filtered)
+            {
+                var relative = file.RelativePath;
+                var row = Row(
+                    Btn(
+                        "Export",
+                        async () =>
+                        {
+                            var target = await SaveFile(
+                                Path.GetFileName(relative),
+                                Path.GetExtension(relative)
+                            );
+                            if (target != null)
+                                await session.Run(
+                                    "Export schematic",
+                                    ct => SchematicManager.Export(directory, relative, target, ct)
+                                );
+                        }
+                    ),
+                    Btn(
+                        "Rename",
+                        async () =>
+                        {
+                            session.EnsureFilesIdle();
+                            var name = Input(Path.GetFileNameWithoutExtension(relative));
+                            if (await Dialog("Rename", name, true))
+                            {
+                                SchematicManager.Rename(directory, relative, name.Text!);
+                                await SchematicsPage(instance);
+                            }
+                        }
+                    ),
+                    DeleteFile(
+                        SchematicManager.ExistingFile(directory, relative),
+                        () => SchematicsPage(instance)
+                    )
                 );
+                var name = T(Path.GetFileName(relative), 14, true);
+                name.MaxLines = 1;
+                name.TextTrimming = global::Avalonia.Media.TextTrimming.CharacterEllipsis;
+                ToolTip.SetTip(name, relative);
+                var line = new Grid
+                {
+                    ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                    ColumnSpacing = 12,
+                };
+                var details = new StackPanel
+                {
+                    Spacing = 0,
+                    Children =
+                    {
+                        name,
+                        T(
+                            $"{Path.GetExtension(relative).ToUpperInvariant()} · {file.Size / 1024d:N1} KB · {file.ModifiedUtc.ToLocalTime():yyyy-MM-dd HH:mm}",
+                            11
+                        ),
+                    },
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+                line.Children.Add(details);
+                Grid.SetColumn(row, 1);
+                line.Children.Add(row);
+                var fileCard = Card(line);
+                fileCard.Padding = new Thickness(11, 7);
+                fileCard.MinHeight = 64;
+                groups
+                    .GetValueOrDefault(Path.GetDirectoryName(relative) ?? "", tree)
+                    .Children.Add(fileCard);
+            }
         }
-        pageContent.Content = body;
+        search.TextChanged += (_, _) => Draw();
+        Draw();
+        await ShowInstancePage(instance, "schematics", body);
     }
 
     async Task ExportPackPage(Instance instance)

@@ -23,7 +23,7 @@ public sealed partial class MainWindow
     string blueprintSource = "schematicraft";
     bool cmsAccepted;
 
-    Control BlueprintsPage()
+    async Task<Control> BlueprintsPage()
     {
         Button previous = null!,
             next = null!;
@@ -37,8 +37,11 @@ public sealed partial class MainWindow
         var jump = Input("1");
         jump.Width = 70;
         var target = Choice(
-            session.Store.Config.Instances.Where(i =>
-                SchematicManager.EnsureDirectory(session.Store, i, false) != null
+            await Task.Run(() =>
+                session
+                    .Store.Config.Instances.ToArray()
+                    .Where(i => SchematicManager.EnsureDirectory(session.Store, i, false) != null)
+                    .ToArray()
             ),
             session.Selected
         );
@@ -294,11 +297,12 @@ public sealed partial class MainWindow
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             }
         );
-        var targets = session
-            .Store.Config.Instances.Where(i =>
-                SchematicManager.EnsureDirectory(session.Store, i, false) != null
-            )
-            .ToArray();
+        var targets = await Task.Run(() =>
+            session
+                .Store.Config.Instances.ToArray()
+                .Where(i => SchematicManager.EnsureDirectory(session.Store, i, false) != null)
+                .ToArray()
+        );
         var picker = Choice(targets, selected);
         host.Children.Add(Field("Install to", picker));
         foreach (var file in detail.Files)

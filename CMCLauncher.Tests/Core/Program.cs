@@ -104,6 +104,96 @@ try
         overflow == (.875, .125, 0),
         "over-allocation clips at available RAM without rescaling used memory"
     );
+    Check(
+        LauncherNavigation
+            .Groups.Select(g => g.Key)
+            .SequenceEqual(new[] { "downloads", "settings", "more" }),
+        "shared desktop menu groups preserve WinUI order"
+    );
+    Check(
+        LauncherNavigation
+            .Groups[0]
+            .Entries.Select(e => e.AvaloniaRoute)
+            .SequenceEqual(
+                new[]
+                {
+                    "downloads",
+                    "mod",
+                    "modpack",
+                    "datapack",
+                    "resourcepack",
+                    "shader",
+                    "world",
+                    "blueprints",
+                }
+            ),
+        "shared resource navigation keeps maps before blueprints"
+    );
+    Check(
+        LauncherNavigation
+            .Groups.SelectMany(g => g.Entries)
+            .All(e =>
+                !string.IsNullOrWhiteSpace(e.Glyph) && !string.IsNullOrWhiteSpace(e.IconPath)
+            ),
+        "both desktop frontends have icons for every menu entry"
+    );
+    var cachedJar = Path.Combine(root, "cached-mod.jar");
+    using (
+        var zip = System.IO.Compression.ZipFile.Open(
+            cachedJar,
+            System.IO.Compression.ZipArchiveMode.Create
+        )
+    )
+    {
+        using var writer = new StreamWriter(zip.CreateEntry("fabric.mod.json").Open());
+        writer.Write(
+            "{\"schemaVersion\":1,\"id\":\"cached_fixture\",\"name\":\"Cached fixture\",\"version\":\"1.0\"}"
+        );
+    }
+    ContentInspectionCache.ClearMemory();
+    var beforeCache = ContentInspectionCache.InspectionCount;
+    var cachedReads = await Task.WhenAll(
+        Enumerable
+            .Range(0, 4)
+            .Select(_ => ContentInspectionCache.GetAsync(cachedJar, "mod", true, root))
+    );
+    Check(
+        cachedReads.All(result => result.Item.Name == "Cached fixture")
+            && ContentInspectionCache.InspectionCount == beforeCache + 1,
+        "portable content inspection coalesces duplicate metadata reads"
+    );
+    ContentInspectionCache.ClearMemory();
+    var diskRead = await ContentInspectionCache.GetAsync(cachedJar, "mod", false, root);
+    Check(
+        diskRead.Item.Name == "Cached fixture"
+            && !diskRead.Item.Enabled
+            && ContentInspectionCache.InspectionCount == beforeCache + 1,
+        "portable content metadata cache survives memory reset and preserves enabled state"
+    );
+    var skinRoot = Path.Combine(root, "skin-data");
+    var skinId = Guid.NewGuid();
+    Directory.CreateDirectory(Path.Combine(skinRoot, "skin-cache"));
+    await File.WriteAllBytesAsync(
+        Path.Combine(skinRoot, "skin-cache", skinId.ToString("N") + ".png"),
+        new byte[] { 137, 80, 78, 71 }
+    );
+    using (var skinCore = new LauncherCore(new Store(skinRoot)))
+    {
+        var skins = new MinecraftSkins(skinCore, skinRoot);
+        var skin = await skins.Get(skinId.ToString("D"), cacheOnly: true);
+        Check(
+            skin is { Length: 4 }
+                && ReferenceEquals(
+                    skins.Get(skinId.ToString("N"), true),
+                    skins.Get(skinId.ToString("D"), true)
+                ),
+            "shared account skins use disk cache and coalesce normalized UUIDs"
+        );
+        Check(
+            await skins.Get("../../not-a-profile", cacheOnly: true) == null,
+            "account skin cache rejects invalid UUID paths"
+        );
+    }
     var catalog = new ThemeCatalog(Path.Combine(root, "themes"));
     Check(catalog.IsBuiltIn("craft"), "embedded theme belongs to core");
     var languages = new LocalizationCatalog(Path.Combine(root, "locales"));

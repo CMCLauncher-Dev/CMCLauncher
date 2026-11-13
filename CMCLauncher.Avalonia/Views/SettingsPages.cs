@@ -26,6 +26,13 @@ public sealed partial class MainWindow
             languages,
             languages.FirstOrDefault(l => l.Code == settings.LauncherLanguage)
         );
+        void Labels(ComboBox combo, Dictionary<string, string> labels)
+        {
+            combo.ItemTemplate = new global::Avalonia.Controls.Templates.FuncDataTemplate<object>(
+                (value, _) =>
+                    T(labels.GetValueOrDefault(value?.ToString() ?? "", value?.ToString() ?? ""))
+            );
+        }
         var memory = new Slider
         {
             Minimum = 512,
@@ -79,10 +86,12 @@ public sealed partial class MainWindow
         Grid.SetColumn(memoryValue, 1);
         memoryLegend.Children.Add(usedMemory);
         memoryLegend.Children.Add(memoryValue);
-        var autoMemory = new CheckBox
+        var autoMemory = new ToggleSwitch
         {
             Content = Ui("Automatic memory allocation"),
             IsChecked = settings.AutoMemory,
+            OnContent = Ui("Automatic [context 467]"),
+            OffContent = Ui("Manual"),
         };
         var memoryPanel = Stack(T("Memory / MiB"), memoryLegend, memoryTrack, memory);
         var memoryAnimation = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
@@ -182,7 +191,7 @@ public sealed partial class MainWindow
         RefreshMemory();
         var threads = Number(settings.DownloadThreads, 1, 256);
         var source = Choice(
-            new[] { "official", "auto", "mirror" },
+            new[] { "mirror", "auto", "official" },
             settings.EffectiveGameDownloadSource
         );
         var proxyMode = Choice(new[] { "system", "direct", "custom" }, NetworkProxy.Mode(settings));
@@ -202,30 +211,36 @@ public sealed partial class MainWindow
             Content = Ui("Use direct connection if proxy is unavailable"),
             IsChecked = settings.ProxyDirectFallback,
         };
-        var ssl = new CheckBox
+        var ssl = new ToggleSwitch
         {
             Content = Ui("Ignore SSL certificate errors"),
             IsChecked = settings.IgnoreSslErrors,
+            OnContent = Ui("context.settingspage.on"),
+            OffContent = Ui("Off"),
         };
-        var jvm = Input(settings.CustomJvmArgs, multiline: true);
-        var gameLanguage = Input(settings.GameLanguage);
+        var jvm = Input(settings.CustomJvmArgs, "-Dexample=1 -XX:+UseG1GC");
+        var gameLanguage = Choice(
+            new[] { "auto", "zh_cn", "zh_tw", "en_us", "ja_jp", "preserve" },
+            settings.GameLanguage
+        );
         var windowTitle = Input(settings.GameWindowTitle);
         var priority = Choice(
-            new[] { "normal", "high", "above", "below", "idle", "realtime" },
+            new[] { "normal", "above", "high", "realtime", "below", "idle" },
             settings.PlayerPriority
         );
-        var gpu = new CheckBox
+        var gpu = new ToggleSwitch
         {
             Content = Ui("Prefer high-performance GPU"),
             IsChecked = settings.PreferHighPerformanceGpu,
+            OnContent = Ui("context.settingspage.on"),
+            OffContent = Ui("Off"),
         };
-        var maximize = new CheckBox
-        {
-            Content = Ui("Start maximized"),
-            IsChecked = settings.StartMaximized,
-        };
+        var maximize = Choice(
+            new[] { "Windowed", "Maximized" },
+            settings.StartMaximized ? "Maximized" : "Windowed"
+        );
         var visibility = Choice(
-            new[] { "keep", "minimize", "hide_reopen", "hide_close", "close" },
+            new[] { "keep", "close", "hide_close", "hide_reopen", "minimize" },
             settings.LauncherVisibility
         );
         var checkUpdates = new CheckBox
@@ -239,71 +254,77 @@ public sealed partial class MainWindow
             IsChecked = settings.ReceiveBetaUpdates,
         };
         var mirror = Input(settings.DownloadMirror);
-        var introduction = new CheckBox
+        var introduction = new ToggleSwitch
         {
             Content = Ui("Expand project introduction"),
             IsChecked = settings.ExpandProjectIntroduction,
+            OnContent = Ui("context.settingspage.on"),
+            OffContent = Ui("Off"),
         };
-        return Stack(
-            Card(
-                Stack(
-                    Field("Language", language),
-                    maximize,
-                    Field("Launcher visibility", visibility),
-                    checkUpdates,
-                    beta,
-                    Field("Update download mirror", mirror),
-                    introduction
-                )
-            ),
-            Card(
-                Stack(
-                    T("Game", 18, true),
-                    autoMemory,
-                    memoryPanel,
-                    Field("Game language", gameLanguage),
-                    Field("Java arguments", jvm),
-                    Field("Game window title", windowTitle),
-                    Field("Process priority", priority),
-                    gpu
-                )
-            ),
-            Card(
-                Stack(
-                    T("Network", 18, true),
-                    Field("Download source", source),
-                    Field("Concurrent downloads", threads),
-                    Field("Proxy mode", proxyMode),
-                    Field("Proxy address", address),
-                    new Expander
-                    {
-                        Header = Ui("Advanced proxy settings"),
-                        Content = Stack(
-                            Field("Username", username),
-                            Field("Password", password),
-                            clearPassword,
-                            Field("Bypass hosts", bypass),
-                            bypassLocal,
-                            fallback
-                        ),
-                        HorizontalAlignment = HorizontalAlignment.Stretch,
-                    },
-                    ssl
-                )
-            ),
-            Btn(
-                "Save",
-                async () =>
+        string NetworkSettings() =>
+            JsonSerializer.Serialize(
+                new
                 {
-                    var mode = proxyMode.SelectedItem?.ToString() ?? "system";
-                    if (mode == "custom")
-                        _ = NetworkProxy.Address(address.Text ?? "");
-                    settings.LauncherLanguage =
-                        (language.SelectedItem as InterfaceLanguage)?.Code ?? "en_us";
-                    settings.MemoryMb = (int)Math.Round(memory.Value);
-                    settings.AutoMemory = autoMemory.IsChecked == true;
-                    settings.DownloadThreads = (int)(threads.Value ?? 16);
-                    settings.GameDownloadSource = source.SelectedItem?.ToString() ?? "official";
+                    ProxyMode = NetworkProxy.Mode(settings),
+                    settings.Proxy,
+                    settings.ProxyUsername,
+                    settings.ProxyPasswordProtected,
+                    settings.ProxyBypassHosts,
+                    settings.ProxyBypassLocal,
+                    settings.ProxyDirectFallback,
+                    settings.IgnoreSslErrors,
+                    GameDownloadSource = settings.EffectiveGameDownloadSource,
+                    settings.DownloadMirror,
+                }
+            );
+        Labels(
+            source,
+            new()
+            {
+                ["mirror"] = "Prefer mirror sources",
+                ["auto"] = "Prefer official sources; switch to mirrors if slow",
+                ["official"] = "Prefer official sources",
+            }
+        );
+        Labels(
+            proxyMode,
+            new()
+            {
+                ["system"] = "System proxy",
+                ["direct"] = "No proxy",
+                ["custom"] = "Manual proxy",
+            }
+        );
+        Labels(
+            gameLanguage,
+            new()
+            {
+                ["auto"] = "context.settingspage.system_default",
+                ["zh_cn"] = "Simplified Chinese",
+                ["zh_tw"] = "Traditional Chinese",
+                ["en_us"] = "English",
+                ["ja_jp"] = "Japanese",
+                ["preserve"] = "context.settingspage.keep_current",
+            }
+        );
+        var saveGate = new SemaphoreSlim(1, 1);
+        async Task SaveSettings(bool rebuild = false, bool applyNetwork = false)
+        {
+            await saveGate.WaitAsync();
+            try
+            {
+                var previousNetwork = NetworkSettings();
+                var mode = proxyMode.SelectedItem?.ToString() ?? "system";
+                if (applyNetwork && mode == "custom")
+                    _ = NetworkProxy.Address(address.Text ?? "");
+                settings.LauncherLanguage =
+                    (language.SelectedItem as InterfaceLanguage)?.Code ?? "en_us";
+                settings.MemoryMb = (int)Math.Round(memory.Value);
+                settings.AutoMemory = autoMemory.IsChecked == true;
+                settings.DownloadThreads = (int)(threads.Value ?? 16);
+                settings.GameDownloadSource = source.SelectedItem?.ToString() ?? "official";
+                if (applyNetwork)
+                {
                     settings.ProxyMode = mode;
                     settings.Proxy = address.Text ?? "";
                     settings.ProxyUsername = username.Text ?? "";
@@ -317,25 +338,216 @@ public sealed partial class MainWindow
                             password.Text
                         );
                     settings.IgnoreSslErrors = ssl.IsChecked == true;
-                    settings.CustomJvmArgs = jvm.Text ?? "";
-                    settings.GameLanguage = gameLanguage.Text ?? "auto";
-                    settings.GameWindowTitle = windowTitle.Text ?? "";
-                    settings.PlayerPriority = priority.SelectedItem?.ToString() ?? "normal";
-                    if (settings.PreferHighPerformanceGpu && gpu.IsChecked != true)
-                        await GameGpuPreference.Restore(session.Store);
-                    settings.PreferHighPerformanceGpu = gpu.IsChecked == true;
-                    settings.StartMaximized = maximize.IsChecked == true;
-                    settings.LauncherVisibility = visibility.SelectedItem?.ToString() ?? "keep";
-                    settings.CheckLauncherUpdates = checkUpdates.IsChecked == true;
-                    settings.ReceiveBetaUpdates = beta.IsChecked == true;
-                    settings.DownloadMirror = mirror.Text ?? "";
-                    settings.ExpandProjectIntroduction = introduction.IsChecked == true;
-                    await session.Save();
+                }
+                settings.CustomJvmArgs = (jvm.Text ?? "").Trim();
+                settings.GameLanguage = gameLanguage.SelectedItem?.ToString() ?? "auto";
+                settings.GameWindowTitle = (windowTitle.Text ?? "").TrimStart();
+                settings.PlayerPriority = priority.SelectedItem?.ToString() ?? "normal";
+                if (settings.PreferHighPerformanceGpu && gpu.IsChecked != true)
+                    await GameGpuPreference.Restore(session.Store);
+                settings.PreferHighPerformanceGpu = gpu.IsChecked == true;
+                settings.StartMaximized = maximize.SelectedItem?.ToString() == "Maximized";
+                settings.LauncherVisibility = visibility.SelectedItem?.ToString() ?? "keep";
+                settings.CheckLauncherUpdates = checkUpdates.IsChecked == true;
+                settings.ReceiveBetaUpdates = beta.IsChecked == true;
+                var mirrorValue = (mirror.Text ?? "").Trim().TrimEnd('/');
+                if (
+                    mirrorValue.Length == 0
+                    || Uri.TryCreate(mirrorValue, UriKind.Absolute, out var mirrorUri)
+                        && mirrorUri.Scheme is "http" or "https"
+                        && !string.IsNullOrWhiteSpace(mirrorUri.Host)
+                )
+                    settings.DownloadMirror = mirrorValue;
+                settings.ExpandProjectIntroduction = introduction.IsChecked == true;
+                await session.Save();
+                if (NetworkSettings() != previousNetwork)
                     session.ConfigureNetwork();
+                if (rebuild)
+                {
                     BuildNavigation();
                     await Navigate("settings");
-                },
-                true
+                }
+            }
+            finally
+            {
+                saveGate.Release();
+            }
+        }
+        async Task PersistSettings()
+        {
+            try
+            {
+                await SaveSettings();
+            }
+            catch (Exception ex)
+            {
+                await Error(ex);
+            }
+        }
+        language.SelectionChanged += async (_, _) =>
+        {
+            if (
+                language.SelectedItem is not InterfaceLanguage selected
+                || selected.Code == settings.LauncherLanguage
+            )
+                return;
+            try
+            {
+                await SaveSettings(rebuild: true);
+            }
+            catch (Exception ex)
+            {
+                await Error(ex);
+            }
+        };
+        foreach (var combo in new[] { maximize, visibility, priority, gameLanguage, source })
+            combo.SelectionChanged += async (_, _) => await PersistSettings();
+        foreach (
+            var toggle in new global::Avalonia.Controls.Primitives.ToggleButton[]
+            {
+                autoMemory,
+                gpu,
+                checkUpdates,
+                beta,
+                introduction,
+            }
+        )
+            toggle.IsCheckedChanged += async (_, _) => await PersistSettings();
+        foreach (var input in new[] { jvm, windowTitle, mirror })
+            input.TextChanged += async (_, _) => await PersistSettings();
+        memory.ValueChanged += async (_, _) => await PersistSettings();
+        threads.ValueChanged += async (_, _) => await PersistSettings();
+        address.IsEnabled = proxyMode.SelectedItem?.ToString() == "custom";
+        proxyMode.SelectionChanged += async (_, _) =>
+        {
+            address.IsEnabled = proxyMode.SelectedItem?.ToString() == "custom";
+            // Switching modes must not validate an unfinished manual address.
+            if (address.IsEnabled)
+                return;
+            try
+            {
+                await SaveSettings(applyNetwork: true);
+            }
+            catch (Exception ex)
+            {
+                await Error(ex);
+            }
+        };
+        var proxyHint = T("", 12);
+        proxyHint.IsVisible = false;
+        async Task<bool> ApplyProxy()
+        {
+            try
+            {
+                await SaveSettings(applyNetwork: true);
+                proxyHint.IsVisible = false;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                proxyHint.Text = ex.Message;
+                proxyHint.IsVisible = true;
+                return false;
+            }
+        }
+        var applyProxy = Btn(
+            "Apply proxy settings",
+            async () =>
+            {
+                if (await ApplyProxy())
+                    ShowToast(Ui("Proxy settings saved"));
+            }
+        );
+        var testProxy = Btn(
+            "Apply and test connection",
+            async () =>
+            {
+                if (!await ApplyProxy())
+                    return;
+                try
+                {
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    var selected = NetworkProxy.Create(settings);
+                    using var transport = new System.Net.Http.HttpClientHandler
+                    {
+                        Proxy = selected,
+                        UseProxy = selected != null,
+                    };
+                    using var client = new System.Net.Http.HttpClient(transport);
+                    using var response = await client.GetAsync(
+                        "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
+                        System.Net.Http.HttpCompletionOption.ResponseHeadersRead,
+                        timeout.Token
+                    );
+                    response.EnsureSuccessStatusCode();
+                    ShowToast(Ui("Connection test succeeded"));
+                }
+                catch (Exception ex)
+                {
+                    proxyHint.Text =
+                        Ui(
+                            ex is OperationCanceledException
+                                ? "Connection test timed out."
+                                : "Connection test failed."
+                        )
+                        + " "
+                        + ex.Message;
+                    proxyHint.IsVisible = true;
+                }
+            }
+        );
+        Control Section(string title, params Control[] controls) =>
+            Card(Stack(new[] { T(title, 18, true) }.Cast<Control>().Concat(controls).ToArray()));
+        return Stack(
+            Section(
+                "Language and interface",
+                Field("Launcher language", language),
+                Field("Default window mode", maximize),
+                introduction
+            ),
+            Section(
+                "Game launch",
+                Field("Game language", gameLanguage),
+                Field("Launcher visibility", visibility),
+                Field("Custom game window title", windowTitle),
+                gpu,
+                Field("Process priority", priority)
+            ),
+            Section("Memory and Java", autoMemory, memoryPanel, Field("Custom JVM arguments", jvm)),
+            Section(
+                "Downloads and network",
+                Field("Download threads", threads),
+                Field("Game download source", source),
+                Field("Proxy mode", proxyMode),
+                Field("Proxy address", address),
+                proxyHint,
+                Field("Update download mirror", mirror),
+                new Expander
+                {
+                    Header = Ui("Advanced network options"),
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Content = Stack(
+                        Field("Username", username),
+                        Field("Password", password),
+                        clearPassword,
+                        Field("Bypass hosts", bypass),
+                        bypassLocal,
+                        fallback,
+                        Row(applyProxy, testProxy),
+                        T(
+                            "Authentication and bypass rules apply to manual proxy mode. Connection tests do not use direct fallback.",
+                            12
+                        ),
+                        ssl,
+                        T("Skipping certificate validation reduces connection security.", 12)
+                    ),
+                }
+            ),
+            Section(
+                "Launcher updates",
+                checkUpdates,
+                beta,
+                Btn("Check for updates", () => CheckDesktopUpdates(true))
             ),
             ThirdPartyApplicationsCard(),
             T(Ui("Current version:") + " " + LauncherUpdates.CurrentVersion, 12)
@@ -602,6 +814,31 @@ public sealed partial class MainWindow
                 )
             ),
             Row(
+                Btn(
+                    "Use Java from PATH",
+                    async () =>
+                    {
+                        var path = (Environment.GetEnvironmentVariable("PATH") ?? "")
+                            .Split(Path.PathSeparator)
+                            .Select(entry =>
+                                Path.Combine(entry.Trim().Trim('"'), JavaManager.JavaExecutable)
+                            )
+                            .FirstOrDefault(File.Exists);
+                        if (path == null)
+                            throw new IOException(Ui("No Java installation was found on PATH."));
+                        await session.Run(
+                            "Import Java",
+                            async ct =>
+                            {
+                                var java = await JavaManager.Inspect(path, ct);
+                                JavaManager.Register(session.Store.Config.Settings, java);
+                                session.Store.Config.Settings.JavaPath = java.Path;
+                                await session.Save();
+                            }
+                        );
+                        Draw();
+                    }
+                ),
                 major,
                 Btn(
                     "Download Temurin",
@@ -616,7 +853,11 @@ public sealed partial class MainWindow
                                     session.Store,
                                     (int)major.SelectedItem!,
                                     ct,
-                                    value => session.Log("INFO", value)
+                                    value =>
+                                    {
+                                        session.ReportStatus(value);
+                                        session.Log("INFO", value);
+                                    }
                                 );
                                 JavaManager.Register(session.Store.Config.Settings, java);
                                 await session.Save();
@@ -636,6 +877,7 @@ public sealed partial class MainWindow
         var body = Stack();
         var code = T("");
         var signInUrl = "https://www.microsoft.com/link";
+        var deviceCode = "";
         body.Children.Add(
             Card(
                 Stack(
@@ -656,9 +898,11 @@ public sealed partial class MainWindow
                                                 Dispatcher.UIThread.Post(() =>
                                                 {
                                                     code.Text = value + "\n" + url;
+                                                    deviceCode = value;
                                                     signInUrl = url;
                                                 }),
-                                            ct
+                                            ct,
+                                            session.ReportStatus
                                         );
                                         session.Store.Config.Accounts.RemoveAll(a =>
                                             a.Type == identity.Type && a.Uuid == identity.Uuid
@@ -671,6 +915,14 @@ public sealed partial class MainWindow
                                 await Navigate("accounts");
                             },
                             true
+                        ),
+                        Btn(
+                            "复制设备代码",
+                            async () =>
+                            {
+                                if (Clipboard != null && deviceCode.Length > 0)
+                                    await Clipboard.SetTextAsync(deviceCode);
+                            }
                         ),
                         Btn(
                             "Open sign-in page",
@@ -753,38 +1005,50 @@ public sealed partial class MainWindow
                 }
             )
         );
+        foreach (var card in body.Children.OfType<Border>())
+            if (card.Child is Expander { Content: StackPanel external })
+            {
+                var allowed = MicrosoftAuth.CanUseExternal(session.Store.Config.Accounts);
+                foreach (var signIn in external.Children.OfType<Button>())
+                    signIn.IsEnabled = allowed;
+                if (!allowed)
+                    external.Children.Add(T(MicrosoftAuth.ExternalLockedMessage, 12));
+            }
         foreach (var identity in session.Store.Config.Accounts.ToArray())
+        {
+            var use = Btn(
+                "Use account",
+                async () =>
+                {
+                    MicrosoftAuth.EnsureAccountAllowed(session.Store.Config.Accounts, identity);
+                    session.Account = identity;
+                    await session.Save();
+                    await Navigate("accounts");
+                }
+            );
+            use.Tag = "use-account:" + identity.Key;
+            use.IsEnabled = MicrosoftAuth.CanUseAccount(session.Store.Config.Accounts, identity);
             body.Children.Add(
                 Card(
                     Stack(
-                        T(identity.ToString(), 16, true),
+                        Row(AccountAvatar(identity, 40), T(identity.ToString(), 16, true)),
                         Row(
-                            Btn(
-                                "Use account",
-                                async () =>
-                                {
-                                    session.Account = identity;
-                                    await session.Save();
-                                }
-                            ),
-                            Btn(
+                            use,
+                            ConfirmationButton(
                                 "Remove account",
+                                Ui("Remove account?") + " " + identity.Name,
                                 async () =>
                                 {
-                                    if (!await Confirm("Remove account?", identity.Name))
-                                        return;
-                                    session.Store.Config.Accounts.Remove(identity);
-                                    if (session.Account == identity)
-                                        session.Account =
-                                            session.Store.Config.Accounts.FirstOrDefault();
-                                    await session.Save();
+                                    await session.RemoveAccount(identity);
                                     await Navigate("accounts");
-                                }
+                                },
+                                "Remove"
                             )
                         )
                     )
                 )
             );
+        }
         return body;
     }
 

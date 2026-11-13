@@ -9,51 +9,20 @@ namespace CMCLauncher.Avalonia.Views;
 
 public sealed partial class MainWindow
 {
-    Control HomePage()
-    {
-        var instances = Choice(session.Store.Config.Instances, session.Selected);
-        var accounts = Choice(session.Store.Config.Accounts, session.Account);
-        instances.SelectionChanged += async (_, _) =>
-        {
-            session.Selected = instances.SelectedItem as Instance;
-            await session.Save();
-        };
-        accounts.SelectionChanged += async (_, _) =>
-        {
-            session.Account = accounts.SelectedItem as Account;
-            await session.Save();
-        };
-        return Stack(
-            Card(
-                Stack(
-                    T("Minecraft Java Edition", 23, true),
-                    Field("Instance", instances),
-                    Field("Account", accounts),
-                    Row(
-                        Btn(
-                            "Launch",
-                            () => session.Run("Launch game", session.LaunchSelected),
-                            true
-                        ),
-                        Btn("Version settings", () => InstanceSettings()),
-                        Btn("Download game", () => Navigate("downloads")),
-                        Btn("Import modpack", ImportPack)
-                    )
-                )
-            ),
-            Card(Stack(T("Launcher notes", 16, true), T(session.Store.Config.Settings.HomeNote)))
-        );
-    }
-
     Task<Control> InstancesPage()
     {
         var search = Input("", "Search version name, description or Minecraft version");
-        var loader = Choice(new[] { "All", "vanilla", "fabric", "quilt", "forge", "neoforge" });
-        var sort = Choice(new[] { "Default", "Name", "Last played", "Minecraft version" });
+        var loader = Choice(
+            new[] { "All versions", "Favorites", "vanilla", "fabric", "quilt", "forge", "neoforge" }
+        );
+        var sort = Choice(
+            new[] { "Default (by loader)", "Recently played", "Name", "Minecraft version" }
+        );
         var view = Choice(
             new[] { "List", "Tiles" },
-            session.Store.Config.Settings.InstanceView == "tiles" ? "Tiles" : "List"
+            session.Store.Config.Settings.InstanceView is "tile" or "tiles" ? "Tiles" : "List"
         );
+        view.Name = "InstanceLayout";
         var roots = new MinecraftDirectoryManager(session.Store)
             .List()
             .Select(r => r.Path)
@@ -72,7 +41,17 @@ public sealed partial class MainWindow
                             StringComparison.OrdinalIgnoreCase
                         )
                     )
-                    && (loader.SelectedIndex == 0 || i.Loader == loader.SelectedItem?.ToString())
+                    && (
+                        loader.SelectedIndex == 0
+                        || (
+                            loader.SelectedIndex == 1
+                                ? i.Favorite
+                                : i.Loader.Equals(
+                                    loader.SelectedItem?.ToString(),
+                                    StringComparison.OrdinalIgnoreCase
+                                )
+                        )
+                    )
                     && (
                         directory.SelectedIndex == 0
                         || session.Store.StorageDirectory(i) == directory.SelectedItem?.ToString()
@@ -81,59 +60,184 @@ public sealed partial class MainWindow
                 .ToArray();
             var ordered = sort.SelectedIndex switch
             {
-                1 => entries.OrderBy(i => i.Name),
-                2 => entries.OrderByDescending(i => i.LastPlayed),
-                3 => entries.OrderByDescending(i => i.GameVersion),
-                _ => entries.OrderBy(i => i.Loader).ThenBy(i => i.Name),
+                1 => entries
+                    .OrderByDescending(i => i.LastPlayed)
+                    .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase),
+                3 => entries
+                    .OrderBy(i => i.GameVersion, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase),
+                _ => entries.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase),
             };
             void Group(string title, IEnumerable<Instance> items)
             {
                 var array = items.ToArray();
                 if (array.Length == 0)
                     return;
-                results.Children.Add(T(title, 17, true));
+                if (title.Length > 0)
+                    results.Children.Add(T(title, 17, true));
                 var tiles = new WrapPanel();
                 foreach (var item in array)
                 {
-                    var titleText = T(item.Name, 17, true);
+                    var titleText = T(item.Name, 16, true);
                     titleText.MaxLines = 1;
                     titleText.TextTrimming = TextTrimming.CharacterEllipsis;
-                    var card = Stack(
-                        titleText,
-                        T($"Minecraft {item.GameVersion} · {item.Loader}"),
-                        T(item.Description, 12),
-                        Row(
-                            Btn(
-                                item.Favorite ? "★" : "☆",
-                                async () =>
-                                {
-                                    item.Favorite = !item.Favorite;
-                                    await session.Save();
-                                    Draw();
-                                }
-                            ),
-                            Btn(
-                                "Settings",
-                                async () =>
-                                {
-                                    session.Selected = item;
-                                    await session.Save();
-                                    await InstanceSettings();
-                                }
-                            ),
-                            Btn(
-                                "Launch",
-                                async () =>
-                                {
-                                    session.Selected = item;
-                                    await session.Save();
-                                    await session.Run("Launch game", session.LaunchSelected);
-                                },
-                                true
-                            )
+                    var metadata = T($"Minecraft {item.GameVersion} · {item.Loader}", 12);
+                    metadata.MaxLines = 1;
+                    metadata.TextTrimming = TextTrimming.CharacterEllipsis;
+                    var identity = new StackPanel
+                    {
+                        Spacing = 3,
+                        Children = { titleText, metadata },
+                        VerticalAlignment = VerticalAlignment.Center,
+                    };
+                    if (item.Description.Length > 0)
+                    {
+                        var description = T(item.Description, 11);
+                        description.MaxLines = 1;
+                        description.TextTrimming = TextTrimming.CharacterEllipsis;
+                        identity.Children.Add(description);
+                    }
+                    var favorite = HomeTool(
+                        item.Favorite ? "★" : "☆",
+                        "Favorites",
+                        async () =>
+                        {
+                            item.Favorite = !item.Favorite;
+                            await session.Save();
+                            Draw();
+                        }
+                    );
+                    favorite.Width = favorite.MinWidth = 30;
+                    favorite.Height = favorite.MinHeight = 28;
+                    var flyout = new Flyout();
+                    var more = HomeTool("⋯", "More", () => Task.CompletedTask);
+                    var menu = Stack(
+                        Btn(
+                            "Settings",
+                            async () =>
+                            {
+                                flyout.Hide();
+                                session.Selected = item;
+                                await session.Save();
+                                await InstanceSettings();
+                            }
+                        ),
+                        Btn(
+                            "Open folder",
+                            () =>
+                            {
+                                flyout.Hide();
+                                Open(session.Store.GameDirectory(item));
+                                return Task.CompletedTask;
+                            }
+                        ),
+                        DangerButton(
+                            "Delete version",
+                            async () =>
+                            {
+                                flyout.Hide();
+                                await DeleteInstance(item);
+                            }
                         )
                     );
-                    var border = Card(card);
+                    flyout.Content = menu;
+                    more.Flyout = flyout;
+                    var actions = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Spacing = 6,
+                        Children = { favorite, more },
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                    };
+                    var tile = view.SelectedIndex == 1;
+                    var artwork = InstanceArtwork(item, tile ? 64 : 40);
+                    var row = tile
+                        ? new Grid
+                        {
+                            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+                            RowSpacing = 10,
+                        }
+                        : new Grid
+                        {
+                            ColumnDefinitions = new ColumnDefinitions("40,*,Auto"),
+                            ColumnSpacing = 12,
+                        };
+                    if (tile)
+                    {
+                        row.Children.Add(actions);
+                        artwork.HorizontalAlignment = HorizontalAlignment.Center;
+                        artwork.VerticalAlignment = VerticalAlignment.Center;
+                        Grid.SetRow(artwork, 1);
+                        row.Children.Add(artwork);
+                        Grid.SetRow(identity, 2);
+                        row.Children.Add(identity);
+                        foreach (var label in identity.Children.OfType<TextBlock>())
+                            label.TextAlignment = TextAlignment.Center;
+                    }
+                    else
+                    {
+                        row.Children.Add(artwork);
+                        Grid.SetColumn(identity, 1);
+                        row.Children.Add(identity);
+                        Grid.SetColumn(actions, 2);
+                        row.Children.Add(actions);
+                    }
+                    var border = Card(row);
+                    border.Padding = new Thickness(11, 7);
+                    border.BorderThickness = new Thickness(1);
+                    if (session.Selected?.Id == item.Id)
+                        border.BorderBrush = Accent;
+                    border.Focusable = true;
+                    border.Tag = "instance-card";
+                    ToolTip.SetTip(border, session.Store.GameDirectory(item));
+                    async Task Choose()
+                    {
+                        session.Selected = item;
+                        await session.Save();
+                        await Navigate("home");
+                    }
+                    border.AddHandler(
+                        global::Avalonia.Input.Gestures.TappedEvent,
+                        async (_, e) =>
+                        {
+                            if (
+                                e.Source is global::Avalonia.Visual visual
+                                && global::Avalonia
+                                    .VisualTree.VisualExtensions.GetVisualAncestors(visual)
+                                    .TakeWhile(parent => parent != border)
+                                    .Any(parent => parent is Button)
+                            )
+                                return;
+                            try
+                            {
+                                await Choose();
+                            }
+                            catch (Exception ex)
+                            {
+                                await Error(ex);
+                            }
+                        }
+                    );
+                    border.KeyDown += async (_, e) =>
+                    {
+                        if (
+                            e.Key
+                                is global::Avalonia.Input.Key.Enter
+                                    or global::Avalonia.Input.Key.Space
+                            && e.Source == border
+                        )
+                        {
+                            e.Handled = true;
+                            try
+                            {
+                                await Choose();
+                            }
+                            catch (Exception ex)
+                            {
+                                await Error(ex);
+                            }
+                        }
+                    };
                     if (view.SelectedIndex == 1)
                     {
                         border.Width = 260;
@@ -148,7 +252,25 @@ public sealed partial class MainWindow
                     results.Children.Add(tiles);
             }
             Group("Favorites", ordered.Where(i => i.Favorite).OrderBy(i => i.Name));
-            Group("Instances", ordered.Where(i => !i.Favorite));
+            var regular = ordered.Where(i => !i.Favorite);
+            if (sort.SelectedIndex == 0)
+                foreach (
+                    var group in regular.GroupBy(i => i.Loader, StringComparer.OrdinalIgnoreCase)
+                )
+                    Group(
+                        group.Key.ToLowerInvariant() switch
+                        {
+                            "vanilla" => "Vanilla",
+                            "fabric" => "Fabric",
+                            "quilt" => "Quilt",
+                            "forge" => "Forge",
+                            "neoforge" => "NeoForge",
+                            _ => group.Key,
+                        },
+                        group
+                    );
+            else
+                Group("", regular);
             if (entries.Length == 0)
                 results.Children.Add(T("No instances found."));
         }
@@ -158,10 +280,30 @@ public sealed partial class MainWindow
         sort.SelectionChanged += (_, _) => Draw();
         view.SelectionChanged += async (_, _) =>
         {
-            session.Store.Config.Settings.InstanceView = view.SelectedIndex == 1 ? "tiles" : "list";
+            session.Store.Config.Settings.InstanceView = view.SelectedIndex == 1 ? "tile" : "list";
             await session.Save();
             Draw();
         };
+        search.MinWidth = loader.MinWidth = sort.MinWidth = view.MinWidth = 0;
+        var filterBar = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("2*,Auto,*,*,*"),
+            ColumnSpacing = 8,
+        };
+        var find = Btn(
+            "Search",
+            () =>
+            {
+                Draw();
+                return Task.CompletedTask;
+            }
+        );
+        var filters = new Control[] { search, find, loader, view, sort };
+        for (var i = 0; i < filters.Length; i++)
+        {
+            Grid.SetColumn(filters[i], i);
+            filterBar.Children.Add(filters[i]);
+        }
         Draw();
         return Task.FromResult<Control>(
             Stack(
@@ -173,8 +315,7 @@ public sealed partial class MainWindow
                     Btn("Import local instances", ImportLocal),
                     Btn("Migrate other launchers", MigrateForeign)
                 ),
-                Field("Search", search),
-                Row(loader, sort, view),
+                filterBar,
                 results
             )
         );
@@ -250,7 +391,7 @@ public sealed partial class MainWindow
         session.Store.EnsureUniqueInstanceName(instance);
     }
 
-    Task InstanceSettings()
+    async Task InstanceSettings()
     {
         if (session.Selected is not { } instance)
             throw new IOException(Ui("Select an instance."));
@@ -303,6 +444,7 @@ public sealed partial class MainWindow
                                 {
                                     instance.IconPath = path;
                                     await session.Save();
+                                    await InstanceSettings();
                                 }
                             }
                         ),
@@ -320,56 +462,89 @@ public sealed partial class MainWindow
             )
         );
         body.Children.Add(
-            Row(
-                Btn("Saves", () => WorldsPage(instance)),
-                Btn("Mods", () => ContentPage(instance, "mod")),
-                Btn("Resource packs", () => ContentPage(instance, "resourcepack")),
-                Btn("Shaders", () => ContentPage(instance, "shader")),
-                Btn("Data packs", () => ContentPage(instance, "datapack")),
-                Btn("Schematics", () => SchematicsPage(instance))
-            )
-        );
-        body.Children.Add(
             Card(
                 Stack(
                     T("Version management", 16, true),
                     Row(
                         Btn("Export modpack", () => ExportPackPage(instance)),
-                        DangerButton(
-                            "Delete version",
-                            async () =>
-                            {
-                                session.EnsureFilesIdle();
-                                var inspection = session.Store.InspectVersionDeletion(instance);
-                                var delete = new CheckBox
-                                {
-                                    Content = Ui("Also move version files to the recycle bin"),
-                                    IsEnabled = inspection.DeletableDirectory != null,
-                                };
-                                var info = Stack(T(instance.Name), delete);
-                                if (inspection.DeletableDirectory == null)
-                                    info.Children.Add(
-                                        T("Shared or dependent game files will be kept.")
-                                    );
-                                if (!await Dialog("Delete version?", info, true))
-                                    return;
-                                if (
-                                    delete.IsChecked == true
-                                    && inspection.DeletableDirectory is { } folder
-                                )
-                                    await Trash(folder);
-                                session.Store.Config.Instances.Remove(instance);
-                                session.Selected = session.Store.Config.Instances.FirstOrDefault();
-                                await session.Save();
-                                await Navigate("instances");
-                            }
-                        )
+                        DangerButton("Delete version", () => DeleteInstance(instance))
                     )
                 )
             )
         );
-        pageContent.Content = body;
-        return Task.CompletedTask;
+        if (body.Children[0] is Border { Child: StackPanel summary })
+        {
+            var details = new StackPanel { Spacing = 6 };
+            foreach (var text in summary.Children.OfType<TextBlock>().Take(3).ToArray())
+            {
+                summary.Children.Remove(text);
+                details.Children.Add(text);
+            }
+            var identity = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("56,*"),
+                ColumnSpacing = 14,
+            };
+            identity.Children.Add(InstanceArtwork(instance, 56));
+            Grid.SetColumn(details, 1);
+            identity.Children.Add(details);
+            summary.Children.Insert(0, identity);
+            if (summary.Children.OfType<WrapPanel>().FirstOrDefault() is { } actions)
+                foreach (
+                    var open in actions
+                        .Children.OfType<Button>()
+                        .Where(button => button.Content?.ToString() == Ui("Open folder"))
+                        .ToArray()
+                )
+                    actions.Children.Remove(open);
+        }
+        body.Children.Insert(
+            1,
+            Card(
+                Stack(
+                    T("Game directory", 15, true),
+                    new SelectableTextBlock
+                    {
+                        Text = session.Store.GameDirectory(instance),
+                        FontSize = 12,
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    Btn(
+                        "Open folder",
+                        () =>
+                        {
+                            Directory.CreateDirectory(session.Store.GameDirectory(instance));
+                            Open(session.Store.GameDirectory(instance));
+                            return Task.CompletedTask;
+                        }
+                    )
+                )
+            )
+        );
+        await ShowInstancePage(instance, "overview", body);
+    }
+
+    async Task DeleteInstance(Instance instance)
+    {
+        session.EnsureFilesIdle();
+        var inspection = session.Store.InspectVersionDeletion(instance);
+        var delete = new CheckBox
+        {
+            Content = Ui("Also move version files to the recycle bin"),
+            IsEnabled = inspection.DeletableDirectory != null,
+        };
+        var info = Stack(T(instance.Name), delete);
+        if (inspection.DeletableDirectory == null)
+            info.Children.Add(T("Shared or dependent game files will be kept."));
+        if (!await Dialog("Delete version?", info, true, danger: true))
+            return;
+        if (delete.IsChecked == true && inspection.DeletableDirectory is { } folder)
+            await Trash(folder);
+        session.Store.Config.Instances.Remove(instance);
+        if (session.Selected == instance)
+            session.Selected = session.Store.Config.Instances.FirstOrDefault();
+        await session.Save();
+        await Navigate("instances");
     }
 
     Button DangerButton(string text, Func<Task> action)

@@ -1,13 +1,14 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
-namespace CMCLauncher.WinUI;
+namespace CMCLauncher;
 
 // 元数据按内容哈希落盘，相同文件换名或在不同实例中出现时可以复用识别结果。
-internal static class ContentInspectionCache
+public static class ContentInspectionCache
 {
-    sealed record Entry(
+    internal sealed record Entry(
         string Name,
         string Version,
         string Loader,
@@ -15,7 +16,7 @@ internal static class ContentInspectionCache
         bool Recognized
     );
 
-    internal sealed record Result(ContentItem Item, byte[]? Icon);
+    public sealed record Result(ContentItem Item, byte[]? Icon);
 
     static readonly ConcurrentDictionary<string, Lazy<Task<Entry>>> Pending = new(
         StringComparer.Ordinal
@@ -24,12 +25,15 @@ internal static class ContentInspectionCache
     static readonly ConcurrentDictionary<
         string,
         (long Length, long Modified, string Hash)
-    > Fingerprints = new(StringComparer.OrdinalIgnoreCase);
+    > Fingerprints = new(
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal
+    );
+
     // 运行期常驻缓存无界增长会导致内存持续攀升，达到阈值后整体收敛以限定内存上界。
     const int MaxEntries = 4096;
-    internal static int InspectionCount;
+    public static int InspectionCount;
 
-    internal static void Tighten()
+    public static void Tighten()
     {
         if (Pending.Count > MaxEntries)
             Pending.Clear();
@@ -39,19 +43,17 @@ internal static class ContentInspectionCache
             Fingerprints.Clear();
     }
 
-    internal static void ClearMemory()
+    public static void ClearMemory()
     {
         Pending.Clear();
         Icons.Clear();
         Fingerprints.Clear();
     }
 
-    internal static async Task<Result> GetAsync(
-        string file,
-        string kind,
-        bool enabled,
-        string cacheRoot
-    )
+    public static Task<Result> GetAsync(string file, string kind, bool enabled, string cacheRoot) =>
+        Task.Run(() => GetCore(file, kind, enabled, cacheRoot));
+
+    static async Task<Result> GetCore(string file, string kind, bool enabled, string cacheRoot)
     {
         // Unpacked packs can change individual files without changing directory timestamps.
         if (Directory.Exists(file))
@@ -121,7 +123,11 @@ internal static class ContentInspectionCache
             try
             {
                 await using (var output = File.Create(temp))
-                    await JsonSerializer.SerializeAsync(output, result);
+                    await JsonSerializer.SerializeAsync(
+                        output,
+                        result,
+                        ContentInspectionJsonContext.Default.Entry
+                    );
                 File.Move(temp, savedMetadata, true);
             }
             finally
@@ -185,3 +191,6 @@ internal static class ContentInspectionCache
         }
     }
 }
+
+[JsonSerializable(typeof(ContentInspectionCache.Entry))]
+internal partial class ContentInspectionJsonContext : JsonSerializerContext { }

@@ -248,6 +248,22 @@ public sealed class LauncherSession : ObservableState, IDisposable
             throw new IOException(Ui("Close the game before changing instance files."));
     }
 
+    public void ReportStatus(string message) => Stage(message);
+
+    public async Task RemoveAccount(Account identity)
+    {
+        Store.Config.Accounts.RemoveAll(account => account.Key == identity.Key);
+        if (
+            Account == null
+            || !Store.Config.Accounts.Contains(Account)
+            || !MicrosoftAuth.CanUseAccount(Store.Config.Accounts, Account)
+        )
+            Account = Store.Config.Accounts.FirstOrDefault(account =>
+                MicrosoftAuth.CanUseAccount(Store.Config.Accounts, account)
+            );
+        await Save();
+    }
+
     public async Task Save() => await Store.Save();
 
     public async Task AddInstance(Instance instance)
