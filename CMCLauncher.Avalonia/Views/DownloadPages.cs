@@ -215,6 +215,7 @@ public sealed partial class MainWindow
             new[] { "", "fabric", "forge", "neoforge", "quilt" },
             state.Filters.Loader
         );
+        loader.Tag = "community-filter-loader";
         var sort = Choice(new[] { "", "downloads", "newest", "updated" }, state.Filters.Sort);
         var category = Choice(new[] { "" });
         var categoryChoices = new List<ComboBox> { category };
@@ -399,8 +400,9 @@ public sealed partial class MainWindow
         CommunitySearchFilters Read() =>
             new(
                 GameVersion: game.SelectedItem?.ToString() ?? "",
-                Loader: loader.SelectedItem?.ToString() ?? "",
+                Loader: loader.IsEnabled ? loader.SelectedItem?.ToString() ?? "" : "",
                 Categories: categoryChoices
+                    .Where(choice => choice.IsEnabled)
                     .Select(choice => choice.SelectedItem)
                     .OfType<CommunityCategory>()
                     .Select(c => c.Name)
@@ -547,6 +549,11 @@ public sealed partial class MainWindow
         {
             var provider = source.SelectedItem?.ToString() ?? "modrinth";
             more.IsEnabled = provider == "modrinth";
+            var selectedLoader =
+                catalog == null ? state.Filters.Loader : loader.SelectedItem?.ToString() ?? "";
+            loader.IsEnabled = false;
+            foreach (var choice in categoryChoices)
+                choice.IsEnabled = false;
             try
             {
                 if (!filterCatalogs.TryGetValue((provider, type), out var loaded))
@@ -562,6 +569,21 @@ public sealed partial class MainWindow
                 if (source.SelectedItem?.ToString() != provider)
                     return;
                 catalog = loaded;
+                loader.ItemsSource = new[] { "" }
+                    .Concat(
+                        catalog
+                            .Loaders.Where(entry => entry.ProjectTypes.Contains(type))
+                            .Where(entry =>
+                                provider == "modrinth"
+                                || entry.Name is "forge" or "fabric" or "quilt" or "neoforge"
+                            )
+                            .Select(entry => entry.Name)
+                    )
+                    .ToArray();
+                loader.SelectedItem = selectedLoader;
+                if (loader.SelectedIndex < 0)
+                    loader.SelectedIndex = 0;
+                loader.IsEnabled = true;
                 RefreshVersions();
                 // Provider categories include independent feature/resolution groups.
                 // Rebuild columns together so every applicable filter stays in one row.

@@ -612,7 +612,15 @@ public sealed partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
 
-    Control Field(string name, Control input) => Stack(T(name, 13), input);
+    Control Field(string name, Control input)
+    {
+        var label = T(name, 13);
+        label.MaxLines = 1;
+        label.LineHeight = label.FontSize * 1.4;
+        label.TextTrimming = TextTrimming.CharacterEllipsis;
+        ToolTip.SetTip(label, Ui(name));
+        return Stack(label, input);
+    }
 
     ComboBox Choice<T>(IEnumerable<T> values, T? selected = default)
     {

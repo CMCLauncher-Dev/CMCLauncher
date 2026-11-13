@@ -13,7 +13,7 @@ public sealed partial class MainWindow
     void ConfigureControlAppearance()
     {
         foreach (
-            var selector in new Func<Selector, Selector>[]
+            var selector in new Func<Selector?, Selector>[]
             {
                 s => s.Class("custom-appearance").Descendant().OfType<TextBox>(),
                 s => s.Class("custom-appearance").Descendant().OfType<ComboBox>(),
