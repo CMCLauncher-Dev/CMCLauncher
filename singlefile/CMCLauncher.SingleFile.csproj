@@ -15,6 +15,7 @@
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../CMCLauncher.Platform/Windows/PortableDataDirectory.cs" Link="PortableDataDirectory.cs" />
     <EmbeddedResource
       Include="$(SingleFilePayload)"
       LogicalName="CMCLauncher.SingleFile.Payload"

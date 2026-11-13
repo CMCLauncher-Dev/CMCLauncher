@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -28,8 +28,8 @@ public sealed partial class MainWindow
                     Ui("Import schematics"),
                     async (_, _) =>
                     {
-                        var picker = new FileOpenPicker();
-                        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                        var picker = new DesktopFileOpenPicker();
+                        DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                         foreach (var extension in SchematicManager.Extensions)
                             picker.FileTypeFilter.Add(extension);
                         var files = await picker.PickMultipleFilesAsync();
@@ -163,8 +163,8 @@ public sealed partial class MainWindow
                             Ui("Export"),
                             async (_, _) =>
                             {
-                                var picker = new FileSavePicker();
-                                InitializeWithWindow.Initialize(
+                                var picker = new DesktopFileSavePicker();
+                                DesktopPicker.Initialize(
                                     picker,
                                     WindowNative.GetWindowHandle(this)
                                 );

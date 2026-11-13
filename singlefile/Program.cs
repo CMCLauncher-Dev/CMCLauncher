@@ -106,8 +106,14 @@ internal static class Program
             // 所有可编辑资源与运行时文件都集中到该文件夹内。
             var rootDirectory =
                 Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
-            var userDirectory = Path.Combine(rootDirectory, "cmcl");
-            Directory.CreateDirectory(userDirectory);
+            var userDirectory = PortableDataDirectory.Resolve(
+                Path.Combine(rootDirectory, "cmcl"),
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "CMCLauncher",
+                    "cmcl"
+                )
+            );
             foreach (var folder in new[] { "locales", "themes" })
             {
                 var source = Path.Combine(runtime, folder);

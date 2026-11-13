@@ -101,11 +101,11 @@ public sealed partial class MainWindow
                 }
                 foreach (var node in tree.SelectedNodes)
                     Collect(node);
-                var picker = new FileSavePicker
+                var picker = new DesktopFileSavePicker
                 {
                     SuggestedFileName = instance.Name + "-" + versionBox.Text.Trim(),
                 };
-                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                 var format = formatBox.SelectedIndex == 0 ? "modrinth" : "curseforge";
                 var bundle = includeResources.IsChecked == true;
                 picker.FileTypeChoices.Add(

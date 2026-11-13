@@ -480,8 +480,8 @@ public sealed partial class MainWindow
             Ui("Import preset"),
             async (_, _) =>
             {
-                var picker = new FileOpenPicker();
-                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                var picker = new DesktopFileOpenPicker();
+                DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                 picker.FileTypeFilter.Add(".json");
                 var file = await picker.PickSingleFileAsync();
                 if (file == null)
@@ -627,11 +627,11 @@ public sealed partial class MainWindow
                 Ui("context.personalization.export_personalization"),
                 async (_, _) =>
                 {
-                    var picker = new FileSavePicker
+                    var picker = new DesktopFileSavePicker
                     {
                         SuggestedFileName = "CMCLauncher-personalization",
                     };
-                    InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                    DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                     picker.FileTypeChoices.Add("JSON", [".json"]);
                     var file = await picker.PickSaveFileAsync();
                     if (file == null)

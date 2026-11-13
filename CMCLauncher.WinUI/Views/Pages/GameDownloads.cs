@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -504,8 +504,8 @@ public sealed partial class MainWindow
 
     async Task ImportPack()
     {
-        var picker = new FileOpenPicker();
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        var picker = new DesktopFileOpenPicker();
+        DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
         picker.FileTypeFilter.Add(".mrpack");
         picker.FileTypeFilter.Add(".zip");
         var file = await picker.PickSingleFileAsync();

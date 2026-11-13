@@ -874,10 +874,10 @@ public sealed partial class MainWindow
         var chooseIcon = new Button { Content = Ui("Choose image") };
         chooseIcon.Click += async (_, _) =>
         {
-            var picker = new FileOpenPicker();
+            var picker = new DesktopFileOpenPicker();
             foreach (var ext in new[] { ".png", ".jpg", ".jpeg", ".ico" })
                 picker.FileTypeFilter.Add(ext);
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+            DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
             var file = await picker.PickSingleFileAsync();
             if (file != null)
             {

@@ -110,9 +110,9 @@ public sealed partial class MainWindow
                 // Capture the rendered file before opening the picker, so later changes
                 // cannot make the exported image differ from the preview the user chose.
                 var bytes = png;
-                var picker = new FileSavePicker { SuggestedFileName = "MinecraftPFP" };
+                var picker = new DesktopFileSavePicker { SuggestedFileName = "MinecraftPFP" };
                 picker.FileTypeChoices.Add("PNG image", new List<string> { ".png" });
-                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                 if (await picker.PickSaveFileAsync() is not { } file)
                     return;
                 await FileIO.WriteBytesAsync(file, bytes);
@@ -340,9 +340,9 @@ public sealed partial class MainWindow
             "Upload skin",
             async (_, _) =>
             {
-                var picker = new FileOpenPicker();
+                var picker = new DesktopFileOpenPicker();
                 picker.FileTypeFilter.Add(".png");
-                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                 if (
                     await picker.PickSingleFileAsync() is not { } file
                     || generation != renderVersion

@@ -308,7 +308,7 @@ public sealed partial class MainWindow
                         await SchematicManager.Import(destination!, new[] { file }, ct);
                     else
                     {
-                        var picker = new FileSavePicker
+                        var picker = new DesktopFileSavePicker
                         {
                             SuggestedFileName = Path.GetFileNameWithoutExtension(file),
                         };
@@ -316,7 +316,7 @@ public sealed partial class MainWindow
                             Ui("Blueprint"),
                             new[] { Path.GetExtension(file) }
                         );
-                        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                        DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                         var target = await picker.PickSaveFileAsync();
                         if (target == null)
                             throw new OperationCanceledException();

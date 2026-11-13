@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
@@ -62,7 +62,7 @@ public sealed class LogsPage : CMCPage
             (_, _) =>
             {
                 RuntimeLog.Write("INFO", "[按钮:打开日志文件夹] 打开日志目录");
-                var path = Path.Combine(Program.UserDirectory, "logs");
+                var path = Path.Combine(Program.WritableDirectory, "logs");
                 Directory.CreateDirectory(path);
                 System.Diagnostics.Process.Start(
                     new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }

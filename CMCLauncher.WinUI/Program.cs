@@ -17,6 +17,20 @@ internal static class Program
             is { Length: > 0 } directory
             ? Path.GetFullPath(directory)
             : AppContext.BaseDirectory;
+
+    // Portable installs keep their data beside the executable. Protected installations use
+    // a per-user directory; never require elevation just to write logs or FRP configurations.
+    internal static string WritableDirectory { get; } = ResolveWritableDirectory(UserDirectory);
+
+    internal static string ResolveWritableDirectory(string preferred) =>
+        PortableDataDirectory.Resolve(
+            preferred,
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CMCLauncher"
+            )
+        );
+
     const uint MuiLanguageName = 0x8;
 
     // 当前会话已加载的 MUI 语言列表（如 zh-CN、en-us）
@@ -128,6 +142,8 @@ internal static class Program
         catch (ArgumentException) { }
         foreach (var culture in args.Skip(2))
         {
+            if (culture.Equals("en-us", StringComparison.OrdinalIgnoreCase))
+                continue;
             var root = Path.Combine(AppContext.BaseDirectory, culture);
             var source = Path.Combine(AppContext.BaseDirectory, "languages", culture);
             if (!Directory.Exists(root) || !Directory.Exists(source))
@@ -197,17 +213,29 @@ internal static class Program
                 continue;
             var destination = Path.Combine(root, Path.GetFileName(source));
             if (Directory.Exists(destination))
+            {
+                loaded.Add(Path.GetFileName(source));
                 continue;
+            }
             var files = Directory.GetFiles(source, "*.mui", SearchOption.TopDirectoryOnly);
             if (files.Length == 0)
                 continue;
-            Directory.CreateDirectory(destination);
-            foreach (var file in files)
+            try
             {
-                var staged = Path.Combine(destination, Path.GetFileName(file));
-                File.Copy(file, staged);
+                Directory.CreateDirectory(destination);
+                foreach (var file in files)
+                    File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+                loaded.Add(Path.GetFileName(source));
             }
-            loaded.Add(Path.GetFileName(source));
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // A protected installation may not stage optional native translations.
+                // The published en-US resources remain available without writing to the install directory.
+                RuntimeLog.Write(
+                    "WARN",
+                    "Cannot stage native language " + language + ": " + ex.Message
+                );
+            }
         }
         LoadedMuiLanguages = loaded;
     }
@@ -225,6 +253,8 @@ internal static class Program
             .ToDictionary(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
         foreach (var pair in sources)
         {
+            if (pair.Key.Equals("en-us", StringComparison.OrdinalIgnoreCase))
+                continue;
             var destination = Path.Combine(root, pair.Key);
             if (!Directory.Exists(destination))
                 continue;
@@ -257,7 +287,11 @@ internal static class Program
     // 单文件发布模式下，将嵌入的伴生文件解压到 exe 所在目录
     static void ExtractCompanionFiles()
     {
-        var exeDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+        var executableDirectory =
+            Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+        var exeDir = ResolveWritableDirectory(executableDirectory);
+        if (!string.Equals(exeDir, executableDirectory, StringComparison.OrdinalIgnoreCase))
+            Environment.SetEnvironmentVariable("CMCLAUNCHER_PROGRAM_DIRECTORY", exeDir);
         var marker = Path.Combine(exeDir, ".companion-extracted");
         if (
             File.Exists(marker)

@@ -1,4 +1,4 @@
-﻿# Only ship WinUI resources for the launcher's bundled interface languages.
+# Only ship WinUI resources for the launcher's bundled interface languages.
 param([Parameter(Mandatory = $true)][string]$PublishDir)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'launcher-mui-languages.ps1')
@@ -49,7 +49,15 @@ foreach ($directory in $cultureDirectories)
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
     foreach ($file in Get-ChildItem -LiteralPath $directory.FullName -File)
     {
-        Move-Item -LiteralPath $file.FullName -Destination (Join-Path $destination $file.Name) -Force
+        # Keep the native English fallback beside the DLLs for read-only installations.
+        if ($directory.Name -ieq 'en-us')
+        {
+            Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $destination $file.Name) -Force
+        }
+        else
+        {
+            Move-Item -LiteralPath $file.FullName -Destination (Join-Path $destination $file.Name) -Force
+        }
     }
     if (@(Get-ChildItem -LiteralPath $directory.FullName -Force).Count -eq 0)
     {

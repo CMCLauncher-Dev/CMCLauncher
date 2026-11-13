@@ -86,8 +86,8 @@ public sealed partial class MainWindow
 
     async Task ExportCrashReport(CrashReport report)
     {
-        var picker = new FileSavePicker { SuggestedFileName = report.FileName };
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        var picker = new DesktopFileSavePicker { SuggestedFileName = report.FileName };
+        DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
         picker.FileTypeChoices.Add(Ui("Error report"), [".txt"]);
         var file = await picker.PickSaveFileAsync();
         if (file == null)

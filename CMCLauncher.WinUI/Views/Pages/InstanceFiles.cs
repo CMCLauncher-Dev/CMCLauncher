@@ -145,8 +145,8 @@ public sealed partial class MainWindow
 
     async Task ImportWorld(Instance instance)
     {
-        var picker = new FileOpenPicker();
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        var picker = new DesktopFileOpenPicker();
+        DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
         picker.FileTypeFilter.Add(".zip");
         var file = await picker.PickSingleFileAsync();
         if (file == null)
@@ -176,8 +176,8 @@ public sealed partial class MainWindow
 
     async Task ExportWorld(string name, string folder)
     {
-        var picker = new FileSavePicker();
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        var picker = new DesktopFileSavePicker();
+        DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
         picker.FileTypeChoices.Add("ZIP 存档", [".zip"]);
         picker.SuggestedFileName = name;
         var file = await picker.PickSaveFileAsync();

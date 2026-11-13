@@ -21,8 +21,8 @@ public sealed class JavaSettingsPage : CMCPage
                     Ui("Import Java"),
                     async (_, _) =>
                     {
-                        var picker = new FileOpenPicker();
-                        InitializeWithWindow.Initialize(
+                        var picker = new DesktopFileOpenPicker();
+                        DesktopPicker.Initialize(
                             picker,
                             WindowNative.GetWindowHandle(Window)
                         );

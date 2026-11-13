@@ -84,6 +84,23 @@ public sealed partial class MainWindow
                 message + Environment.NewLine
             );
         }
+        DesktopPicker.Verify(this, Check);
+        var writable = Path.Combine(directory, "portable path 测试");
+        Directory.CreateDirectory(writable);
+        Check(
+            Program.ResolveWritableDirectory(writable) == writable
+                && !Directory.EnumerateFileSystemEntries(writable).Any(),
+            "portable paths with spaces and Unicode remain writable without probe files"
+        );
+        var blocked = Path.Combine(directory, "not-a-directory");
+        File.WriteAllText(blocked, "fixture");
+        var fallback = Program.ResolveWritableDirectory(blocked);
+        Check(
+            fallback != blocked
+                && Directory.Exists(fallback)
+                && File.ReadAllText(blocked) == "fixture",
+            "unwritable installation uses a per-user data directory without changing existing files"
+        );
         await SwitchLanguage("zh_cn");
         await VerifyToolboxUi(Check, directory);
         await VerifyInterfaceLayout(Check, directory);

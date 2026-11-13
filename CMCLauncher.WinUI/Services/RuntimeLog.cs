@@ -1,8 +1,8 @@
-﻿using System.Text;
+using System.Text;
 
 namespace CMCLauncher.WinUI;
 
-// 按天写入程序目录；磁盘不可写时跳过日志，不能拖垮启动器操作。
+// Prefer portable logs; protected installations use the per-user writable directory.
 static class RuntimeLog
 {
     static readonly object Gate = new();
@@ -16,7 +16,7 @@ static class RuntimeLog
     }
 
     static string FilePath =>
-        Path.Combine(Program.UserDirectory, "logs", $"launcher-{DateTime.Now:yyyyMMdd}.log");
+        Path.Combine(Program.WritableDirectory, "logs", $"launcher-{DateTime.Now:yyyyMMdd}.log");
 
     // 脱敏后再落盘，把消息中的换行转义，保持一条事件对应一行。
     public static void Write(string level, string message)

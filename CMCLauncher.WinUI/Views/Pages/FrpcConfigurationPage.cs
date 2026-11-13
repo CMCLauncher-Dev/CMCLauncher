@@ -200,8 +200,8 @@ public sealed partial class MainWindow
                 Ui("Choose files"),
                 async (_, _) =>
                 {
-                    var picker = new FileOpenPicker();
-                    InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+                    var picker = new DesktopFileOpenPicker();
+                    DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                     picker.FileTypeFilter.Add(".ini");
                     picker.FileTypeFilter.Add(".toml");
                     var files = await picker.PickMultipleFilesAsync();

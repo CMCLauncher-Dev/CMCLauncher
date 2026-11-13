@@ -131,13 +131,16 @@ public sealed partial class MainWindow
     // 同时发生的错误只开一个对话框，完整异常由日志保留。
     internal async Task Error(Exception ex)
     {
-        Report(ex.Message);
+        var message = string.IsNullOrWhiteSpace(ex.Message)
+            ? $"{Ui("Operation incomplete")} ({ex.GetType().Name}, 0x{ex.HResult:X8})"
+            : ex.Message;
+        Report(message);
         if (dialogOpen)
             return;
         dialogOpen = true;
         try
         {
-            var detail = ex.Message.Replace("\r\n", "\n").Replace('\r', '\n');
+            var detail = message.Replace("\r\n", "\n").Replace('\r', '\n');
             var firstLine = Ui(
                 detail
                     .Split(
@@ -370,8 +373,8 @@ public sealed partial class MainWindow
 
     async Task ImportContent(Instance instance, string type, string? world)
     {
-        var picker = new FileOpenPicker();
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        var picker = new DesktopFileOpenPicker();
+        DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
         picker.FileTypeFilter.Add(type == "mod" ? ".jar" : ".zip");
         var files = await picker.PickMultipleFilesAsync();
         if (files.Count == 0)

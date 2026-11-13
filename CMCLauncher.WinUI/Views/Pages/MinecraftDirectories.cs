@@ -10,7 +10,12 @@ public sealed partial class MainWindow
         var path = new TextBox
         {
             Header = Ui("Minecraft directory"),
-            Text = Path.Combine(Program.UserDirectory, ".minecraft"),
+            Text = Path.Combine(
+                Program.WritableDirectory == Program.UserDirectory
+                    ? Program.UserDirectory
+                    : Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                ".minecraft"
+            ),
         };
         var body = new StackPanel { Spacing = 12, MinWidth = 320 };
         body.Children.Add(
@@ -19,7 +24,7 @@ public sealed partial class MainWindow
         var location = new BelowComboBox
         {
             ItemsSource = new[] { Ui("Launcher directory"), Ui("AppData") },
-            SelectedIndex = 0,
+            SelectedIndex = Program.WritableDirectory == Program.UserDirectory ? 0 : 1,
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
         location.SelectionChanged += (_, _) =>
