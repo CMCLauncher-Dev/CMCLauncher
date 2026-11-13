@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../CMCLauncher.Core/CMCLauncher.Core.csproj" />
+    <InternalsVisibleTo Include="CMCLauncher.Linux.Tests" />
   </ItemGroup>
 </Project>

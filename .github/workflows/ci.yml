@@ -44,6 +44,9 @@ jobs:
       - name: Check macOS platform integration
         if: runner.os == 'macOS'
         run: dotnet run --project CMCLauncher.Tests/MacOS/CMCLauncher.MacOS.Tests.csproj -c Release
+      - name: Check Linux platform integration
+        if: runner.os == 'Linux'
+        run: dotnet run --project CMCLauncher.Tests/Linux/CMCLauncher.Linux.Tests.csproj -c Release
       - name: Check APT recovery helper
         if: runner.os == 'Linux'
         run: python -B scripts/test-ci-apt-install.py

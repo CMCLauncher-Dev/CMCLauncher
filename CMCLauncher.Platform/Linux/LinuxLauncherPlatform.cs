@@ -39,31 +39,36 @@ public sealed class LinuxLauncherPlatform : LauncherPlatform
             () =>
             {
                 ct.ThrowIfCancellationRequested();
+                var adapters = new List<GraphicsUsage>();
                 try
                 {
-                    return PlatformCommand
-                        .Execute(
-                            "nvidia-smi",
-                            ["--query-gpu=name,utilization.gpu", "--format=csv,noheader,nounits"]
-                        )
-                        .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                        .Select(line =>
-                        {
-                            var separator = line.LastIndexOf(',');
-                            return new GraphicsUsage(
-                                line[..separator].Trim(),
-                                double.Parse(
-                                    line[(separator + 1)..].Trim(),
-                                    System.Globalization.CultureInfo.InvariantCulture
-                                )
-                            );
-                        })
-                        .ToArray();
+                    adapters.AddRange(
+                        PlatformCommand
+                            .Execute(
+                                "nvidia-smi",
+                                [
+                                    "--query-gpu=name,utilization.gpu",
+                                    "--format=csv,noheader,nounits",
+                                ]
+                            )
+                            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(line =>
+                            {
+                                var separator = line.LastIndexOf(',');
+                                return new GraphicsUsage(
+                                    line[..separator].Trim(),
+                                    double.Parse(
+                                        line[(separator + 1)..].Trim(),
+                                        System.Globalization.CultureInfo.InvariantCulture
+                                    )
+                                );
+                            })
+                            .ToArray()
+                    );
                 }
-                catch
-                {
-                    return [];
-                }
+                catch (Exception) when (!ct.IsCancellationRequested) { }
+                adapters.AddRange(LinuxGraphics.ReadDrm("/sys/class/drm", adapters.Count == 0, ct));
+                return adapters;
             },
             ct
         );
