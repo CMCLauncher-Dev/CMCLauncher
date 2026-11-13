@@ -601,6 +601,9 @@ public sealed partial class MainWindow : Window
             AcceptsReturn = multiline,
             TextWrapping = multiline ? TextWrapping.Wrap : TextWrapping.NoWrap,
             MinHeight = multiline ? 180 : 38,
+            MinWidth = 0,
+            Padding = new Thickness(12, 8),
+            CornerRadius = new CornerRadius(6),
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
 
@@ -631,6 +634,7 @@ public sealed partial class MainWindow : Window
                                 ),
                             string option => option switch
                             {
+                                "" => Ui("All"),
                                 "vanilla" => Ui("Vanilla"),
                                 "fabric" => "Fabric",
                                 "forge" => "Forge",
@@ -662,7 +666,7 @@ public sealed partial class MainWindow : Window
                                 "hide_reopen" => Ui("Hide and reopen after the game exits"),
                                 "hide_close" => Ui("Hide and close after the game exits"),
                                 "close" => Ui("Close launcher"),
-                                _ => option,
+                                _ => Ui(option),
                             },
                             _ => value?.ToString() ?? "",
                         }
@@ -855,12 +859,15 @@ public sealed partial class MainWindow : Window
             )
         );
 
+    long toastRevision;
+
     async void ShowToast(string text)
     {
+        var revision = ++toastRevision;
         toast.Child = T(text);
         toast.IsVisible = true;
         await Task.Delay(4000);
-        if (session.Toast == text)
+        if (revision == toastRevision)
             toast.IsVisible = false;
     }
 }

@@ -90,7 +90,7 @@ License: AGPL-3.0-only
 URL: https://github.com/com-in/CMCLauncher
 BuildArch: x86_64
 AutoReqProv: no
-Requires: glibc >= 2.34, libgcc, libstdc++, zlib, libicu, openssl-libs, fontconfig, libX11, libXrandr, libXi, libXcursor, libXrender, libICE, libSM
+Requires: glibc >= 2.34, libgcc, libstdc++, zlib, libicu, libssl.so.3()(64bit), libcrypto.so.3()(64bit), fontconfig, libX11, libXrandr, libXi, libXcursor, libXrender, libICE, libSM
 Recommends: libsecret, glib2
 %description
 Manage Minecraft instances, mods, worlds and downloads.

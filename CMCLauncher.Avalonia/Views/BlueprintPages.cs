@@ -69,7 +69,7 @@ public sealed partial class MainWindow
                     "Go",
                     () =>
                         int.TryParse(jump.Text, out var value) && value > 0
-                            ? Load(query.Text?.Trim() ?? "", value)
+                            ? Load(current?.Query ?? "", value)
                             : throw new IOException("Enter a valid page number.")
                 ),
                 next

@@ -212,6 +212,9 @@ jobs:
           - distro: fedora-44
             image: fedora:44
             family: rpm
+          - distro: fedora-45
+            image: fedora:45
+            family: rpm
           - distro: rocky-9
             image: rockylinux:9
             family: rpm

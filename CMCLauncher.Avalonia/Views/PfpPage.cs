@@ -16,50 +16,93 @@ public sealed partial class MainWindow
         var height = 0;
         var renderRevision = 0;
         WriteableBitmap? rendered = null;
+        byte[]? exportBytes = null;
+        Button export = null!;
         var username = Input("", "Minecraft Java username");
         var info = T("");
         var preview = new Image
         {
-            Width = 300,
-            Height = 300,
+            Width = 192,
+            Height = 192,
+            Tag = "pfp-preview",
             Stretch = Stretch.Uniform,
         };
         var size = Choice(new[] { 128, 256, 512, 1024 }, 512);
-        var padding = Number(12, 0, 40);
-        var mode = Choice(new[] { "Portrait", "Head" });
+        var padding = new Slider
+        {
+            Minimum = 0,
+            Maximum = 40,
+            Value = 12,
+            TickFrequency = 1,
+            IsSnapToTickEnabled = true,
+        };
+        var headOnly = new CheckBox { Content = Ui("Head only") };
         var overlay = new CheckBox { Content = Ui("Include outer skin layer"), IsChecked = true };
-        var shadow = new CheckBox { Content = Ui("Shadow"), IsChecked = true };
-        var slim = new CheckBox { Content = Ui("Slim arms") };
-        var background = Choice(new[] { "Transparent", "Solid", "Gradient" });
-        var start = Input("#00BFA5");
-        var end = Input("#2478E8");
-        var angle = Number(90, 0, 360, 5);
+        var shadow = new CheckBox { Content = Ui("Soft shadow"), IsChecked = true };
+        var slim = new CheckBox { Content = Ui("Slim arms (Alex model)") };
+        var background = Choice(
+            new[] { "Transparent", "Light", "Dark", "Custom color" },
+            "Custom color"
+        );
+        background.Tag = "pfp-background";
+        var gradient = new CheckBox { Content = Ui("Gradient background"), Tag = "pfp-gradient" };
+        var start = Input("#00B4A6");
+        var end = Input("#005C64");
+        var angle = new Slider
+        {
+            Minimum = 0,
+            Maximum = 360,
+            Value = 90,
+            TickFrequency = 1,
+            IsSnapToTickEnabled = true,
+        };
+        var customField = Field("Background color (#RRGGBB)", start);
+        var gradientOptions = Stack(
+            Field("Gradient end color (#RRGGBB)", end),
+            Field("Gradient angle (°)", angle)
+        );
+        gradientOptions.Tag = "pfp-gradient-options";
+        gradientOptions.IsVisible = false;
         async Task Refresh()
         {
+            var revision = ++renderRevision;
+            exportBytes = null;
+            export.IsEnabled = false;
+            customField.IsVisible = background.SelectedIndex == 3;
+            gradientOptions.IsVisible = gradient.IsChecked == true && background.SelectedIndex != 0;
             if (pixels == null)
                 return;
-            var revision = ++renderRevision;
             byte[]? first = null,
                 second = null;
             if (background.SelectedIndex != 0)
             {
-                if (!Color.TryParse(start.Text, out var color))
-                    return;
-                first = [color.R, color.G, color.B];
+                var hex = background.SelectedIndex switch
+                {
+                    1 => "#F5F5F5",
+                    2 => "#202020",
+                    _ => start.Text,
+                };
+                if (hex?.Length != 7 || hex[0] != '#' || !Color.TryParse(hex, out var color))
+                    throw new IOException(Ui("Enter a color in #RRGGBB format."));
+                first = [color.B, color.G, color.R];
             }
-            if (background.SelectedIndex == 2)
+            if (gradient.IsChecked == true && background.SelectedIndex != 0)
             {
-                if (!Color.TryParse(end.Text, out var color))
-                    return;
-                second = [color.R, color.G, color.B];
+                if (
+                    end.Text?.Length != 7
+                    || end.Text[0] != '#'
+                    || !Color.TryParse(end.Text, out var color)
+                )
+                    throw new IOException(Ui("Enter a color in #RRGGBB format."));
+                second = [color.B, color.G, color.R];
             }
             var dimension = (int)(size.SelectedItem ?? 512);
-            var portrait = mode.SelectedIndex == 0;
+            var portrait = headOnly.IsChecked != true;
             var layer = overlay.IsChecked == true;
-            var inset = (int)(padding.Value ?? 12);
+            var inset = (int)padding.Value;
             var shadows = shadow.IsChecked == true;
             var isSlim = slim.IsChecked == true;
-            var degrees = (double)(angle.Value ?? 90);
+            var degrees = angle.Value;
             var source = pixels;
             var w = width;
             var h = height;
@@ -99,6 +142,11 @@ public sealed partial class MainWindow
             rendered = bitmap;
             preview.Source = bitmap;
             old?.Dispose();
+            using var encoded = new MemoryStream();
+            bitmap.Save(encoded);
+            exportBytes = encoded.ToArray();
+            export.IsEnabled = true;
+            info.Text = "";
         }
         async Task Load(byte[] png)
         {
@@ -178,48 +226,76 @@ public sealed partial class MainWindow
                 throw;
             }
         }
-        var body = Stack(
-            Btn("Back to toolbox", () => Navigate("toolbox")),
-            Row(
-                username,
-                Btn("Load player skin", Player),
-                Btn(
-                    "Upload skin",
-                    async () =>
-                    {
-                        var file = await OpenFile("*.png");
-                        if (file != null)
-                        {
-                            if (new FileInfo(file).Length > 8 * 1024 * 1024)
-                                throw new IOException("Skin is too large.");
-                            await Load(await File.ReadAllBytesAsync(file));
-                        }
-                    }
-                )
-            ),
+        export = Btn(
+            "Export PNG",
+            async () =>
+            {
+                var bytes = exportBytes;
+                if (bytes == null)
+                    return;
+                var path = await SaveFile("MinecraftPFP", ".png");
+                if (path != null)
+                {
+                    await File.WriteAllBytesAsync(path, bytes);
+                    ShowToast(Ui("Avatar exported"));
+                }
+            },
+            true
+        );
+        export.IsEnabled = false;
+        export.Tag = "pfp-export";
+        var upload = Btn(
+            "Upload skin",
+            async () =>
+            {
+                var file = await OpenFile("*.png");
+                if (file == null)
+                    return;
+                if (new FileInfo(file).Length > 8 * 1024 * 1024)
+                    throw new IOException("Skin is too large.");
+                await Load(await File.ReadAllBytesAsync(file));
+            }
+        );
+        var controls = Stack(
+            username,
+            Btn("Load player skin", Player),
+            Row(upload, export),
             info,
-            Card(preview),
-            Row(size, mode, background),
-            Field("Padding / %", padding),
+            Field("Export size", size),
             overlay,
+            headOnly,
             shadow,
             slim,
-            Field("Background color", start),
-            Field("Gradient end color", end),
-            Field("Gradient angle", angle),
-            Btn(
-                "Export PNG",
-                async () =>
-                {
-                    if (rendered == null)
-                        throw new IOException("Load a skin first.");
-                    var path = await SaveFile("MinecraftPFP", ".png");
-                    if (path != null)
-                        rendered.Save(path);
-                },
-                true
-            )
+            Field("Padding (%)", padding),
+            Field("Background", background),
+            customField,
+            gradient,
+            gradientOptions
         );
+        var picture = Card(Stack(T("Avatar preview", 16, true), preview));
+        picture.VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top;
+        var options = Card(controls);
+        options.VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top;
+        var layout = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 16,
+            RowSpacing = 16,
+        };
+        layout.Tag = "pfp-layout";
+        layout.Children.Add(picture);
+        layout.Children.Add(options);
+        Grid.SetColumn(options, 1);
+        layout.SizeChanged += (_, _) =>
+        {
+            var wide = layout.Bounds.Width >= 640;
+            Grid.SetColumnSpan(picture, wide ? 1 : 2);
+            Grid.SetColumnSpan(options, wide ? 1 : 2);
+            Grid.SetColumn(options, wide ? 1 : 0);
+            Grid.SetRow(options, wide ? 0 : 1);
+        };
+        var body = Stack(Btn("Back to toolbox", () => Navigate("toolbox")), layout);
         async Task RefreshSafely()
         {
             try
@@ -245,9 +321,9 @@ public sealed partial class MainWindow
                 }
             }
         };
-        foreach (var combo in new[] { size, mode, background })
+        foreach (var combo in new[] { size, background })
             combo.SelectionChanged += async (_, _) => await RefreshSafely();
-        foreach (var check in new[] { overlay, shadow, slim })
+        foreach (var check in new[] { overlay, headOnly, shadow, slim, gradient })
             check.IsCheckedChanged += async (_, _) => await RefreshSafely();
         foreach (var input in new[] { start, end })
             input.TextChanged += async (_, _) => await RefreshSafely();

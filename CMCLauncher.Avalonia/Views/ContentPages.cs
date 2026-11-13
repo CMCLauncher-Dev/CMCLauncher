@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
@@ -347,81 +348,95 @@ public sealed partial class MainWindow
     {
         session.EnsureFilesIdle();
         var updates = Stack();
+        var failures = new List<string>();
+        var game = session.Store.GameDirectory(instance);
+        var records = Path.Combine(game, ".craft-mods-native.json");
+        var curseForgeFiles = File.Exists(records)
+            ? JsonNode
+                .Parse(await File.ReadAllTextAsync(records))!
+                .Items()
+                .Where(record => CurseForgeCommunityService.IsProject(record.S("project")))
+                .Select(record => record.S("file"))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await session.Run(
-            "Check for updates",
+            "Checking mod updates",
             async ct =>
             {
-                foreach (
-                    var item in await Task.Run(
-                        () =>
-                            ContentManager
-                                .List(session.Store.GameDirectory(instance), "mod")
-                                .Where(i => i.Enabled)
-                                .ToArray(),
-                        ct
-                    )
-                )
+                var files = await Task.Run(
+                    () => ContentManager.List(game, "mod").Where(item => item.Enabled).ToArray(),
+                    ct
+                );
+                foreach (var item in files)
                 {
-                    var cf = await session.CurseForge.FindTrackedModUpdate(instance, item.File, ct);
-                    var mr =
-                        cf == null
-                            ? await session.Modrinth.FindModUpdate(
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        var update = curseForgeFiles.Contains(item.File)
+                            ? await session.CurseForge.FindTrackedModUpdate(instance, item.File, ct)
+                            : await session.Modrinth.FindModUpdate(
                                 instance,
-                                ContentManager.Locate(
-                                    session.Store.GameDirectory(instance),
-                                    "mod",
-                                    null,
-                                    item.File
-                                ),
+                                ContentManager.Locate(game, "mod", null, item.File),
                                 ct
-                            )
-                            : null;
-                    var update = cf ?? mr;
-                    if (update == null)
-                        continue;
-                    var captured = update.Value;
-                    updates.Children.Add(
-                        Card(
-                            Stack(
-                                T(item.Name, 15, true),
-                                T(captured.Name),
-                                Btn(
-                                    "Update",
-                                    async () =>
-                                    {
-                                        session.EnsureFilesIdle();
-                                        await session.Run(
-                                            "Update mod",
-                                            token =>
-                                                session.Modrinth.UpdateMod(
-                                                    instance,
-                                                    item.File,
-                                                    captured.Project,
-                                                    captured.Version,
-                                                    token,
-                                                    cf != null
-                                                        ? (temporary, inner) =>
-                                                            session.CurseForge.InstallContent(
-                                                                temporary,
-                                                                captured.Project,
-                                                                captured.Version,
-                                                                "mod",
-                                                                null,
-                                                                inner
-                                                            )
-                                                        : null
-                                                )
-                                        );
-                                    }
-                                )
-                            )
-                        )
-                    );
+                            );
+                        if (update == null)
+                            continue;
+                        var captured = update.Value;
+                        var status = T("");
+                        var completed = false;
+                        var button = Btn(
+                            "Update",
+                            async () =>
+                            {
+                                if (completed)
+                                    return;
+                                session.EnsureFilesIdle();
+                                await session.Run(
+                                    "Update mod",
+                                    token =>
+                                        session.Modrinth.UpdateMod(
+                                            instance,
+                                            item.File,
+                                            captured.Project,
+                                            captured.Version,
+                                            token,
+                                            CurseForgeCommunityService.IsProject(captured.Project)
+                                                ? (temporary, inner) =>
+                                                    session.CurseForge.InstallContent(
+                                                        temporary,
+                                                        captured.Project,
+                                                        captured.Version,
+                                                        "mod",
+                                                        null,
+                                                        inner
+                                                    )
+                                                : null
+                                        )
+                                );
+                                completed = true;
+                                status.Text = Ui("Updated. Old files are in mod-backups.");
+                            }
+                        );
+                        updates.Children.Add(
+                            Card(Stack(T(item.Name, 15, true), T(captured.Name), button, status))
+                        );
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add(item.File + ": " + ex.Message);
+                        session.Log("ERROR", ex.ToString());
+                    }
                 }
             }
         );
         if (updates.Children.Count == 0)
             updates.Children.Add(T("No compatible updates found."));
+        foreach (var failure in failures)
+            updates.Children.Add(T(failure, 12));
         pageContent.Content = Stack(Btn("Back", () => ContentPage(instance, "mod")), updates);
     }
 

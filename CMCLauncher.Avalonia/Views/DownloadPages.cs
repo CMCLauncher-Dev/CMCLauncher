@@ -209,6 +209,7 @@ public sealed partial class MainWindow
             type == "world" ? new[] { "curseforge" } : new[] { "modrinth", "curseforge", "all" },
             state.Source
         );
+        source.Tag = "community-source";
         var game = Choice(new[] { "" }, state.Filters.GameVersion);
         var loader = Choice(
             new[] { "", "fabric", "forge", "neoforge", "quilt" },
@@ -216,6 +217,7 @@ public sealed partial class MainWindow
         );
         var sort = Choice(new[] { "", "downloads", "newest", "updated" }, state.Filters.Sort);
         var category = Choice(new[] { "" });
+        var categoryChoices = new List<ComboBox> { category };
         var environment = Choice(
             new[] { "", "client", "server", "both" },
             state.Filters.Environment
@@ -307,7 +309,7 @@ public sealed partial class MainWindow
                             async () =>
                             {
                                 drawer.IsPaneOpen = false;
-                                await Search(0);
+                                await Search(0, true);
                             },
                             true
                         ),
@@ -363,7 +365,7 @@ public sealed partial class MainWindow
         Grid.SetColumn(more, 3);
         options.Children.Add(more);
         body.Children.Add(options);
-        var searchButton = Btn("Search", () => Search(0), true);
+        var searchButton = Btn("Search", () => Search(0, true), true);
         var searchRow = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("*,Auto"),
@@ -398,7 +400,11 @@ public sealed partial class MainWindow
             new(
                 GameVersion: game.SelectedItem?.ToString() ?? "",
                 Loader: loader.SelectedItem?.ToString() ?? "",
-                Categories: category.SelectedItem is CommunityCategory c ? [c.Name] : [],
+                Categories: categoryChoices
+                    .Select(choice => choice.SelectedItem)
+                    .OfType<CommunityCategory>()
+                    .Select(c => c.Name)
+                    .ToArray(),
                 Environment: source.SelectedItem?.ToString() == "modrinth"
                     ? environment.SelectedItem?.ToString() ?? ""
                     : "",
@@ -445,20 +451,30 @@ public sealed partial class MainWindow
                 );
                 description.MaxLines = 1;
                 description.TextTrimming = TextTrimming.CharacterEllipsis;
+                var title = T(item.Name, 16, true);
+                title.MaxLines = 1;
+                title.TextTrimming = TextTrimming.CharacterEllipsis;
                 var labels = Stack(
-                    T(item.Name, 17, true),
+                    title,
                     description,
-                    T(item.Source == "curseforge" ? "CurseForge" : "Modrinth", 11),
-                    Btn("View details", () => CommunityDetails(item, type))
+                    T(item.Source == "curseforge" ? "CurseForge" : "Modrinth", 11)
                 );
+                labels.Spacing = 4;
+                labels.VerticalAlignment = VerticalAlignment.Center;
                 var card = new Grid
                 {
-                    ColumnDefinitions = new ColumnDefinitions("110,*"),
+                    ColumnDefinitions = new ColumnDefinitions("64,*,Auto"),
                     ColumnSpacing = 12,
                 };
-                card.Children.Add(Preview(item.IconUrl));
+                var icon = Preview(item.IconUrl);
+                icon.Width = icon.Height = 64;
+                card.Children.Add(icon);
                 Grid.SetColumn(labels, 1);
                 card.Children.Add(labels);
+                var details = Btn("View details", () => CommunityDetails(item, type));
+                details.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetColumn(details, 2);
+                card.Children.Add(details);
                 list.Children.Add(Card(card));
             }
             var totalPages = Math.Max(1, (state.Result.TotalHits + 15) / 16);
@@ -468,19 +484,19 @@ public sealed partial class MainWindow
             next.IsEnabled = state.Result.HasNext;
             status.Text = state.Result.Warning ?? $"{state.Result.TotalHits:N0}";
         }
-        async Task Search(int page)
+        async Task Search(int page, bool submit = false)
         {
             if (loading || page < 0)
                 return;
-            if (state.Result != null && page > 0 && page * 16 >= state.Result.TotalHits)
+            if (!submit && state.Result != null && page > 0 && page * 16 >= state.Result.TotalHits)
                 return;
             loading = true;
             source.IsEnabled = false;
             status.Text = Ui("Loading…");
             try
             {
-                var filters = Read();
-                var text = query.Text?.Trim() ?? "";
+                var filters = submit ? Read() : state.Filters;
+                var text = submit ? query.Text?.Trim() ?? "" : state.Query;
                 var response = await session.Community.SearchPage(
                     text,
                     type,
@@ -547,14 +563,53 @@ public sealed partial class MainWindow
                     return;
                 catalog = loaded;
                 RefreshVersions();
-                category.ItemsSource = new object[] { "" }.Concat(
-                    catalog.Categories.Where(c => c.ProjectType == type)
-                );
-                category.SelectedItem = catalog.Categories.FirstOrDefault(c =>
-                    state.Filters.Categories?.Contains(c.Name) == true
-                );
-                if (category.SelectedIndex < 0)
+                // Provider categories include independent feature/resolution groups.
+                // Rebuild columns together so every applicable filter stays in one row.
+                var applicable = catalog.Categories.Where(c => c.ProjectType == type).ToArray();
+                if (type == "datapack" && applicable.Length == 0)
+                    applicable = catalog.Categories.Where(c => c.ProjectType == "mod").ToArray();
+                while (fields.Count > (type is "mod" or "modpack" or "shader" ? 3 : 2))
+                    fields.RemoveAt(fields.Count - 1);
+                categoryChoices.Clear();
+                foreach (var group in applicable.GroupBy(c => c.Header))
+                {
+                    if (provider == "all")
+                        break;
+                    var choice = Choice(new object[] { "" }.Concat(group));
+                    choice.Tag = "community-filter-category-" + group.Key;
+                    choice.SelectedItem =
+                        group.FirstOrDefault(c =>
+                            state.Filters.Categories?.Contains(c.Name) == true
+                        ) ?? (object)"";
+                    categoryChoices.Add(choice);
+                    var label = group.Key switch
+                    {
+                        "categories" => "Category",
+                        "features" => "Features",
+                        "resolutions" => "Resolution",
+                        "performance impact" => "Performance impact",
+                        _ => group.Key,
+                    };
+                    fields.Add(Field(label, choice));
+                }
+                if (categoryChoices.Count == 0)
+                {
+                    category.ItemsSource = new[] { "" };
                     category.SelectedIndex = 0;
+                    category.IsEnabled = false;
+                    categoryChoices.Add(category);
+                    fields.Add(Field("Category", category));
+                }
+                basic.Children.Clear();
+                basic.ColumnDefinitions.Clear();
+                for (var i = 0; i < fields.Count; i++)
+                {
+                    basic.ColumnDefinitions.Add(
+                        new ColumnDefinition(new GridLength(1, GridUnitType.Star))
+                    );
+                    Grid.SetColumn(fields[i], i);
+                    basic.Children.Add(fields[i]);
+                }
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
@@ -570,7 +625,7 @@ public sealed partial class MainWindow
             if (e.Key == global::Avalonia.Input.Key.Enter)
             {
                 e.Handled = true;
-                await Search(0);
+                await Search(0, true);
             }
         };
         Draw();
@@ -586,13 +641,61 @@ public sealed partial class MainWindow
         var host = Stack(Btn("Back", () => Navigate(returnRoute)), T("Loading…"));
         pageContent.Content = host;
         var ct = navigationRequest?.Token ?? default;
-        var project = await session.Community.ProjectDetails(item.Id, ct);
-        CommunityVersionPage? firstPage =
-            item.Source == "curseforge"
-                ? await session.CurseForge.ProjectVersionPage(item.Id, 0, 50, ct)
-                : null;
-        var versions =
-            firstPage?.Versions.ToList() ?? await session.Modrinth.ProjectVersions(item.Id, ct);
+        using var request = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        request.CancelAfter(TimeSpan.FromSeconds(45));
+        var projectTask = Task.Run(
+            () => session.Community.ProjectDetails(item.Id, request.Token),
+            request.Token
+        );
+        var versionTask = Task.Run(
+            async () =>
+            {
+                if (item.Source == "curseforge")
+                {
+                    var page = await session.CurseForge.ProjectVersionPage(
+                        item.Id,
+                        0,
+                        50,
+                        request.Token
+                    );
+                    return (Page: (CommunityVersionPage?)page, Versions: page.Versions.ToList());
+                }
+                return (
+                    Page: (CommunityVersionPage?)null,
+                    Versions: await session.Modrinth.ProjectVersions(item.Id, request.Token)
+                );
+            },
+            request.Token
+        );
+        var pending = Task.WhenAll(projectTask, (Task)versionTask);
+        try
+        {
+            await pending.WaitAsync(request.Token);
+        }
+        catch (OperationCanceledException)
+            when (ct.IsCancellationRequested || revision != generation)
+        {
+            return;
+        }
+        catch (OperationCanceledException)
+        {
+            throw new IOException(Ui("The request timed out. Please try again."));
+        }
+        finally
+        {
+            _ = pending.ContinueWith(
+                task =>
+                {
+                    _ = task.Exception;
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted
+                    | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default
+            );
+        }
+        var project = await projectTask;
+        var (firstPage, versions) = await versionTask;
         if (revision != generation)
             return;
         host.Children.Clear();

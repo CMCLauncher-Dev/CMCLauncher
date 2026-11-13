@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Themes.Fluent;
@@ -12,6 +13,43 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        try
+        {
+            Run(args);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            try
+            {
+                var directory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "CMCLauncher.Native",
+                    "logs"
+                );
+                Directory.CreateDirectory(directory);
+                var file = Path.Combine(directory, "startup-error.log");
+                File.AppendAllText(
+                    file,
+                    DateTimeOffset.Now.ToString("O")
+                        + Environment.NewLine
+                        + ex
+                        + Environment.NewLine
+                );
+                Console.Error.WriteLine("Startup diagnostics: " + file);
+            }
+            catch (Exception loggingError)
+            {
+                Console.Error.WriteLine(
+                    "Cannot write startup diagnostics: " + loggingError.Message
+                );
+            }
+            Environment.ExitCode = 1;
+        }
+    }
+
+    static void Run(string[] args)
+    {
         if (OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException(
                 "On Windows, run CMCLauncher.WinUI. Avalonia is the Linux/macOS frontend."
@@ -24,7 +62,20 @@ internal static class Program
         if (OperatingSystem.IsMacOS())
             MacOSLauncherPlatform.Initialize();
         else if (OperatingSystem.IsLinux())
+        {
+            // Check before the first HTTPS call: the runtime otherwise aborts without a managed exception.
+            foreach (var library in new[] { "libcrypto.so.3", "libssl.so.3" })
+            {
+                if (!NativeLibrary.TryLoad(library, out var handle))
+                    throw new PlatformNotSupportedException(
+                        "Cannot load "
+                            + library
+                            + ". Install OpenSSL 3 libraries (Fedora: openssl3-libs; Debian/Ubuntu: libssl3 or libssl3t64)."
+                    );
+                NativeLibrary.Free(handle);
+            }
             LinuxLauncherPlatform.Initialize();
+        }
         // CI can activate the published self-contained host without opening an AppKit window.
         if (args.Length == 2 && args[0] == "--verify-platform-runtime")
         {
