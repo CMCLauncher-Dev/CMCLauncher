@@ -25,7 +25,8 @@ static class LauncherUpdateTests
         string tag,
         bool prerelease = false,
         bool draft = false,
-        string? url = null
+        string? url = null,
+        string assetName = "CMCLauncher-2.0.0-win-x64.zip"
     ) =>
         new
         {
@@ -37,9 +38,9 @@ static class LauncherUpdateTests
             {
                 new
                 {
-                    name = "CMCLauncher-2.0.0-win-x64.zip",
+                    name = assetName,
                     browser_download_url = url
-                        ?? "https://github.com/com-in/CMCLauncher/releases/download/v2.0.0/CMCLauncher-2.0.0-win-x64.zip",
+                        ?? "https://github.com/CMCLauncher-Dev/CMCLauncher/releases/download/v2.0.0/CMCLauncher-2.0.0-win-x64.zip",
                     size = 3,
                     digest = "sha256:" + new string('a', 64),
                 },
@@ -62,6 +63,64 @@ static class LauncherUpdateTests
     public static async Task Run(string root)
     {
         Directory.CreateDirectory(root);
+        var migratedRelease = LauncherUpdates
+            .ParseReleases(
+                JsonSerializer.Serialize(
+                    new[]
+                    {
+                        Release(
+                            "CMCL-v1.0.5-release",
+                            url: "https://github.com/CMCLauncher-Dev/CMCLauncher/releases/download/CMCL-v1.0.5-release/CMCLauncher-1.0.5-win-x64.zip",
+                            assetName: "CMCLauncher-1.0.5-win-x64.zip"
+                        ),
+                    }
+                ),
+                false
+            )
+            .Single();
+        Check(
+            migratedRelease.Asset is { Sha256.Length: 64 }
+                && migratedRelease.Page.AbsoluteUri.Contains("/CMCLauncher-Dev/CMCLauncher/"),
+            "Migrated repository releases remain eligible for automatic updates"
+        );
+        Check(
+            LauncherUpdates
+                .ParseReleases(
+                    JsonSerializer.Serialize(
+                        new[]
+                        {
+                            Release(
+                                "CMCL-v1.0.5-release",
+                                url: "https://github.com/CMCLauncher-Dev/CMCLauncher/releases/download/CMCL-v1.0.5-release/CMCLauncher-1.0.5-win-x64.exe",
+                                assetName: "CMCLauncher-1.0.5-win-x64.exe"
+                            ),
+                        }
+                    ),
+                    true
+                )
+                .Single()
+                .Asset
+                is { Sha256.Length: 64 },
+            "Migrated single-file releases retain their verified automatic update asset"
+        );
+        Check(
+            LauncherUpdates.IsAssetUrl(
+                new Uri(
+                    "https://github.com/com-in/CMCLauncher/releases/download/v1.0.3/CMCLauncher-1.0.3-win-x64.zip"
+                )
+            )
+                && !LauncherUpdates.IsAssetUrl(
+                    new Uri(
+                        "https://github.com/CMCLauncher-Dev/CMCLauncher-other/releases/download/v1.0.5/package.zip"
+                    )
+                )
+                && !LauncherUpdates.IsAssetUrl(
+                    new Uri(
+                        "https://github.com.evil.invalid/CMCLauncher-Dev/CMCLauncher/releases/download/v1.0.5/package.zip"
+                    )
+                ),
+            "Repository migration preserves historical URLs without accepting unrelated repositories or hosts"
+        );
         Check(
             LauncherVersion.Parse("CMCL-v1.0.0-release") == LauncherVersion.Parse("1.0.0+hash"),
             "Historical release tags normalize correctly"
@@ -164,19 +223,15 @@ static class LauncherUpdateTests
         );
         Check(
             LauncherUpdates.AcceleratedAssetUrl(asset.Url, null) == asset.Url
-                && LauncherUpdates.AcceleratedAssetUrl(
-                    asset.Url,
-                    "https://mirror.example/download"
-                )
+                && LauncherUpdates.AcceleratedAssetUrl(asset.Url, "https://mirror.example/download")
                     == new Uri(
                         "https://mirror.example/download/https://github.com/com-in/CMCLauncher/releases/download/v2.0.0/update.exe"
                     )
                 && LauncherUpdates.AcceleratedAssetUrl(asset.Url, "not-a-url") == asset.Url
                 && LauncherUpdates.AcceleratedAssetUrl(
-                        new Uri("https://example.com/other"),
-                        "https://mirror.example"
-                    )
-                    == new Uri("https://example.com/other"),
+                    new Uri("https://example.com/other"),
+                    "https://mirror.example"
+                ) == new Uri("https://example.com/other"),
             "accelerated download prefix rewrites only this repository's update assets"
         );
         using (

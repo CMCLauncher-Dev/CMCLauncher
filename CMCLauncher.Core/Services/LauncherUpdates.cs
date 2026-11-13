@@ -99,7 +99,8 @@ public sealed record LauncherRelease(
 
 public sealed class LauncherUpdates(HttpClient client)
 {
-    public const string Repository = "com-in/CMCLauncher";
+    public const string Repository = "CMCLauncher-Dev/CMCLauncher";
+    const string LegacyRepository = "com-in/CMCLauncher";
     public const string ReleasesPage = "https://github.com/" + Repository + "/releases";
     const long MaximumPackageSize = 512L * 1024 * 1024;
 
@@ -131,9 +132,15 @@ public sealed class LauncherUpdates(HttpClient client)
         && uri.IsDefaultPort
         && uri.UserInfo.Length == 0
         && uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
-        && uri.AbsolutePath.StartsWith(
-            "/" + Repository + "/releases/download/",
-            StringComparison.Ordinal
+        && (
+            uri.AbsolutePath.StartsWith(
+                "/" + Repository + "/releases/download/",
+                StringComparison.OrdinalIgnoreCase
+            )
+            || uri.AbsolutePath.StartsWith(
+                "/" + LegacyRepository + "/releases/download/",
+                StringComparison.OrdinalIgnoreCase
+            )
         );
 
     // 加速下载前缀（下载镜像）：仅作用于启动器更新包下载。
