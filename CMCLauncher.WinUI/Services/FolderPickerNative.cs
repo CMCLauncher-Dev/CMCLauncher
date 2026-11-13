@@ -61,7 +61,7 @@ static partial class DesktopPicker
         int SetFileName([MarshalAs(UnmanagedType.LPWStr)] string pszName);
 
         [PreserveSig]
-        int GetFileName([MarshalAs(UnmanagedType.LPWStr)] out IntPtr pszName);
+        int GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
 
         [PreserveSig]
         int SetTitle([MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
@@ -150,7 +150,7 @@ static partial class DesktopPicker
         int SetFileName([MarshalAs(UnmanagedType.LPWStr)] string pszName);
 
         [PreserveSig]
-        int GetFileName([MarshalAs(UnmanagedType.LPWStr)] out IntPtr pszName);
+        int GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
 
         [PreserveSig]
         int SetTitle([MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
@@ -242,7 +242,7 @@ static partial class DesktopPicker
         bool folder,
         Filter[] filters,
         string? name,
-        Action<Action>? beforeShow = null
+        Action<object, Action>? beforeShow = null
     )
     {
         if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA || owner == IntPtr.Zero)
@@ -293,8 +293,9 @@ static partial class DesktopPicker
             }
             if (!string.IsNullOrEmpty(name))
                 Marshal.ThrowExceptionForHR(dialog.SetFileName(name));
-            beforeShow?.Invoke(() =>
-                Marshal.ThrowExceptionForHR(dialog.Close(unchecked((uint)0x800704C7)))
+            beforeShow?.Invoke(
+                instance,
+                () => Marshal.ThrowExceptionForHR(dialog.Close(unchecked((uint)0x800704C7)))
             );
             var result = dialog.Show(owner);
             if (result == unchecked((int)0x800704C7))

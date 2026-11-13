@@ -2,6 +2,7 @@
   "code": "ja_jp",
   "displayName": "日本語",
   "strings": {
+    "Show scrollbars": "スクロールバーを表示",
     "No Java installation was found on PATH.": "PATH に Java が見つかりません。",
     "No compatible loader versions found.": "対応するローダーバージョンが見つかりません。",
     "No matching versions. Try a different version number or release type.": "一致するバージョンがありません。番号や種類を変更してください。",

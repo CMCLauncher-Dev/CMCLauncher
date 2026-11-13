@@ -101,6 +101,43 @@ public sealed partial class MainWindow
                     throw new IOException("Page failed: " + page);
                 checks.Add("PASS " + page);
             }
+            await Navigate("appearance");
+            var scrollToggle = pageContent
+                .GetVisualDescendants()
+                .OfType<ToggleSwitch>()
+                .Single(toggle => toggle.Tag?.ToString() == "show-scrollbars");
+            if (
+                scrollToggle.Parent is not StackPanel controls
+                || controls.Children.FirstOrDefault() != scrollToggle
+            )
+                throw new IOException("Scrollbar toggle is not at the top of the controls card.");
+            scrollToggle.IsChecked = true;
+            await Task.Delay(120);
+            var scrollBar = this.GetVisualDescendants()
+                .OfType<global::Avalonia.Controls.Primitives.ScrollBar>()
+                .First(bar =>
+                    bar.Orientation == global::Avalonia.Layout.Orientation.Vertical
+                    && bar.Maximum > 0
+                    && bar.Opacity == 1
+                );
+            if (
+                !scrollBar.IsHitTestVisible
+                || !new Store(session.Store.Root).Config.Settings.ShowScrollBars
+            )
+                throw new IOException("Scrollbar visibility did not update or persist.");
+            var scrollThumb = scrollBar
+                .GetVisualDescendants()
+                .OfType<global::Avalonia.Controls.Primitives.Thumb>()
+                .First();
+            if (Math.Abs(scrollThumb.Bounds.Width - 4) > .1)
+                throw new IOException(
+                    "Scrollbar thumb is not four pixels wide: " + scrollThumb.Bounds.Width
+                );
+            scrollToggle.IsChecked = false;
+            await Task.Delay(120);
+            if (scrollBar.Opacity != 0 || scrollBar.IsHitTestVisible)
+                throw new IOException("Disabled scrollbars remained visible or intercepted input.");
+            checks.Add("PASS scrollbar preference position, live visibility and persistence");
             var savedLayout = session.Store.Config.Settings.InstanceView;
             session.Store.Config.Settings.InstanceView = "tile";
             await Navigate("instances");

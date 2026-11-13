@@ -144,7 +144,7 @@
           <ScrollViewer
             x:Name="CommunityFilterDrawerScroll"
             Grid.Row="1"
-            VerticalScrollBarVisibility="Hidden"
+            VerticalScrollBarVisibility="Auto"
             HorizontalScrollBarVisibility="Disabled"
             HorizontalScrollMode="Disabled"
             HorizontalContentAlignment="Stretch"
@@ -226,7 +226,7 @@
               </Grid>
               <ScrollViewer
                 Grid.Row="1"
-                VerticalScrollBarVisibility="Hidden"
+                VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled"
                 HorizontalScrollMode="Disabled"
                 HorizontalContentAlignment="Stretch"
@@ -275,8 +275,8 @@
               <Grid RowDefinitions="0,*,Auto">
                 <ScrollViewer
                   Grid.Row="1"
-                  VerticalScrollBarVisibility="Hidden"
-                  HorizontalScrollBarVisibility="Hidden"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Auto"
                 >
                   <StackPanel
                     x:Name="NavigationMenu"
@@ -415,7 +415,7 @@
                 x:Name="PageViewport"
                 Grid.Row="1"
                 Margin="0,18,0,14"
-                VerticalScrollBarVisibility="Hidden"
+                VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled"
                 HorizontalScrollMode="Disabled"
                 HorizontalContentAlignment="Stretch"

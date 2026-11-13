@@ -285,6 +285,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Check Windows release packaging
+        shell: pwsh
+        run: ./scripts/test-package-release.ps1
       - name: Run native tests
         run: dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Release
 

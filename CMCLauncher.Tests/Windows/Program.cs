@@ -218,6 +218,10 @@ internal static class Program
     // 覆盖路径、内容识别、账号、下载和整合包流程；多数网络响应由 MockHandler 提供。
     static async Task CoreTests()
     {
+        await WindowsPathCompatibilityTests.Run(Path.Combine(root, "windows-paths"));
+        Pass(
+            "portable directory fallback and concurrent native language staging preserve user data"
+        );
         await LaunchAuditTests.Run(Path.Combine(root, "launch-audit"));
         Pass(
             "cold and warm process launch, native isolation, output drain, concurrent downloads and profile reimport"

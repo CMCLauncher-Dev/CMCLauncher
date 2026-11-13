@@ -2,6 +2,7 @@
   "code": "ru_ru",
   "displayName": "Русский",
   "strings": {
+    "Show scrollbars": "Показывать полосы прокрутки",
     "No Java installation was found on PATH.": "Java не найдена в PATH.",
     "No compatible loader versions found.": "Совместимые версии загрузчика не найдены.",
     "No matching versions. Try a different version number or release type.": "Нет подходящих версий. Измените номер или тип версии.",

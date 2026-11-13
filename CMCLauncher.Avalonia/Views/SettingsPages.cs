@@ -579,6 +579,18 @@ public sealed partial class MainWindow
             .Concat(session.Themes.Presets)
             .ToArray();
         var preset = Choice(presets, presets.FirstOrDefault(p => p.Id == settings.ColorPreset));
+        var showScrollBars = new ToggleSwitch
+        {
+            Content = Ui("Show scrollbars"),
+            Tag = "show-scrollbars",
+            IsChecked = settings.ShowScrollBars,
+        };
+        showScrollBars.IsCheckedChanged += async (_, _) =>
+        {
+            settings.ShowScrollBars = showScrollBars.IsChecked == true;
+            await session.Save();
+            ApplyTheme();
+        };
         var scale = Number((decimal)(settings.UiScale * 100), 70, 200, 5);
         var buttons = Number((decimal)(settings.UiButtonScale * 100), 70, 200, 5);
         var menus = Number((decimal)(settings.UiMenuScale * 100), 70, 200, 5);
@@ -634,16 +646,15 @@ public sealed partial class MainWindow
             colors.Children.Add(new Expander { Header = Ui(label), Content = panel });
         }
         return Stack(
+            Card(Stack(Field("Appearance", theme), Field("Preset", preset), colors)),
             Card(
                 Stack(
-                    Field("Appearance", theme),
-                    Field("Preset", preset),
+                    showScrollBars,
                     Field("UI scale / %", scale),
                     Field("Button scale / %", buttons),
                     Field("Menu scale / %", menus),
                     Field("Font family", font),
                     Field("Font size", fontSize),
-                    colors,
                     Btn("Apply", Apply, true)
                 )
             ),
@@ -659,6 +670,7 @@ public sealed partial class MainWindow
                                     return;
                                 settings.Theme = value.Theme;
                                 settings.ColorPreset = value.ColorPreset;
+                                settings.ShowScrollBars = value.ShowScrollBars;
                                 settings.UiScale = value.UiScale;
                                 settings.UiButtonScale = value.UiButtonScale;
                                 settings.UiMenuScale = value.UiMenuScale;
@@ -684,6 +696,7 @@ public sealed partial class MainWindow
                                         Name = name.Text ?? "",
                                         Theme = settings.Theme,
                                         ColorPreset = settings.ColorPreset,
+                                        ShowScrollBars = settings.ShowScrollBars,
                                         UiScale = settings.UiScale,
                                         UiButtonScale = settings.UiButtonScale,
                                         UiMenuScale = settings.UiMenuScale,

@@ -7,24 +7,29 @@ public static class PortableDataDirectory
     {
         try
         {
-            Directory.CreateDirectory(preferred);
-            var probe = Path.Combine(preferred, ".cmcl-write-" + Guid.NewGuid().ToString("N"));
-            using (
-                new FileStream(
-                    probe,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    1,
-                    FileOptions.DeleteOnClose
-                )
-            ) { }
+            VerifyWritable(preferred);
             return preferred;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Directory.CreateDirectory(fallback);
+            VerifyWritable(fallback);
             return fallback;
         }
+    }
+
+    static void VerifyWritable(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        var probe = Path.Combine(directory, ".cmcl-write-" + Guid.NewGuid().ToString("N"));
+        using (
+            new FileStream(
+                probe,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                1,
+                FileOptions.DeleteOnClose
+            )
+        ) { }
     }
 }

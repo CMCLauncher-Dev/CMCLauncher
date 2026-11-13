@@ -22,6 +22,7 @@ public sealed partial class MainWindow
             "third-party client management is combined immediately before the current version"
         );
         await VerifyMemoryAllocation(check, directory);
+        await VerifyScrollBarAppearance(check);
         check(
             !navigationButtons.ContainsKey("page:logs"),
             "runtime logs are absent from the sidebar"

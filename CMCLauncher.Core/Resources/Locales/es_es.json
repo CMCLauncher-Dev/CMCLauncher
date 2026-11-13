@@ -2,6 +2,7 @@
   "code": "es_es",
   "displayName": "Español",
   "strings": {
+    "Show scrollbars": "Mostrar barras de desplazamiento",
     "No Java installation was found on PATH.": "No se encontró Java en PATH.",
     "No compatible loader versions found.": "No se encontraron versiones compatibles del cargador.",
     "No matching versions. Try a different version number or release type.": "No hay versiones coincidentes. Prueba otro número o tipo.",

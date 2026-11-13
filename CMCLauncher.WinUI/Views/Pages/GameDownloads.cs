@@ -76,7 +76,7 @@ public sealed partial class MainWindow
             Ui("Minecraft version")
         );
         ScrollViewer.SetHorizontalScrollBarVisibility(versions, ScrollBarVisibility.Disabled);
-        ScrollViewer.SetVerticalScrollBarVisibility(versions, ScrollBarVisibility.Hidden);
+        ScrollViewer.SetVerticalScrollBarVisibility(versions, ScrollBarVisibility.Auto);
         var versionStatus = Text(Ui("Fetching official version list…"), 12);
         var versionDetail = Text(Ui("No version selected"), 21, true);
         versionDetail.Foreground = Brush(lightTheme ? "#69745F" : "#ACADBD");

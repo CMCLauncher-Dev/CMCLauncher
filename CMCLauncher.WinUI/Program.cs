@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -20,7 +19,8 @@ internal static class Program
 
     // Portable installs keep their data beside the executable. Protected installations use
     // a per-user directory; never require elevation just to write logs or FRP configurations.
-    internal static string WritableDirectory { get; } = ResolveWritableDirectory(UserDirectory);
+    static readonly Lazy<string> WritableRoot = new(() => ResolveWritableDirectory(UserDirectory));
+    internal static string WritableDirectory => WritableRoot.Value;
 
     internal static string ResolveWritableDirectory(string preferred) =>
         PortableDataDirectory.Resolve(
@@ -61,7 +61,7 @@ internal static class Program
         ExtractCompanionFiles();
 #endif
         if (args.Length >= 2 && args[0] == "--cleanup-mui")
-            return CleanupWorker(args);
+            return 0; // Older launchers may still invoke this command; native resources are now persistent.
         PrepareMuiResources();
         if (args.Length == 2 && args[0] == "--verify-singlefile-runtime")
         {
@@ -88,7 +88,6 @@ internal static class Program
                 OleUninitialize();
             }
         }
-        StartMuiCleanupWorker();
         WinRT.ComWrappersSupport.InitializeComWrappers();
         // 文件拖放依赖 OLE，在 STA 主线程初始化，并在消息循环退出后成对清理。
         var oleResult = OleInitialize(IntPtr.Zero);
@@ -111,74 +110,20 @@ internal static class Program
         return 0;
     }
 
-    // 主进程退出后异步清理过期 MUI 文件（启动独立子进程避免锁冲突）
-    static void StartMuiCleanupWorker()
-    {
-        if (LoadedMuiLanguages.Count == 0 || Environment.ProcessPath is not string executable)
-            return;
-        var start = new ProcessStartInfo(executable)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden,
-        };
-        start.ArgumentList.Add("--cleanup-mui");
-        start.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
-        foreach (var culture in LoadedMuiLanguages)
-            start.ArgumentList.Add(culture);
-        using var cleanup = Process.Start(start);
-    }
-
-    // 清理子进程入口 — 等待主进程退出后删除不再需要的 MUI 文件夹
-    static int CleanupWorker(string[] args)
-    {
-        if (!int.TryParse(args[1], out var processId))
-            return 2;
-        try
-        {
-            using var owner = Process.GetProcessById(processId);
-            owner.WaitForExit();
-        }
-        catch (ArgumentException) { }
-        foreach (var culture in args.Skip(2))
-        {
-            if (culture.Equals("en-us", StringComparison.OrdinalIgnoreCase))
-                continue;
-            var root = Path.Combine(AppContext.BaseDirectory, culture);
-            var source = Path.Combine(AppContext.BaseDirectory, "languages", culture);
-            if (!Directory.Exists(root) || !Directory.Exists(source))
-                continue;
-            // 只清理本程序暂放且与源文件相同的 MUI；目录里有其他内容时保留。
-            var stagedFiles = Directory.GetFiles(root, "*.mui", SearchOption.TopDirectoryOnly);
-            var sourceFiles = Directory.GetFiles(source, "*.mui", SearchOption.TopDirectoryOnly);
-            if (
-                stagedFiles.Length == 0
-                || stagedFiles.Length != sourceFiles.Length
-                || Directory.GetFileSystemEntries(root).Length != stagedFiles.Length
-            )
-                continue;
-            var matches = sourceFiles.All(file =>
-            {
-                var staged = Path.Combine(root, Path.GetFileName(file));
-                return File.Exists(staged)
-                    && File.ReadAllBytes(staged).AsSpan().SequenceEqual(File.ReadAllBytes(file));
-            });
-            if (!matches)
-                continue;
-            try
-            {
-                foreach (var file in stagedFiles)
-                    File.Delete(file);
-                Directory.Delete(root, false);
-            }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
-        }
-        return 0;
-    }
-
     // 部署 MUI 语言资源 — 将用户首选语言的 .mui 文件从 languages 目录复制到 exe 同级
     static void PrepareMuiResources()
+    {
+        try
+        {
+            PrepareMuiResourcesCore();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            RuntimeLog.Write("WARN", "Native language resources are unavailable: " + ex.Message);
+        }
+    }
+
+    static void PrepareMuiResourcesCore()
     {
         var root = AppContext.BaseDirectory;
         var languageRoot = Path.Combine(root, "languages");
@@ -188,7 +133,6 @@ internal static class Program
             .GetDirectories(languageRoot)
             .Where(path => Path.GetFileName(path).Contains('-'))
             .ToDictionary(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
-        CleanupMuiResources(sources);
 
         var preferred = new List<string>();
         uint count = 0,
@@ -212,20 +156,10 @@ internal static class Program
             if (!sources.TryGetValue(language, out var source))
                 continue;
             var destination = Path.Combine(root, Path.GetFileName(source));
-            if (Directory.Exists(destination))
-            {
-                loaded.Add(Path.GetFileName(source));
-                continue;
-            }
-            var files = Directory.GetFiles(source, "*.mui", SearchOption.TopDirectoryOnly);
-            if (files.Length == 0)
-                continue;
             try
             {
-                Directory.CreateDirectory(destination);
-                foreach (var file in files)
-                    File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
-                loaded.Add(Path.GetFileName(source));
+                if (NativeLanguageResources.Stage(source, destination))
+                    loaded.Add(Path.GetFileName(source));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -240,49 +174,6 @@ internal static class Program
         LoadedMuiLanguages = loaded;
     }
 
-    // 清理过时 MUI 资源 — 如果已经部署的文件与源文件一致（不再需要），直接删除
-    static void CleanupMuiResources(Dictionary<string, string>? sources)
-    {
-        var root = AppContext.BaseDirectory;
-        var languageRoot = Path.Combine(root, "languages");
-        if (!Directory.Exists(languageRoot))
-            return;
-        sources ??= Directory
-            .GetDirectories(languageRoot)
-            .Where(path => Path.GetFileName(path).Contains('-'))
-            .ToDictionary(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in sources)
-        {
-            if (pair.Key.Equals("en-us", StringComparison.OrdinalIgnoreCase))
-                continue;
-            var destination = Path.Combine(root, pair.Key);
-            if (!Directory.Exists(destination))
-                continue;
-            var existing = Directory.GetFiles(destination, "*.mui", SearchOption.TopDirectoryOnly);
-            var originals = Directory.GetFiles(pair.Value, "*.mui", SearchOption.TopDirectoryOnly);
-            if (existing.Length != originals.Length || existing.Length == 0)
-                continue;
-            var matches = originals.All(original =>
-            {
-                var staged = Path.Combine(destination, Path.GetFileName(original));
-                return File.Exists(staged)
-                    && File.ReadAllBytes(staged)
-                        .AsSpan()
-                        .SequenceEqual(File.ReadAllBytes(original));
-            });
-            if (matches && Directory.GetFileSystemEntries(destination).Length == existing.Length)
-            {
-                try
-                {
-                    foreach (var file in existing)
-                        File.Delete(file);
-                    Directory.Delete(destination, false);
-                }
-                catch (IOException) { }
-                catch (UnauthorizedAccessException) { }
-            }
-        }
-    }
 #if SINGLE_FILE
     // 单文件发布模式下，将嵌入的伴生文件解压到 exe 所在目录
     static void ExtractCompanionFiles()

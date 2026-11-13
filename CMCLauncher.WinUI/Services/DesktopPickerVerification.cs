@@ -6,7 +6,7 @@ namespace CMCLauncher.WinUI;
 
 static partial class DesktopPicker
 {
-    internal static void Verify(Window window, Action<bool, string> check)
+    internal static async Task Verify(Window window, Action<bool, string> check, string directory)
     {
         var owner = WindowNative.GetWindowHandle(window);
         foreach (var mode in new[] { "folder", "open", "multiple", "save" })
@@ -25,7 +25,7 @@ static partial class DesktopPicker
                         ? []
                         : [new Filter { Name = "Test files", Pattern = "*.txt;*.zip" }],
                     mode == "save" ? "compatibility.txt" : null,
-                    cancel =>
+                    (_, cancel) =>
                     {
                         timer.Tick += (_, _) => cancel();
                         timer.Start();
@@ -37,6 +37,107 @@ static partial class DesktopPicker
                         + mode
                         + " dialog activates, configures and cancels without a WinRT broker"
                 );
+            }
+            finally
+            {
+                timer.Stop();
+            }
+        }
+        var fixture = Path.Combine(directory, "picker 中文 files");
+        Directory.CreateDirectory(fixture);
+        var first = Path.Combine(fixture, "first 中文.txt");
+        var second = Path.Combine(fixture, "second file.txt");
+        File.WriteAllText(first, "one");
+        File.WriteAllText(second, "two");
+        foreach (var mode in new[] { "open", "multiple", "save", "folder" })
+        {
+            var name = mode switch
+            {
+                "multiple" => "\"" + first + "\" \"" + second + "\"",
+                "save" => Path.Combine(fixture, "new 中文.txt"),
+                "folder" => fixture,
+                _ => first,
+            };
+            var timer = window.DispatcherQueue.CreateTimer();
+            timer.Interval = TimeSpan.FromMilliseconds(400);
+            timer.IsRepeating = true;
+            var attempts = 0;
+            try
+            {
+                var selected = Pick(
+                    owner,
+                    mode == "save",
+                    mode == "multiple",
+                    mode == "folder",
+                    mode == "folder" ? [] : [new Filter { Name = "Text files", Pattern = "*.txt" }],
+                    mode == "folder" ? null : name,
+                    (dialog, cancel) =>
+                    {
+                        if (mode == "folder")
+                        {
+                            var folderIid = typeof(IShellItem).GUID;
+                            Marshal.ThrowExceptionForHR(
+                                SHCreateItemFromParsingName(
+                                    fixture,
+                                    IntPtr.Zero,
+                                    ref folderIid,
+                                    out var folderItem
+                                )
+                            );
+                            try
+                            {
+                                var pointer = Marshal.GetComInterfaceForObject(
+                                    folderItem,
+                                    typeof(IShellItem)
+                                );
+                                try
+                                {
+                                    Marshal.ThrowExceptionForHR(
+                                        ((IFileDialog)dialog).SetFolder(pointer)
+                                    );
+                                }
+                                finally
+                                {
+                                    Marshal.Release(pointer);
+                                }
+                            }
+                            finally
+                            {
+                                Marshal.ReleaseComObject(folderItem);
+                            }
+                        }
+                        timer.Tick += (_, _) =>
+                        {
+                            if (++attempts >= 15)
+                            {
+                                timer.Stop();
+                                cancel();
+                                return;
+                            }
+                            Marshal.ThrowExceptionForHR(
+                                ((IOleWindow)dialog).GetWindow(out var handle)
+                            );
+                            PostMessage(handle, 0x0111, new IntPtr(1), IntPtr.Zero); // IDOK in our test dialog only.
+                        };
+                        timer.Start();
+                    }
+                );
+                var expected = mode == "multiple" ? new[] { first, second } : new[] { name };
+                check(
+                    selected
+                        .Order(StringComparer.OrdinalIgnoreCase)
+                        .SequenceEqual(
+                            expected.Order(StringComparer.OrdinalIgnoreCase),
+                            StringComparer.OrdinalIgnoreCase
+                        ),
+                    "desktop " + mode + " returns selected Unicode paths with spaces"
+                );
+                if (mode == "open")
+                    check(
+                        (await Windows.Storage.StorageFile.GetFileFromPathAsync(selected[0])).Path
+                            == first,
+                        "selected desktop path is compatible with existing StorageFile consumers"
+                    );
             }
             finally
             {
@@ -62,6 +163,24 @@ static partial class DesktopPicker
             Marshal.ReleaseComObject(item);
         }
     }
+
+    [
+        ComImport,
+        Guid("00000114-0000-0000-C000-000000000046"),
+        InterfaceType(ComInterfaceType.InterfaceIsIUnknown)
+    ]
+    interface IOleWindow
+    {
+        [PreserveSig]
+        int GetWindow(out IntPtr handle);
+
+        [PreserveSig]
+        int ContextSensitiveHelp([MarshalAs(UnmanagedType.Bool)] bool enter);
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    static extern bool PostMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
     static extern int SHCreateItemFromParsingName(

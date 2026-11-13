@@ -62,6 +62,7 @@ public sealed class Settings
     public bool IgnoreSslErrors { get; set; }
     public string Theme { get; set; } = "dark";
     public string ColorPreset { get; set; } = "craft";
+    public bool ShowScrollBars { get; set; }
     public double UiScale { get; set; } = 1;
     public double UiButtonScale { get; set; } = 1;
     public double UiMenuScale { get; set; } = 1;
@@ -109,6 +110,7 @@ public sealed class CustomAppearancePreset
     public string Name { get; set; } = "";
     public string Theme { get; set; } = "dark";
     public string ColorPreset { get; set; } = "craft";
+    public bool ShowScrollBars { get; set; }
     public double UiScale { get; set; } = 1;
     public double UiButtonScale { get; set; } = 1;
     public double UiMenuScale { get; set; } = 1;

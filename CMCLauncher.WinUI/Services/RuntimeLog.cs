@@ -15,8 +15,18 @@ static class RuntimeLog
             Write("DEBUG", message);
     }
 
-    static string FilePath =>
-        Path.Combine(Program.WritableDirectory, "logs", $"launcher-{DateTime.Now:yyyyMMdd}.log");
+    static readonly Lazy<string> LogDirectory = new(() =>
+        PortableDataDirectory.Resolve(
+            Path.Combine(Program.WritableDirectory, "logs"),
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CMCLauncher",
+                "logs"
+            )
+        )
+    );
+    internal static string DirectoryPath => LogDirectory.Value;
+    static string FilePath => Path.Combine(DirectoryPath, $"launcher-{DateTime.Now:yyyyMMdd}.log");
 
     // 脱敏后再落盘，把消息中的换行转义，保持一条事件对应一行。
     public static void Write(string level, string message)

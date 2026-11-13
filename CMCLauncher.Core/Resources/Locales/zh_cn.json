@@ -2,6 +2,7 @@
   "code": "zh_cn",
   "displayName": "简体中文",
   "strings": {
+    "Show scrollbars": "显示滚动条",
     "No Java installation was found on PATH.": "PATH 中未找到 Java。",
     "No compatible loader versions found.": "没有找到兼容的加载器版本。",
     "No matching versions. Try a different version number or release type.": "没有匹配的版本，请尝试其他版本号或版本类型。",

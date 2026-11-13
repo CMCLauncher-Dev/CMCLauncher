@@ -84,7 +84,7 @@ public sealed partial class MainWindow
                 message + Environment.NewLine
             );
         }
-        DesktopPicker.Verify(this, Check);
+        await DesktopPicker.Verify(this, Check, directory);
         var writable = Path.Combine(directory, "portable path 测试");
         Directory.CreateDirectory(writable);
         Check(

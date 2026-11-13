@@ -390,8 +390,10 @@ public sealed partial class MainWindow
             )
             .ToArray();
         Check(
-            stagedLanguages.Length == Program.LoadedMuiLanguages.Count,
-            "only preferred WinUI language folders staged beside executable"
+            Program.LoadedMuiLanguages.All(language =>
+                stagedLanguages.Contains(language, StringComparer.OrdinalIgnoreCase)
+            ),
+            "preferred native language resources remain available across launcher processes"
         );
         // 后续导入、筛选和安装位置检查都使用隔离配置中的测试实例。
         var instance = new Instance
@@ -2062,7 +2064,7 @@ public sealed partial class MainWindow
             "custom background applies immediately and persists"
         );
         Check(
-            PageViewport.VerticalScrollBarVisibility == ScrollBarVisibility.Hidden
+            PageViewport.VerticalScrollBarVisibility == ScrollBarVisibility.Auto
                 && Descendants(Content)
                     .OfType<ScrollViewer>()
                     .All(s => s.VerticalScrollBarVisibility != ScrollBarVisibility.Visible),

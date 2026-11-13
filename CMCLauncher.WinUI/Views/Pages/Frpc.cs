@@ -22,7 +22,16 @@ public sealed partial class MainWindow
     {
         frpc = new FrpcManager(store, core);
         frpcConfigs = new FrpcConfigurations(
-            configurationRoot ?? Path.Combine(Program.WritableDirectory, "frpc", "configs")
+            configurationRoot
+                ?? PortableDataDirectory.Resolve(
+                    Path.Combine(Program.WritableDirectory, "frpc", "configs"),
+                    Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "CMCLauncher",
+                        "frpc",
+                        "configs"
+                    )
+                )
         );
         fetchFrpcReleases = frpc.Releases;
         frpc.Output += RecordFrpcOutput;

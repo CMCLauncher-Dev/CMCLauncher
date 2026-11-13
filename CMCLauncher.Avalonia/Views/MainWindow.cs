@@ -116,6 +116,7 @@ public sealed partial class MainWindow : Window
             Verifying ? Path.Combine(VerificationDirectory!, "data") : null,
             Verifying ? verificationTransport : null
         );
+        ConfigureScrollBars();
         Title = "CMCLauncher";
         MinWidth = 850;
         MinHeight = 600;
@@ -434,6 +435,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var settings = session.Store.Config.Settings;
+            Classes.Set("show-scrollbars", settings.ShowScrollBars);
             RequestedThemeVariant =
                 settings.Theme == "light" ? ThemeVariant.Light
                 : settings.Theme == "dark" ? ThemeVariant.Dark

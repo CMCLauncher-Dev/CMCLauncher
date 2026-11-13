@@ -105,6 +105,7 @@ public sealed partial class MainWindow
         if (Content == null)
             return;
         var settings = store.Config.Settings;
+        ScrollBarAppearance.Show = settings.ShowScrollBars;
         var scale = double.IsFinite(settings.UiScale) ? Math.Clamp(settings.UiScale, .8, 1.5) : 1;
         var buttonScale = double.IsFinite(settings.UiButtonScale)
             ? Math.Clamp(settings.UiButtonScale, .8, 1.5)
@@ -259,6 +260,11 @@ public sealed partial class MainWindow
                             foreach (var control in AppearanceElements(PageBody))
                             {
                                 if (
+                                    control is ToggleSwitch toggle
+                                    && toggle.Tag?.ToString() == "show-scrollbars"
+                                )
+                                    toggle.IsOn = false;
+                                else if (
                                     control is NumberBox number
                                     && number.Header?.ToString() == Ui("Control size / %")
                                 )
@@ -289,6 +295,19 @@ public sealed partial class MainWindow
                 }
             )
         );
+        var showScrollBars = new ToggleSwitch
+        {
+            Header = Ui("Show scrollbars"),
+            IsOn = settings.ShowScrollBars,
+            Tag = "show-scrollbars",
+        };
+        showScrollBars.Toggled += async (_, _) =>
+        {
+            if (syncingAppearanceControls)
+                return;
+            settings.ShowScrollBars = showScrollBars.IsOn;
+            await SaveAppearance();
+        };
         var scale = new NumberBox
         {
             Header = Ui("Control size / %"),
@@ -384,7 +403,7 @@ public sealed partial class MainWindow
                 new StackPanel
                 {
                     Spacing = 12,
-                    Children = { scale, buttonScale, menuScale, font, fontSize },
+                    Children = { showScrollBars, scale, buttonScale, menuScale, font, fontSize },
                 }
             )
         );
@@ -457,6 +476,7 @@ public sealed partial class MainWindow
                 preset ??= new CustomAppearancePreset { Name = name };
                 preset.Theme = settings.Theme;
                 preset.ColorPreset = settings.ColorPreset;
+                preset.ShowScrollBars = settings.ShowScrollBars;
                 preset.UiScale = settings.UiScale;
                 preset.UiFontFamily = settings.UiFontFamily;
                 preset.UiFontSize = settings.UiFontSize;
@@ -537,6 +557,7 @@ public sealed partial class MainWindow
             presetNames.IsDropDownOpen = false;
             settings.Theme = preset.Theme;
             settings.ColorPreset = preset.ColorPreset;
+            settings.ShowScrollBars = preset.ShowScrollBars;
             settings.UiScale = preset.UiScale;
             settings.UiButtonScale = preset.UiButtonScale;
             settings.UiMenuScale = preset.UiMenuScale;
@@ -558,6 +579,7 @@ public sealed partial class MainWindow
             syncingAppearanceControls = true;
             try
             {
+                showScrollBars.IsOn = settings.ShowScrollBars;
                 foreach (var control in AppearanceElements(PageBody))
                 {
                     if (control is ComboBox combo && combo.Header?.ToString() == Ui("Appearance"))
@@ -698,6 +720,7 @@ public sealed partial class MainWindow
                 s.ColorPreset,
                 s.CustomLightColors,
                 s.CustomDarkColors,
+                s.ShowScrollBars,
                 s.UiScale,
                 s.UiButtonScale,
                 s.UiMenuScale,

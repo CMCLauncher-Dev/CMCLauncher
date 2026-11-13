@@ -164,12 +164,12 @@ public sealed partial class MainWindow
                     .Controls
                     .Primitives
                     .ScrollBarVisibility
-                    .Hidden,
+                    .Auto,
                 VerticalScrollBarVisibility = global::Avalonia
                     .Controls
                     .Primitives
                     .ScrollBarVisibility
-                    .Hidden,
+                    .Auto,
             }
         );
         return layout;

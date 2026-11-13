@@ -62,7 +62,7 @@ public sealed class LogsPage : CMCPage
             (_, _) =>
             {
                 RuntimeLog.Write("INFO", "[按钮:打开日志文件夹] 打开日志目录");
-                var path = Path.Combine(Program.WritableDirectory, "logs");
+                var path = RuntimeLog.DirectoryPath;
                 Directory.CreateDirectory(path);
                 System.Diagnostics.Process.Start(
                     new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }
