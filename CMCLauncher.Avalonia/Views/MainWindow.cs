@@ -89,6 +89,24 @@ public sealed partial class MainWindow : Window
     bool applyingTheme;
     IBrush Accent => accentBrush;
 
+    // Saved positions/working areas are physical pixels; window sizes are device-independent units.
+    static PixelPoint ConstrainWindowPosition(
+        PixelPoint saved,
+        PixelRect work,
+        double scaling,
+        Size size
+    )
+    {
+        var pixels = PixelSize.FromSize(
+            size,
+            double.IsFinite(scaling) && scaling > 0 ? scaling : 1
+        );
+        return new PixelPoint(
+            Math.Clamp(saved.X, work.X, Math.Max(work.X, work.Right - pixels.Width)),
+            Math.Clamp(saved.Y, work.Y, Math.Max(work.Y, work.Bottom - pixels.Height))
+        );
+    }
+
     Color AccentColor(bool light) =>
         session.Store.Config.Settings.ColorPreset == "native"
             ? Application.Current?.PlatformSettings?.GetColorValues().AccentColor1
@@ -128,12 +146,16 @@ public sealed partial class MainWindow : Window
         )
         {
             var saved = new PixelPoint(x, y);
-            var area = (Screens.ScreenFromPoint(saved) ?? Screens.Primary)?.WorkingArea;
-            if (area is { } work)
-                Position = new PixelPoint(
-                    Math.Clamp(x, work.X, Math.Max(work.X, work.Right - (int)Width)),
-                    Math.Clamp(y, work.Y, Math.Max(work.Y, work.Bottom - (int)Height))
+            var screen = Screens.ScreenFromPoint(saved) ?? Screens.Primary;
+            if (screen != null)
+                Position = ConstrainWindowPosition(
+                    saved,
+                    screen.WorkingArea,
+                    screen.Scaling,
+                    new Size(Width, Height)
                 );
+            else
+                WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
         else
             WindowStartupLocation = WindowStartupLocation.CenterScreen;

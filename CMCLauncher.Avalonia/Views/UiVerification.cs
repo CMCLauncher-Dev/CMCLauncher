@@ -20,6 +20,30 @@ public sealed partial class MainWindow
         var checks = new List<string>();
         try
         {
+            if (
+                ConstrainWindowPosition(
+                    new PixelPoint(2800, 1800),
+                    new PixelRect(0, 0, 3024, 1890),
+                    2,
+                    new Size(1000, 700)
+                ) != new PixelPoint(1024, 490)
+                || ConstrainWindowPosition(
+                    new PixelPoint(-100, 1300),
+                    new PixelRect(-2560, 0, 2560, 1440),
+                    1.5,
+                    new Size(1000, 700)
+                ) != new PixelPoint(-1500, 390)
+                || ConstrainWindowPosition(
+                    new PixelPoint(1800, 1000),
+                    new PixelRect(0, 0, 1920, 1080),
+                    1,
+                    new Size(1000, 700)
+                ) != new PixelPoint(920, 380)
+            )
+                throw new IOException(
+                    "Restored window position does not respect screen scaling or negative monitor coordinates."
+                );
+            checks.Add("PASS Retina and mixed-DPI window restore stays inside the working area");
             gameCatalog = [new("1.21.1", "release")];
             session.Store.Config.Settings.LauncherLanguage = "en_us";
             BuildNavigation();
