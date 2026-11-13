@@ -242,6 +242,7 @@ public sealed partial class MainWindow
             },
             true
         );
+        buttonAvailability.Add(export, () => exportBytes != null);
         export.IsEnabled = false;
         export.Tag = "pfp-export";
         var upload = Btn(

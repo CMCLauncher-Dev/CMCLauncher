@@ -1119,6 +1119,16 @@ public sealed partial class MainWindow
                     }
                 ),
                 Btn(
+                    "Open log folder",
+                    () =>
+                    {
+                        var folder = Path.Combine(session.Store.Root, "logs");
+                        Directory.CreateDirectory(folder);
+                        Open(folder);
+                        return Task.CompletedTask;
+                    }
+                ),
+                Btn(
                     "Clear",
                     () =>
                     {

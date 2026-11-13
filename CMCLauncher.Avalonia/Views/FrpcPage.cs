@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 
 namespace CMCLauncher.Avalonia.Views;
@@ -173,6 +174,14 @@ public sealed partial class MainWindow
                 Field("Configuration content", draft),
                 Row(
                     Btn(
+                        "Clear content",
+                        () =>
+                        {
+                            draft.Text = "";
+                            return Task.CompletedTask;
+                        }
+                    ),
+                    Btn(
                         "Copy current content",
                         () =>
                         {
@@ -256,7 +265,52 @@ public sealed partial class MainWindow
                 path,
                 Row(
                     Btn("Add path", () => Import(path.Text)),
-                    Btn("Choose file", async () => await Import(await OpenFile("*.toml", "*.ini"))),
+                    Btn(
+                        "Choose files",
+                        async () =>
+                        {
+                            EnsureStopped();
+                            var files = await StorageProvider.OpenFilePickerAsync(
+                                new()
+                                {
+                                    AllowMultiple = true,
+                                    FileTypeFilter =
+                                    [
+                                        new FilePickerFileType("FRP configuration")
+                                        {
+                                            Patterns = ["*.toml", "*.ini"],
+                                        },
+                                    ],
+                                }
+                            );
+                            if (files.Count == 0)
+                                return;
+                            await session.Run(
+                                "Import configuration",
+                                async token =>
+                                {
+                                    foreach (var file in files)
+                                    {
+                                        var source =
+                                            file.TryGetLocalPath()
+                                            ?? throw new IOException(
+                                                "Choose a local configuration file."
+                                            );
+                                        var imported = await session.FrpcProfiles.Import(
+                                            source,
+                                            token
+                                        );
+                                        if (imported.Count > 0)
+                                            session.Store.Config.Settings.FrpcConfigPath = imported[
+                                                0
+                                            ].Path;
+                                    }
+                                    await session.Save();
+                                }
+                            );
+                            await Navigate("frpc");
+                        }
+                    ),
                     Btn("Choose folder", async () => await Import(await Folder()))
                 )
             ),

@@ -312,6 +312,15 @@ public sealed partial class MainWindow
                     Btn("Download game", () => Navigate("downloads")),
                     Btn("Import modpack", ImportPack),
                     Btn("Manage Minecraft directories", () => DirectoriesPage()),
+                    Btn(
+                        "Scan versions",
+                        () =>
+                            ImportLocalFrom(
+                                directory.SelectedIndex > 0
+                                    ? directory.SelectedItem?.ToString()
+                                    : session.Store.MinecraftRoot
+                            )
+                    ),
                     Btn("Import local instances", ImportLocal),
                     Btn("Migrate other launchers", MigrateForeign)
                 ),
@@ -321,9 +330,11 @@ public sealed partial class MainWindow
         );
     }
 
-    async Task ImportLocal()
+    Task ImportLocal() => ImportLocalFrom(null);
+
+    async Task ImportLocalFrom(string? directory)
     {
-        var path = await Folder();
+        var path = directory ?? await Folder();
         if (path == null)
             return;
         await session.Run(
@@ -623,7 +634,19 @@ public sealed partial class MainWindow
                         {
                             session.EnsureFilesIdle();
                             var path = Input("", "Choose a new destination that does not exist");
-                            if (!await Dialog("Migrate directory", path, true))
+                            var destination = Stack(
+                                Field("Migration destination", path),
+                                Btn(
+                                    "Choose parent folder",
+                                    async () =>
+                                    {
+                                        var parent = await Folder();
+                                        if (parent != null)
+                                            path.Text = Path.Combine(parent, ".minecraft");
+                                    }
+                                )
+                            );
+                            if (!await Dialog("Migrate directory", destination, true))
                                 return;
                             await session.Run(
                                 "Migrate directory",

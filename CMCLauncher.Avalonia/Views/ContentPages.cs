@@ -393,8 +393,9 @@ public sealed partial class MainWindow
                                 session.EnsureFilesIdle();
                                 await session.Run(
                                     "Update mod",
-                                    token =>
-                                        session.Modrinth.UpdateMod(
+                                    async token =>
+                                    {
+                                        await session.Modrinth.UpdateMod(
                                             instance,
                                             item.File,
                                             captured.Project,
@@ -411,12 +412,15 @@ public sealed partial class MainWindow
                                                         inner
                                                     )
                                                 : null
-                                        )
+                                        );
+                                        completed = true;
+                                    }
                                 );
-                                completed = true;
-                                status.Text = Ui("Updated. Old files are in mod-backups.");
+                                if (completed)
+                                    status.Text = Ui("Updated. Old files are in mod-backups.");
                             }
                         );
+                        buttonAvailability.Add(button, () => !completed);
                         updates.Children.Add(
                             Card(Stack(T(item.Name, 15, true), T(captured.Name), button, status))
                         );
