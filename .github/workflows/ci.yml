@@ -86,9 +86,15 @@ jobs:
       - name: Verify Linux pages
         if: runner.os == 'Linux'
         run: |
-          timeout 90s xvfb-run -a .artifacts/avalonia-publish/CMCLauncher.Avalonia --verify-ui "$PWD/.artifacts/avalonia-ui"
+          timeout 90s xvfb-run -a .artifacts/avalonia-publish/CMCLauncher.Avalonia --verify-ui "$PWD/.artifacts/avalonia-ui" || {
+            cat .artifacts/avalonia-ui/failure.txt 2>/dev/null || true
+            exit 1
+          }
           test -f .artifacts/avalonia-ui/passed.txt
-          test ! -f .artifacts/avalonia-ui/failure.txt
+          if test -f .artifacts/avalonia-ui/failure.txt; then
+            cat .artifacts/avalonia-ui/failure.txt
+            exit 1
+          fi
       - name: Package desktop application
         id: desktop-package
         env:

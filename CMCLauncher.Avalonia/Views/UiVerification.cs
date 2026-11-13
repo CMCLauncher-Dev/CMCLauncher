@@ -136,13 +136,29 @@ public sealed partial class MainWindow
             )
                 throw new IOException("Scrollbar toggle is not at the top of the controls card.");
             scrollToggle.IsChecked = true;
-            await Task.Delay(120);
-            var scrollBar = this.GetVisualDescendants()
-                .OfType<global::Avalonia.Controls.Primitives.ScrollBar>()
-                .First(bar =>
-                    bar.Orientation == global::Avalonia.Layout.Orientation.Vertical
-                    && bar.Maximum > 0
-                    && bar.Opacity == 1
+            global::Avalonia.Controls.Primitives.ScrollBar? scrollBar = null;
+            // Saving the preference and measuring a newly navigated page complete asynchronously.
+            // Wait for the actual state instead of assuming a runner can finish both within 120 ms.
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+                scrollBar = this.GetVisualDescendants()
+                    .OfType<global::Avalonia.Controls.Primitives.ScrollBar>()
+                    .FirstOrDefault(bar =>
+                        bar.Orientation == global::Avalonia.Layout.Orientation.Vertical
+                        && bar.Maximum > 0
+                        && bar.Opacity == 1
+                    );
+                if (
+                    scrollBar != null
+                    && new Store(session.Store.Root).Config.Settings.ShowScrollBars
+                )
+                    break;
+                await Task.Delay(50);
+            }
+            if (scrollBar == null)
+                throw new IOException(
+                    "Enabled scrollbar did not complete layout within five seconds."
                 );
             if (
                 !scrollBar.IsHitTestVisible
@@ -158,7 +174,15 @@ public sealed partial class MainWindow
                     "Scrollbar thumb is not four pixels wide: " + scrollThumb.Bounds.Width
                 );
             scrollToggle.IsChecked = false;
-            await Task.Delay(120);
+            for (
+                var attempt = 0;
+                attempt < 100 && (scrollBar.Opacity != 0 || scrollBar.IsHitTestVisible);
+                attempt++
+            )
+            {
+                await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+                await Task.Delay(50);
+            }
             if (scrollBar.Opacity != 0 || scrollBar.IsHitTestVisible)
                 throw new IOException("Disabled scrollbars remained visible or intercepted input.");
             checks.Add("PASS scrollbar preference position, live visibility and persistence");
