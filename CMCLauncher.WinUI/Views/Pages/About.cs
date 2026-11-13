@@ -8,7 +8,7 @@ public sealed partial class MainWindow
 {
     void AboutPage()
     {
-        Header("About", "");
+        Header(Ui("About"), "");
         var identity = new Grid { ColumnSpacing = 18 };
         identity.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         identity.ColumnDefinitions.Add(
