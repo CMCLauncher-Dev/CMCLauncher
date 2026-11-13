@@ -258,9 +258,15 @@ jobs:
             if [ -S /tmp/.X11-unix/X99 ]; then break; fi
             sleep 0.2
           done
-          timeout 120s cmclauncher --verify-ui /tmp/cmcl-installed-ui
+          timeout 120s cmclauncher --verify-ui /tmp/cmcl-installed-ui || {
+            cat /tmp/cmcl-installed-ui/failure.txt 2>/dev/null || true
+            exit 1
+          }
           test -f /tmp/cmcl-installed-ui/passed.txt
-          test ! -f /tmp/cmcl-installed-ui/failure.txt
+          if test -f /tmp/cmcl-installed-ui/failure.txt; then
+            cat /tmp/cmcl-installed-ui/failure.txt
+            exit 1
+          fi
       - name: Verify removal preserves user data
         shell: bash
         env:
@@ -273,6 +279,14 @@ jobs:
           fi
           test -f /tmp/cmcl-installed-ui/data/settings.json
           test ! -f /usr/bin/cmclauncher
+      - name: Upload installed Linux UI verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-installed-UI-${{ matrix.distro }}
+          path: |
+            /tmp/cmcl-installed-ui/*.txt
+            /tmp/cmcl-installed-ui/*.png
 
   core-test:
     name: Core (${{ matrix.os }})

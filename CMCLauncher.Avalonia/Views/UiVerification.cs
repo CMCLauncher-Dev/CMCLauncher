@@ -420,7 +420,12 @@ public sealed partial class MainWindow
         var mode = settings.Theme;
         var light = settings.CustomLightColors;
         var dark = settings.CustomDarkColors;
-        var card = Card(T("Theme fixture"));
+        var input = Input("Theme fixture");
+        var choice = Choice(new[] { "Theme fixture" });
+        var number = Number(1, 0, 10);
+        var card = Card(Stack(input, choice, number));
+        var previousContent = pageContent.Content;
+        pageContent.Content = card;
         var background = card.Background;
         var icon = NavigationIcon(LauncherNavigation.BoxIcon);
         var stroke = icon.Stroke;
@@ -460,9 +465,26 @@ public sealed partial class MainWindow
             checks.Add(
                 "PASS existing cards, borders, accents and icons update without page reconstruction"
             );
+            card.UpdateLayout();
+            if (
+                !ReferenceEquals(choice.Background, controlSurfaceBrush)
+                || !ReferenceEquals(input.BorderBrush, borderBrush)
+                || !ReferenceEquals(number.Foreground, textBrush)
+                || choice.CornerRadius != new CornerRadius(6)
+                || ((SolidColorBrush)choice.BorderBrush!).Color != Color.Parse("#668866")
+            )
+                throw new IOException("Custom theme does not reach editable controls.");
+            settings.ColorPreset = "native";
+            ApplyTheme();
+            if (ReferenceEquals(choice.Background, controlSurfaceBrush))
+                throw new IOException("Native preset retained custom control styling.");
+            checks.Add(
+                "PASS text, combo and numeric controls follow live theme colors and release native styling"
+            );
         }
         finally
         {
+            pageContent.Content = previousContent;
             settings.ColorPreset = preset;
             settings.Theme = mode;
             settings.CustomLightColors = light;

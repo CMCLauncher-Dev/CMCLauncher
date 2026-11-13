@@ -135,6 +135,7 @@ public sealed partial class MainWindow : Window
             Verifying ? verificationTransport : null
         );
         ConfigureScrollBars();
+        ConfigureControlAppearance();
         Title = "CMCLauncher";
         MinWidth = 850;
         MinHeight = 600;
@@ -479,6 +480,10 @@ public sealed partial class MainWindow : Window
             sidebarBrush.Color = Color.Parse(
                 ColorValue(Light ? "LightSidebar" : "DarkSidebar", Light ? "#EBEFF3" : "#20232B")
             );
+            controlSurfaceBrush.Color = Color.Parse(
+                Palette(Light ? "LightSurfaceAlt" : "DarkSurfaceAlt", Light ? "#F1F2F5" : "#343044")
+            );
+            Classes.Set("custom-appearance", settings.ColorPreset != "native");
             Background = backgroundBrush;
             Foreground = textBrush;
             sidebar.Background = sidebarBrush;
