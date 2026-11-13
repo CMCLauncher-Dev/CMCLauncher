@@ -121,7 +121,7 @@ public sealed partial class LauncherCore : IDisposable
         )
         {
             var original = request.RequestUri!;
-            var mirror = BmclUrl(original);
+            var mirror = GameMirrorUrl(original);
             if (
                 request.Method != HttpMethod.Get
                 || request.Headers.Authorization != null
@@ -846,6 +846,8 @@ public sealed partial class LauncherCore : IDisposable
         var prefix = LoaderBuildPrefix(instance.GameVersion, instance.Loader);
         if (!build.StartsWith(prefix, StringComparison.Ordinal))
             throw new Exception("加载器构建版本与 Minecraft 版本不匹配");
+        var installerProxyMode = NetworkProxy.Mode(store.Config.Settings);
+        var proxyOptions = string.Join(" ", InstallerProxyArguments(store.Config.Settings));
         var (group, artifact, repository) =
             instance.Loader == "forge"
                 ? ("net/minecraftforge", "forge", "https://maven.minecraftforge.net/")
@@ -858,10 +860,16 @@ public sealed partial class LauncherCore : IDisposable
         var installerUrl =
             $"{repository}{group}/{artifact}/{encoded}/{artifact}-{encoded}-installer.jar";
         Status?.Invoke($"下载 {instance.Loader} 安装器 · {build}");
-        var checksum = (await http.GetStringAsync(installerUrl + ".sha1", ct)).Trim().Split(' ')[0];
-        if (!Regex.IsMatch(checksum, "^[a-fA-F0-9]{40}$"))
-            throw new Exception("安装器缺少有效 SHA-1 校验值");
-        await Download(installerUrl, installer, checksum, ct: ct);
+        var checksum = await InstallerChecksum(installerUrl + ".sha1", ct);
+        await InstallerRequest(
+            async () =>
+            {
+                await Download(installerUrl, installer, checksum, ct: ct);
+                return true;
+            },
+            "installer JAR",
+            ct
+        );
         var baseProfile = await Vanilla(instance.GameVersion, storage, ct);
         if (baseProfile["downloads"]?["client"] is JsonNode baseClient)
             await Download(
@@ -874,6 +882,8 @@ public sealed partial class LauncherCore : IDisposable
                 size: baseClient.Int("size"),
                 ct: ct
             );
+        Status?.Invoke("Preparing installer dependencies");
+        await PrefetchInstallerLibraries(installer, storage, baseProfile, ct);
         var profiles = Path.Combine(storage, "launcher_profiles.json");
         if (!File.Exists(profiles))
             await Store.AtomicJson(profiles, new JsonObject { ["profiles"] = new JsonObject() });
@@ -893,6 +903,13 @@ public sealed partial class LauncherCore : IDisposable
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
+        // Installer processors spawn additional JVMs. Scope proxy options to this process's
+        // environment so children inherit them; never put proxy credentials in process arguments.
+        start.Environment.TryGetValue("JAVA_TOOL_OPTIONS", out var previousJavaOptions);
+        start.Environment["JAVA_TOOL_OPTIONS"] = string.IsNullOrWhiteSpace(previousJavaOptions)
+            ? proxyOptions
+            : previousJavaOptions + " " + proxyOptions;
+        DebugLog?.Invoke("Installer Java proxy mode: " + installerProxyMode);
         start.ArgumentList.Add("-jar");
         start.ArgumentList.Add(installer);
         start.ArgumentList.Add("--installClient");
@@ -904,12 +921,22 @@ public sealed partial class LauncherCore : IDisposable
             Process.Start(CMCLauncher.Platform.PlatformCommand.SystemEnvironment(start))
             ?? throw new Exception("无法启动加载器安装器");
         var output = new Queue<string>();
+        string? networkFailure = null;
         async Task ReadOutput(StreamReader reader)
         {
             while (await reader.ReadLineAsync(ct) is string line)
             {
                 lock (output)
                 {
+                    if (
+                        networkFailure == null
+                        && (
+                            line.Contains("java.net.Socket", StringComparison.Ordinal)
+                            || line.Contains("SSLHandshakeException", StringComparison.Ordinal)
+                            || line.Contains("PKIX path building failed", StringComparison.Ordinal)
+                        )
+                    )
+                        networkFailure = line.Length > 300 ? line[..300] : line;
                     output.Enqueue(line);
                     while (output.Count > 30)
                         output.Dequeue();
@@ -941,7 +968,19 @@ public sealed partial class LauncherCore : IDisposable
             string details;
             lock (output)
                 details = string.Join(Environment.NewLine, output);
-            throw new Exception($"{instance.Loader} 安装失败：{details}");
+            if (networkFailure != null)
+                throw new IOException(
+                    $"{instance.Loader}: installer network request failed. {networkFailure}"
+                );
+            throw new IOException(
+                $"{instance.Loader}: installer exited with code {process.ExitCode}. "
+                    + string.Join(
+                        " ",
+                        details
+                            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                            .TakeLast(3)
+                    )
+            );
         }
         var profileId = await FindLoaderProfile(
             storage,

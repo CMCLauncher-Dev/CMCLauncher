@@ -28,7 +28,18 @@ static class LaunchAuditTests
                 || Directory.GetCurrentDirectory() != storage
             )
                 return 9;
-            if (File.ReadAllText(installer) == "waiting installer")
+            using var installerZip = ZipFile.OpenRead(installer);
+            using var modeReader = new StreamReader(
+                installerZip.GetEntry("audit-mode.txt")!.Open()
+            );
+            if (
+                !File.Exists(Path.Combine(storage, "libraries", "audit", "dependency.jar"))
+                || !(Environment.GetEnvironmentVariable("JAVA_TOOL_OPTIONS") ?? "").Contains(
+                    "-Djava.net.useSystemProxies="
+                )
+            )
+                return 11;
+            if (modeReader.ReadToEnd() == "waiting installer")
             {
                 var pidFile = Path.Combine(storage, "audit-installer-pid");
                 File.WriteAllText(pidFile + ".tmp", Environment.ProcessId.ToString());
@@ -394,7 +405,37 @@ static class LaunchAuditTests
         )
         {
             var path = $"/releases/net/neoforged/neoforge/{build}/neoforge-{build}-installer.jar";
-            responses[path] = Encoding.UTF8.GetBytes(text);
+            using var memory = new MemoryStream();
+            using (var zip = new ZipArchive(memory, ZipArchiveMode.Create, true))
+            {
+                using (var writer = new StreamWriter(zip.CreateEntry("audit-mode.txt").Open()))
+                    writer.Write(text);
+                var dependency = Encoding.UTF8.GetBytes("prefetched installer dependency");
+                responses["/installer-dependency"] = dependency;
+                using var metadata = new StreamWriter(
+                    zip.CreateEntry("install_profile.json").Open()
+                );
+                metadata.Write(
+                    new JsonObject
+                    {
+                        ["libraries"] = new JsonArray(
+                            new JsonObject
+                            {
+                                ["name"] = "audit:dependency:1",
+                                ["downloads"] = new JsonObject
+                                {
+                                    ["artifact"] = Artifact(
+                                        "installer-dependency",
+                                        dependency,
+                                        "audit/dependency.jar"
+                                    ),
+                                },
+                            }
+                        ),
+                    }.ToJsonString()
+                );
+            }
+            responses[path] = memory.ToArray();
             responses[path + ".sha1"] = Encoding.UTF8.GetBytes(Hash(responses[path]));
         }
         var installerInstance = new Instance

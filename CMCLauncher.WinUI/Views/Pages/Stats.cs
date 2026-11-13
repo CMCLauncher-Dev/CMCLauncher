@@ -282,6 +282,10 @@ public sealed partial class MainWindow
                 cachedStatsGpuAdapters = adapters;
                 ShowGraphics(adapters, true);
             }
+            catch (OperationCanceledException)
+            {
+                RuntimeLog.Debug("GPU sampling cancelled or timed out.");
+            }
             catch (Exception ex)
             {
                 if (

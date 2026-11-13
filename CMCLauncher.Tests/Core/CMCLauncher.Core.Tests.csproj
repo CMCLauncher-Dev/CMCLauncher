@@ -16,5 +16,6 @@
       Include="../Windows/BlueprintTests.cs"
       Link="BlueprintTests.cs"
     />
+    <Compile Include="../Windows/InstallerDependencyTests.cs" Link="InstallerDependencyTests.cs" />
   </ItemGroup>
 </Project>

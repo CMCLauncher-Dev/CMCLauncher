@@ -222,6 +222,7 @@ internal static class Program
         Pass(
             "portable directory fallback and concurrent native language staging preserve user data"
         );
+        await InstallerDependencyTests.Run(Path.Combine(root, "installer-dependencies"));
         await LaunchAuditTests.Run(Path.Combine(root, "launch-audit"));
         Pass(
             "cold and warm process launch, native isolation, output drain, concurrent downloads and profile reimport"

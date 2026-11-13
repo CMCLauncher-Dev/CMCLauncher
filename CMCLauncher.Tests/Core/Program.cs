@@ -231,6 +231,7 @@ try
             Console.WriteLine("PASS unsupported binary distribution is rejected");
         }
     }
+    await InstallerDependencyTests.Run(Path.Combine(root, "installer-dependencies"));
     await RuntimeArchiveTests.Run(root);
     await HomeCardLayoutTests.Run(root);
     await TerracottaTests.Run(root);
