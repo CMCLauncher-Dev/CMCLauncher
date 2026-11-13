@@ -556,14 +556,10 @@ public sealed partial class MainWindow
 
     Control ThirdPartyApplicationsCard()
     {
-        var frpc = (Border)FrpcClientSettings();
-        var frpcContent = frpc.Child!;
-        frpc.Child = null;
-        var terracotta = (Border)TerracottaSettingsCard();
-        var terracottaContent = terracotta.Child!;
-        terracotta.Child = null;
-        return Card(
-            Stack(T("Manage third-party applications", 18, true), frpcContent, terracottaContent)
+        return Stack(
+            T("Manage third-party applications", 18, true),
+            FrpcClientSettings(),
+            TerracottaSettingsCard()
         );
     }
 

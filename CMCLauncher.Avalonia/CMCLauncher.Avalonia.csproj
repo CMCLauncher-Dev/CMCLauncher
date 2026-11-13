@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>CMCLauncher.Avalonia</AssemblyName>
     <RootNamespace>CMCLauncher.Avalonia</RootNamespace>
-    <Version>1.0.3</Version>
+    <Version>1.0.5</Version>
     <ApplicationIcon>../CMCLauncher.WinUI/assets/cmc-logo.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>

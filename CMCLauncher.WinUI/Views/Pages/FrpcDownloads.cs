@@ -8,17 +8,13 @@ public sealed partial class MainWindow
     Func<int, CancellationToken, Task<FrpcReleasePage>> fetchFrpcReleases = null!;
     readonly List<string> frpcOnlineVersions = new();
     string? frpcDownloadVersion;
-    int frpcReleasePage = 1;
-    bool frpcHasMoreReleases = true;
-    string? frpcCatalogSource;
     Task frpcVersionsLoad = Task.CompletedTask;
 
-    void BuildFrpcDownloads(Settings settings, string[] versions, bool expandWhenMissing = true)
+    void BuildFrpcDownloads(Settings settings, string[] versions)
     {
         var generation = renderVersion;
         var cancellation = new CancellationTokenSource();
         var requestRevision = 0;
-        Task currentLoad = Task.CompletedTask;
         var summary = Text(
             versions.Length > 0
                 ? Ui("Installed · ") + settings.FrpcVersion
@@ -64,36 +60,24 @@ public sealed partial class MainWindow
                 ? choice
                 : frpcOnlineVersions.FirstOrDefault();
         }
-        async Task Load(bool refresh)
+        async Task Load()
         {
             var revision = ++requestRevision;
             try
             {
                 status.Visibility = Visibility.Visible;
                 status.Text = Ui("Fetching official releases…");
-                var page = refresh ? 1 : frpcReleasePage;
-                var result = await fetchFrpcReleases(page, cancellation.Token);
-                // API 和网页的每页数量不同，切换来源时从第一页重新建立游标。
-                if (page > 1 && frpcCatalogSource != null && result.Source != frpcCatalogSource)
-                {
-                    page = 1;
-                    refresh = true;
-                    result = await fetchFrpcReleases(page, cancellation.Token);
-                }
+                var result = await fetchFrpcReleases(1, cancellation.Token);
                 if (generation != renderVersion || revision != requestRevision)
                     return;
-                if (refresh)
-                    frpcOnlineVersions.Clear();
+                frpcOnlineVersions.Clear();
                 foreach (var version in result.Versions)
                     if (!frpcOnlineVersions.Contains(version))
                         frpcOnlineVersions.Add(version);
                 frpcOnlineVersions.Sort(
                     (a, b) => System.Version.Parse(b).CompareTo(System.Version.Parse(a))
                 );
-                frpcReleasePage = page + 1;
-                frpcHasMoreReleases = result.HasMore;
                 Populate();
-                frpcCatalogSource = result.Source;
                 downloadVersion.PlaceholderText = Ui("No releases available");
                 status.Text = UiFormat("{0} releases loaded", frpcOnlineVersions.Count);
                 if (result.Source == "web")
@@ -107,11 +91,13 @@ public sealed partial class MainWindow
                 if (generation == renderVersion && revision == requestRevision)
                 {
                     Populate();
-                    status.Text = Ui("Could not fetch releases. Refresh to retry: ") + ex.Message;
+                    status.Text = ex.Message;
                 }
             }
         }
-        var actions = new FlowPanel();
+        var actions = new Grid { ColumnSpacing = 12 };
+        actions.ColumnDefinitions.Add(new ColumnDefinition());
+        actions.ColumnDefinitions.Add(new ColumnDefinition());
         actions.Children.Add(
             Action(
                 Ui("Download online"),
@@ -133,29 +119,6 @@ public sealed partial class MainWindow
                     Render();
                 },
                 true
-            )
-        );
-        actions.Children.Add(
-            Action(
-                Ui("Refresh releases"),
-                async (_, _) =>
-                {
-                    frpcVersionsLoad = Load(true);
-                    await frpcVersionsLoad;
-                }
-            )
-        );
-        actions.Children.Add(
-            Action(
-                Ui("Load more releases"),
-                async (_, _) =>
-                {
-                    if (frpcHasMoreReleases)
-                    {
-                        frpcVersionsLoad = Load(false);
-                        await frpcVersionsLoad;
-                    }
-                }
             )
         );
         var deleteVersion = Action(
@@ -187,6 +150,8 @@ public sealed partial class MainWindow
             }
         );
         deleteVersion.IsEnabled = versions.Length > 0 && !frpc.Running;
+        deleteVersion.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(deleteVersion, 1);
         actions.Children.Add(deleteVersion);
         var fields = new Grid { ColumnSpacing = 12, RowSpacing = 10 };
         fields.ColumnDefinitions.Add(new ColumnDefinition());
@@ -208,28 +173,17 @@ public sealed partial class MainWindow
             Grid.SetColumn(installed, narrow ? 0 : 1);
             Grid.SetRow(installed, narrow ? 1 : 0);
         };
-        var panel = new Expander
+        var content = new StackPanel
         {
-            Header = new StackPanel { Spacing = 3, Children = { Text("frpc", 15, true), summary } },
-            Content = new StackPanel { Spacing = 12, Children = { fields, actions, status } },
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            IsExpanded = expandWhenMissing && versions.Length == 0,
-            Tag = "frpc-download-panel",
+            Spacing = 10,
+            Children = { Text("frpc", 15, true), summary, fields, actions, status },
         };
+        var panel = Card(content);
+        panel.Padding = new Thickness(12);
+        panel.Tag = "frpc-download-panel";
         panel.Unloaded += (_, _) => cancellation.Cancel();
-        panel.Expanding += (_, _) =>
-        {
-            if (frpcOnlineVersions.Count == 0 && currentLoad.IsCompleted)
-            {
-                currentLoad = Load(true);
-                frpcVersionsLoad = currentLoad;
-            }
-        };
         PageBody.Children.Add(panel);
         Populate();
-        currentLoad =
-            panel.IsExpanded && frpcOnlineVersions.Count == 0 ? Load(true) : Task.CompletedTask;
-        frpcVersionsLoad = currentLoad;
+        frpcVersionsLoad = frpcOnlineVersions.Count == 0 ? Load() : Task.CompletedTask;
     }
 }

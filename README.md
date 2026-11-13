@@ -4,7 +4,7 @@
 
 # CMCLauncher
 
-A Windows launcher for Minecraft Java Edition.
+**Your Minecraft Java world starts here.**
 
 [English](README.md) · [简体中文](README_zh.md) · [日本語](README_ja.md)
 
@@ -24,60 +24,97 @@ A Windows launcher for Minecraft Java Edition.
 
 </div>
 
-Built with C#, .NET 8 and WinUI 3. CMCLauncher installs Minecraft and mod loaders, manages instances, and downloads community content.
+A native Windows launcher for Minecraft Java Edition, built with C#, .NET 8 and WinUI 3.
+
+English, Simplified Chinese, Japanese, Russian, French, Spanish and Arabic interface translations are included. Choose automatic or manual language selection in **Settings → General → Language**.
+
+## Platform support
+
+| Platform | Interface | Compatibility | Updates & maintenance | Supported systems / hardware |
+| --- | --- | --- | --- | --- |
+| Windows | WinUI 3 | ✅ Supported | Actively maintained | Windows 10 (2004+) / 11, x64 |
+| Linux | Avalonia | ⚠️ Experimental | Experimental updates until stable | Debian-based, Arch-based and Red Hat-based distributions, x64 |
+| macOS | Avalonia | ⚠️ Experimental; **may have serious issues** | Low-priority maintenance | Intel (x64) and Apple M-series (ARM64) |
+
+Linux and macOS builds are for testing. macOS builds are **not signed or notarized**. Back up your instances before testing.
+
+See the [Linux package guide](docs/LINUX_PACKAGES.md) and [Avalonia frontend notes](CMCLauncher.Avalonia/README.md) for platform requirements and known limitations.
+
+## Preview
 
 <div align="center">
 <img src="docs/assets/launcher-home.png" alt="CMCLauncher home" width="960" />
 </div>
 
-## Download and run
+## Ready for your next world
 
-Download the Windows x64 ZIP or EXE from [Releases](https://github.com/CMCLauncher-Dev/CMCLauncher/releases). Extract the ZIP before running `CMCLauncher.exe`. The single EXE extracts its runtime on first launch. Use a writable folder.
+<table>
+<tr>
+<td width="33%" valign="top"><h3>🧩 Manage your instances</h3><p>Separate game directories, local imports, and support for PCL / HMCL instance formats.</p></td>
+<td width="33%" valign="top"><h3>📦 Modpacks and loaders</h3><p>Fabric, Forge, NeoForge, Modrinth modpacks and supported ZIP imports.</p></td>
+<td width="33%" valign="top"><h3>🔎 Discover community content</h3><p>Find mods, resource packs, shaders and more on Modrinth / CurseForge.</p></td>
+</tr>
+<tr>
+<td width="33%" valign="top"><h3>🎨 Make it your own</h3><p>Light and dark themes, custom colors and fonts, and seven interface languages.</p></td>
+<td width="33%" valign="top"><h3>📈 Monitor your system</h3><p>Live CPU, memory and GPU charts, with automatic Java memory allocation.</p></td>
+<td width="33%" valign="top"><h3>🔄 Updates and connections</h3><p>Verified launcher updates, an optional Beta channel, and Frp Client version and connection management.</p></td>
+</tr>
+</table>
 
-Requires Windows 10 version 2004 (build 19041) or later. Release builds include .NET and the Windows App SDK; Java is installed separately.
+## Quick start
 
-1. Choose where to store Minecraft files on first launch. You can import existing instances or add more directories later.
-2. Scan, import or download Java in **Settings → Java**.
-3. Sign in under **Settings → Accounts**.
-4. Download a game version or import a modpack, then select an instance and account to launch.
+### Requirements
 
-Microsoft sign-in requires a Minecraft Java Edition profile. Account availability depends on the launcher's ownership checks and system region. Browser authorization is followed by Xbox and Minecraft profile verification.
+- Windows 10 version 2004 (build 19041) or later, x64; Linux; or macOS.
+- Sign in with a Microsoft account that has a Minecraft Java Edition profile. To use an offline account, first sign in with at least one Microsoft account that owns the game.
+
+### Getting started
+
+1. Download `CMCLauncher-1.0.5-win-x64.zip` from [Releases](https://github.com/CMCLauncher-Dev/CMCLauncher/releases), extract the entire archive, and run `CMCLauncher.exe`.
+2. Open **Settings → Java** to scan or import an existing Java installation, or download Temurin Java.
+3. Open **Settings → Accounts** and choose Microsoft device-code sign-in. Complete authorization in your browser, then wait for the launcher to verify your Minecraft Java profile.
+4. Download a game version, import an existing `.minecraft` folder, or import a modpack. Select a version and account on the home page, then launch.
+
+External sign-in (authlib-injector) is available under **Settings → Accounts** after a Microsoft account passes Minecraft Java Edition profile verification.
+
+Release archives include .NET and the Windows App SDK runtime, so you do not need to install .NET separately.
 
 ## Features
 
-- **Instances:** isolated game folders, multiple Minecraft directories, favorites, and imports from PCL, HMCL, MultiMC and Prism. Migration is available for directories created and recorded by CMCLauncher.
-- **Games and modpacks:** Minecraft releases and snapshots; Fabric, Forge and NeoForge; Modrinth `.mrpack` files and ZIP archives with recognized manifests.
-- **Community content:** Modrinth and CurseForge search, filters, pagination, project details and compatible file selection. Mod updates keep previous files in `mod-backups`.
-- **Worlds and schematics:** CurseForge map downloads, world backup and restore; schematic import, export, rename and folder browsing. Blueprint downloads from Schematicraft, MCS and CMS can be saved to compatible instances.
-- **Java and downloads:** runtime discovery, Temurin downloads, automatic Java selection, memory allocation, transfer progress and cancellation.
-- **Toolbox:** Minecraft skin avatars exported as PNG, frpc downloads and saved INI/TOML configurations, and [Terracotta LAN rooms](docs/TERRACOTTA.md). Terracotta is downloaded separately when requested.
-- **Appearance:** light, dark and system modes; JSON theme presets, fonts and scaling. Seven interface languages are included.
+| Area | Supported features |
+| --- | --- |
+| Games and instances | Browse releases, snapshots and April Fools versions; create isolated instances; import local game folders |
+| Loaders | Find and install Fabric, Forge and NeoForge; identify loaders used by imported versions |
+| Modpacks | Import Modrinth `.mrpack` files, ZIP archives with supported manifests, and MultiMC / Prism ZIP exports; drag-and-drop import |
+| Community content | Choose Modrinth, CurseForge or both; browse paginated results, view project versions, and check game, loader and target-instance compatibility |
+| Content management | View mod metadata and icons; import, disable or remove content; manage data packs per world |
+| Schematics | Search, import, export, rename and delete `.litematic`, `.schematic`, `.schem` and `.nbt` files |
+| Java and memory | Scan, import and download Temurin Java; match Java versions automatically; use automatic or manual heap allocation |
+| Frp Client | Download official Windows x64 releases, validate INI/TOML configurations, and start or stop the client |
+| Appearance and languages | Light, dark and system themes; colors, fonts, scaling and appearance presets; launcher and game language settings |
+| Accounts and diagnostics | Microsoft device-code sign-in, external authlib-injector sign-in, Windows DPAPI credential encryption, runtime logs and game error-report export |
 
-Forge and NeoForge compatibility varies by game version. ZIP imports need a recognized manifest. Shaders require an appropriate shader loader, and schematic compatibility depends on the installed mod. CurseForge downloads also depend on application credentials and the author's distribution settings.
+Interface translations load from editable JSON files in `locales/` beside the executable. Additional valid language packs appear in the language selector. See [language packs](docs/LOCALIZATION.md) for the schema, reload behavior and translation guide.
 
-CMS browsing reads HTML pages. Searches run only when submitted, results are cached, and requests are rate-limited. Access restrictions or changes to the site can interrupt browsing; the page provides a link to the original website.
+## Support and limitations
 
-## Settings and data
+### Frp Client
+
+Open **More → Frp Client**, choose a version from the online release list, and select **Download**. **Refresh releases** updates the list; **Load more releases** retrieves older versions. Downloads come from [official frp releases](https://github.com/fatedier/frp/releases) and must pass official SHA-256 verification. The client is downloaded on demand and is not bundled with the launcher.
+
+## Data and logs
 
 | Location | Contents |
 | --- | --- |
-| `%APPDATA%/CMCLauncher.Native/settings.json` | Settings, instance records and encrypted account credentials |
-| `%APPDATA%/CMCLauncher.Native/library/` | Default library; game directories can be changed in the launcher |
-| `%APPDATA%/CMCLauncher.Native/runtimes/` | Downloaded Java runtimes |
-| `logs/` beside the executable | Launcher logs |
-| `logs/` and `crash-reports/` in each instance | Minecraft logs and crash reports |
+| `%APPDATA%/CMCLauncher.Native/settings.json` | Launcher settings, instance records and encrypted account credentials |
+| `%APPDATA%/CMCLauncher.Native/library/` | Default instances and libraries; a different game root can be selected in the launcher |
+| `%APPDATA%/CMCLauncher.Native/runtimes/` | Java installations downloaded by the launcher |
+| `logs/launcher-yyyyMMdd.log` beside the executable | Launcher runtime logs |
+| `logs/` and `crash-reports/` within each instance | Game logs and crash reports |
 
-Accounts use Windows DPAPI encryption. Moving settings to another Windows user or device may require signing in again. Back up saves from their actual instance directories.
+## Run from source
 
-Frp Client configurations are copied into the launcher's managed configuration directory; imported originals are left untouched. The client is downloaded separately from official frp releases. New configurations should use TOML; INI support depends on the chosen client version.
-
-Launcher updates are available under **More → About**. Startup checks and the Beta channel can be changed there. Updates verify the release package's SHA-256 digest and require running tasks and games to finish first.
-
-Language packs and theme presets use editable JSON files with built-in fallbacks. See [language packs](docs/LOCALIZATION.md) and [theme presets](docs/THEMES.md).
-
-## Build from source
-
-Install the .NET 8 SDK and Windows SDK tools for WinUI 3 development, then run:
+On Windows, install the .NET 8 SDK and the Windows SDK / development tools required to build WinUI 3 projects. The project targets `net8.0-windows10.0.19041.0`, x64. Clone the repository, then run these commands from its root:
 
 ```powershell
 git clone https://github.com/CMCLauncher-Dev/CMCLauncher.git
@@ -85,15 +122,15 @@ cd CMCLauncher
 dotnet run --project CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -p:Platform=x64
 ```
 
-For a self-contained test build, run `build-and-run.cmd`. It builds into `.artifacts/local-runs/` and launches the result using your normal launcher settings. To build without launching:
+For a one-click local build, double-click `build-and-run.cmd` in the repository root. It publishes a self-contained Release build to `.artifacts/local-runs/`.
 
-```powershell
-./build-and-run.ps1 -NoLaunch
-```
+To build without opening the application, run `./build-and-run.ps1 -NoLaunch` in PowerShell.
 
-### Login configuration
+For local CurseForge testing, run `build-and-run.cmd "-curseforgekey=YOUR_KEY"` in Command Prompt.
 
-Microsoft sign-in needs a public OAuth client ID in the Git-ignored `.config/clientid.local.json`:
+### Configure Microsoft sign-in
+
+Source builds without a client ID can run the interface, but Microsoft sign-in is unavailable. To enable it locally, create `.config/clientid.local.json` with your configured public OAuth client ID:
 
 ```json
 {
@@ -101,89 +138,60 @@ Microsoft sign-in needs a public OAuth client ID in the Git-ignored `.config/cli
 }
 ```
 
-Use a valid GUID for an application configured to access Microsoft and Minecraft services. The ID is embedded during compilation. Tagged CI builds read it from the `MICROSOFT_CLIENT_ID` repository secret.
+### Build and package
 
-For local CurseForge testing:
+Build the Release configuration:
 
-```cmd
-build-and-run.cmd "-curseforgekey=YOUR_KEY" -NoLaunch
+```powershell
+dotnet build CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64
 ```
 
-The build script uses a temporary configuration file. Embedded developer keys can be recovered from binaries; do not treat build-time injection as secret storage. See [CurseForge integration](docs/CURSEFORGE.md).
-
-### Publish
+Publish a self-contained directory and create a ZIP archive:
 
 ```powershell
 dotnet publish CMCLauncher.WinUI/CMCLauncher.WinUI.csproj -c Release -p:Platform=x64 -r win-x64 --self-contained true -o dist/cmc-launcher
-./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-win-x64.zip
+./scripts/package-release.ps1 -PublishDirectory dist/cmc-launcher -ArchivePath dist/CMCLauncher-1.0.5-win-x64.zip
 ```
-
-For a single EXE:
-
-```powershell
-./scripts/publish-singlefile.ps1
-```
-
-Publish into a fresh directory to avoid retaining obsolete files. Release builds use partial trimming and preserve application assemblies for reflection and WinUI. Add `-p:PublishTrimmed=false` when comparing with an untrimmed build.
-
-CI runs Core tests on all three systems and Windows regression tests before packaging. Windows builds WinUI ZIP/EXE packages; Linux x64 builds Avalonia DEB, RPM, AppImage and TAR.GZ packages; macOS ARM64 builds an Avalonia TAR.GZ package. Published WinUI/Linux pages and the Windows single-file startup are checked in CI. Workflow artifacts use fixed filenames; tagged release assets include the version. Pushes to `main`, pull requests and manual runs build artifacts; supported version tags also create a GitHub release.
-
-### Avalonia frontend
-
-```sh
-dotnet run --project CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj
-dotnet publish CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -c Release -r linux-x64 --self-contained true -o .artifacts/avalonia-linux
-```
-
-Windows uses WinUI. Publish Avalonia with `linux-x64`, `osx-arm64` (Apple Silicon), or `osx-x64` (Intel) for Linux/macOS. See the [frontend notes](CMCLauncher.Avalonia/README.md) for credential-store requirements and platform verification status, and [Linux packages](docs/LINUX_PACKAGES.md) for installation and compatibility. CI packages Unix applications as TAR archives to retain executable permissions.
 
 ### Tests
 
-Portable core checks:
-
-```powershell
-dotnet run --project CMCLauncher.Tests/Core/CMCLauncher.Core.Tests.csproj -c Release
-```
-
-Windows regression tests (requires Java on PATH):
+Run the native regression tests:
 
 ```powershell
 dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Release
 ```
 
-After publishing, run the UI check:
+These tests use Windows DPAPI and must run on Windows. The final local Java detection check also requires `java` on PATH.
+
+After publishing the application directory, run the WinUI integration check:
 
 ```powershell
 & ./dist/cmc-launcher/CMCLauncher.exe --verify-ui "$PWD/.artifacts/winui-check"
 ```
 
-UI checks use isolated data and write screenshots, `passed.txt` and, on failure, `failure.txt`.
+This check uses an isolated data directory and produces screenshots and `passed.txt`. Failures are recorded in `failure.txt`.
 
 ## Source layout
 
-See [architecture and platform boundaries](docs/ARCHITECTURE.md) for the migration status.
-
 | Directory | Contents |
 | --- | --- |
-| [CMCLauncher.Core/](CMCLauncher.Core/) | `net8.0` domain services, networking, storage and resource providers |
-| [CMCLauncher.Platform/](CMCLauncher.Platform/) | Host contracts and Windows/Linux/macOS integration |
-| [CMCLauncher.WinUI/](CMCLauncher.WinUI/) | Windows frontend and entry point |
-| [CMCLauncher.Avalonia/](CMCLauncher.Avalonia/) | Linux/macOS frontend; see its README for validation status |
-| [CMCLauncher.Tests/Core/](CMCLauncher.Tests/Core/) | Portable core checks |
-| [CMCLauncher.Tests/Windows/](CMCLauncher.Tests/Windows/) | Windows regression tests and fixtures |
-| [scripts/](scripts/) | Build, packaging and maintenance scripts |
-| [docs/](docs/) | Website, documentation and screenshots |
+| [`CMCLauncher.WinUI/`](CMCLauncher.WinUI/) | Desktop entry point, windows, pages, controls and UI services |
+| [`CMCLauncher.Core/`](CMCLauncher.Core/) | Downloads, authentication protocols, resource browsing, storage and platform-independent services |
+| [`CMCLauncher.Platform/Windows/`](CMCLauncher.Platform/Windows/) | Windows credentials, memory and region queries, registry integration and update installation |
+| [`CMCLauncher.Tests/Core/`](CMCLauncher.Tests/Core/) | Portable core regression checks |
+| [`CMCLauncher.Tests/Windows/`](CMCLauncher.Tests/Windows/) | Native regression tests and certificate fixtures |
+| [`scripts/`](scripts/) | Publishing, resource maintenance and packaging scripts |
+| [`docs/`](docs/) | Project website source and screenshot assets |
+| [`.github/workflows/`](.github/workflows/) | Automated tests, builds and tagged releases |
 
-The WinUI application targets Windows x64. Linux/macOS use Avalonia over the shared Core and platform adapters; Linux/macOS game execution still requires host testing. See the [dependency and portability audit](docs/DEPENDENCY_AUDIT.md) for test results and remaining work.
+## Feedback and contributions
 
-## Contributing
+Report issues through [Issues](https://github.com/CMCLauncher-Dev/CMCLauncher/issues). Include the launcher version, Windows version, Minecraft and loader versions, and steps to reproduce. For launch failures, attach an error report or relevant logs. Check for account information and local paths before sharing.
 
-Report bugs through [Issues](https://github.com/CMCLauncher-Dev/CMCLauncher/issues). Include your launcher and Windows versions, Minecraft and loader versions, steps to reproduce, and relevant logs. Remove tokens and other account information before sharing logs.
-
-For code changes, run the relevant tests. Include screenshots for UI changes and check cancellation and cleanup when changing installation or downloads.
+Before submitting a pull request, run the tests relevant to your changes. Include screenshots for layout changes, and check cancellation and failure cleanup when modifying downloads, installation or imports.
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE). Third-party dependencies retain their own licenses.
+CMCLauncher is released under the [GNU Affero General Public License v3.0](LICENSE). Third-party dependencies retain their own licenses.
 
 Minecraft, mods and modpacks belong to their respective owners. CMCLauncher is not affiliated with Mojang Studios, Microsoft or NetEase.

@@ -1,16 +1,30 @@
-# CMCLauncher 1.0.3
+# CMCLauncher 1.0.5
 
 ## 更新内容
 
-- 新增 CurseForge 地图下载，支持搜索、筛选、分页和安装到实例；同名存档自动另存。
-- 新增 CMS 机械动力蓝图来源，统一各蓝图来源的列表与详情页，加入缓存和请求限速。
-- 调整下载页面的标题对齐，移除多余提示，简化单一来源页面的筛选项。
-- 拆出 CMCLauncher.Core，隔离 Windows 平台功能，并加入 Windows、Linux 和 macOS 核心测试流程，为后续跨平台适配做准备。目前启动器仍仅支持 Windows x64。
-- 精简 README，更新源码结构和构建说明。
+- 新增 Linux、macOS 的 Avalonia 界面及跨平台构建，提供 Linux DEB、RPM、AppImage、TAR.GZ，以及 macOS Intel / Apple M 系列 TAR.GZ。
+- 工具箱整合 FRP、陶瓦联机和 MinecraftPFP；设置中的 FRP、陶瓦管理改为独立小卡片，精简版本操作。
+- 调整主页自定义卡片、账户操作按钮、任务日志入口及内存分配显示，新增细灰色滚动条开关。
+- 修复 Windows 文件选择、受限目录中的数据与日志写入，以及窗口位置恢复问题。
+- 修复 Java 下载包中存在多个可执行文件时的识别错误，完善 macOS Java 路径识别与启动参数。
+- Forge / NeoForge 安装依赖复用启动器下载、校验及缓存；安装器跟随代理设置，增加 NeoForge 官方备用下载地址，改善连接失败提示。
+- 更新 README 平台支持表、翻译与构建说明，清理过时文档。
+
+## 平台状态
+
+| 平台 | 状态 |
+| --- | --- |
+| Windows x64 | 支持，持续维护 |
+| Linux x64 | 实验性支持，继续修复至稳定；提供 Debian 系、Arch 系及 Red Hat 系使用的包或通用分发格式 |
+| macOS Intel / Apple M 系列 | 实验性支持，低优先级维护；可能存在无法启动、崩溃等严重问题 |
+
+Linux、macOS 构建供测试使用，请先备份实例。macOS 构建尚未签名或公证。
 
 ## 下载
 
-- CMCLauncher-1.0.3-win-x64.zip：完整解压后运行 CMCLauncher.exe。
-- CMCLauncher-1.0.3-win-x64.exe：单文件版本，首次运行会释放运行时文件。
+- CMCLauncher-1.0.5-win-x64.zip：完整解压后运行 CMCLauncher.exe。
+- CMCLauncher-1.0.5-win-x64.exe：单文件版本，首次运行会释放运行时文件。
+- CMCLauncher-Avalonia-1.0.5-linux-x64：按发行版选择 DEB、RPM，或使用 AppImage / TAR.GZ。
+- CMCLauncher-Avalonia-1.0.5-osx-arm64.tar.gz / osx-x64.tar.gz：分别用于 Apple M 系列 / Intel Mac。
 
-发行包包含 .NET 和 Windows App SDK 运行时，Java 与游戏文件需另行下载或导入。
+发行包包含 .NET，Windows 包另含 Windows App SDK 运行时。Java 与游戏文件需另行下载或导入。

@@ -435,7 +435,9 @@ public sealed partial class MainWindow
                     : "Terracotta is not downloaded."
             )
         );
-        panel.Children.Add(
+        var actions = Row();
+        panel.Children.Add(actions);
+        actions.Children.Add(
             Btn(
                 "Download Terracotta",
                 async () =>
@@ -447,7 +449,7 @@ public sealed partial class MainWindow
             )
         );
         if (session.Terracotta.Installed != null || Directory.Exists(session.Terracotta.Root))
-            panel.Children.Add(
+            actions.Children.Add(
                 Btn(
                     "Remove Terracotta",
                     async () =>
@@ -469,6 +471,8 @@ public sealed partial class MainWindow
                     }
                 )
             );
-        return Card(panel);
+        var card = Card(panel);
+        card.Padding = new global::Avalonia.Thickness(12);
+        return card;
     }
 }

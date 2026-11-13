@@ -382,20 +382,16 @@ public sealed partial class MainWindow
         var versions = frpc.Installed();
         if (!versions.Contains(store.Config.Settings.FrpcVersion))
             store.Config.Settings.FrpcVersion = versions.FirstOrDefault() ?? "";
-        BuildFrpcDownloads(store.Config.Settings, versions, false);
+        BuildFrpcDownloads(store.Config.Settings, versions);
         var frpcPanel = PageBody.Children[^1];
         PageBody.Children.Remove(frpcPanel);
         var terracottaPanel = TerracottaSettingsCard();
-        var terracottaContent = terracottaPanel.Child;
-        terracottaPanel.Child = null;
-        themeCards.Remove(terracottaPanel);
-        var applications = new StackPanel { Spacing = 16 };
+        terracottaPanel.Padding = new Thickness(12);
+        var applications = new StackPanel { Spacing = 10, Tag = "third-party-apps" };
         applications.Children.Add(Text("Manage third-party applications", 18, true));
         applications.Children.Add(frpcPanel);
-        applications.Children.Add(terracottaContent);
-        var card = Card(applications);
-        card.Tag = "third-party-apps";
-        PageBody.Children.Add(card);
+        applications.Children.Add(terracottaPanel);
+        PageBody.Children.Add(applications);
         RefreshFrpcPalette();
     }
 
@@ -410,7 +406,9 @@ public sealed partial class MainWindow
                     : "Terracotta is not downloaded."
             )
         );
-        panel.Children.Add(
+        var actions = new FlowPanel();
+        panel.Children.Add(actions);
+        actions.Children.Add(
             Action(
                 "Download Terracotta",
                 async (_, _) =>
@@ -422,7 +420,7 @@ public sealed partial class MainWindow
             )
         );
         if (terracotta.Installed != null || Directory.Exists(terracotta.Root))
-            panel.Children.Add(
+            actions.Children.Add(
                 Action(
                     "Remove Terracotta",
                     async (sender, _) =>

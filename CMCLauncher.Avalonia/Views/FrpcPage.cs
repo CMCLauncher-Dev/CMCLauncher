@@ -210,65 +210,80 @@ public sealed partial class MainWindow
         var online = Choice(Array.Empty<string>());
         var clients = Choice(installed, session.Store.Config.Settings.FrpcVersion);
         var message = T("");
-        var releasePage = 0;
-        async Task Load(int page)
+        var download = Btn(
+            "Download online",
+            async () =>
+            {
+                if (online.SelectedItem is not string version)
+                    throw new IOException("Select an online version.");
+                await session.Run(
+                    "Download frpc",
+                    async token =>
+                    {
+                        var release = await session.Frpc.FindRelease(version, token);
+                        await session.Frpc.Install(release, token);
+                        session.Store.Config.Settings.FrpcVersion = version;
+                        await session.Save();
+                    }
+                );
+                await Navigate("settings");
+            },
+            true
+        );
+        var remove = Btn(
+            "Delete client",
+            async () =>
+            {
+                if (
+                    clients.SelectedItem is not string version
+                    || !await Confirm("Delete client?", version)
+                )
+                    return;
+                await session.Frpc.Remove(version);
+                session.Store.Config.Settings.FrpcVersion =
+                    session.Frpc.Installed().FirstOrDefault() ?? "";
+                await session.Save();
+                await Navigate("settings");
+            }
+        );
+        remove.IsEnabled = installed.Length > 0 && !session.Frpc.Running;
+        remove.HorizontalAlignment = HorizontalAlignment.Right;
+        var fields = new Grid
         {
-            var releases = await session.Frpc.Releases(page, ct);
-            var previous = page == 1 ? Array.Empty<string>() : online.ItemsSource!.Cast<string>();
-            var values = previous.Concat(releases.Versions).Distinct().ToArray();
-            online.ItemsSource = values;
-            online.SelectedIndex = 0;
-            releasePage = page;
-            message.Text = $"{values.Length} " + Ui("versions loaded");
-        }
-        var downloads = new Expander
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+            RowSpacing = 10,
+        };
+        var onlineField = Field("Online version", online);
+        var installedField = Field("Downloaded client", clients);
+        fields.Children.Add(onlineField);
+        Grid.SetColumn(installedField, 1);
+        fields.Children.Add(installedField);
+        Grid.SetRow(download, 1);
+        fields.Children.Add(download);
+        Grid.SetRow(remove, 1);
+        Grid.SetColumn(remove, 1);
+        fields.Children.Add(remove);
+        var card = Card(Stack(T("frpc", 15, true), fields, message));
+        card.Padding = new global::Avalonia.Thickness(12);
+        var loaded = false;
+        card.AttachedToVisualTree += async (_, _) =>
         {
-            Header = Ui("Download frpc"),
-            IsExpanded = false,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            Content = Stack(
-                Field("Online version", online),
-                Field("Downloaded client", clients),
-                Row(
-                    Btn(
-                        "Download online",
-                        async () =>
-                        {
-                            if (online.SelectedItem is not string version)
-                                throw new IOException("Select an online version.");
-                            await session.Run(
-                                "Download frpc",
-                                async token =>
-                                {
-                                    var release = await session.Frpc.FindRelease(version, token);
-                                    await session.Frpc.Install(release, token);
-                                    session.Store.Config.Settings.FrpcVersion = version;
-                                    await session.Save();
-                                }
-                            );
-                            await Navigate("settings");
-                        },
-                        true
-                    ),
-                    Btn("Refresh releases", () => Load(1)),
-                    Btn("Load more releases", () => Load(releasePage + 1)),
-                    Btn(
-                        "Delete client",
-                        async () =>
-                        {
-                            if (
-                                clients.SelectedItem is string version
-                                && await Confirm("Delete client?", version)
-                            )
-                            {
-                                await session.Frpc.Remove(version);
-                                await Navigate("settings");
-                            }
-                        }
-                    )
-                ),
-                message
-            ),
+            if (loaded)
+                return;
+            loaded = true;
+            try
+            {
+                var releases = await session.Frpc.Releases(1, ct);
+                online.ItemsSource = releases.Versions;
+                online.SelectedIndex = 0;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                message.Text = ex.Message;
+            }
         };
         clients.SelectionChanged += async (_, _) =>
         {
@@ -278,24 +293,6 @@ public sealed partial class MainWindow
                 await session.Save();
             }
         };
-        downloads.PropertyChanged += async (_, args) =>
-        {
-            if (
-                args.Property != Expander.IsExpandedProperty
-                || !downloads.IsExpanded
-                || releasePage != 0
-            )
-                return;
-            try
-            {
-                await Load(1);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
-            catch (Exception ex)
-            {
-                message.Text = ex.Message;
-            }
-        };
-        return Card(downloads);
+        return card;
     }
 }

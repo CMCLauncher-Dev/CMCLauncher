@@ -11,14 +11,15 @@ public sealed partial class MainWindow
         page = "settings";
         await RenderAsync();
         check(
-            PageBody.Children[^2] is Border { Tag: "third-party-apps" }
+            PageBody.Children[^2] is StackPanel { Tag: "third-party-apps" }
                 && PageBody.Children[^1] is TextBlock
                 && Descendants(PageBody.Children[^2])
                     .OfType<Button>()
                     .Any(b => b.Content?.ToString() == Ui("Download Terracotta"))
                 && Descendants(PageBody.Children[^2])
-                    .OfType<Expander>()
-                    .Any(e => e.Tag?.ToString() == "frpc-download-panel"),
+                    .OfType<Border>()
+                    .Any(e => e.Tag?.ToString() == "frpc-download-panel")
+                && !Descendants(PageBody.Children[^2]).OfType<Expander>().Any(),
             "third-party client management is combined immediately before the current version"
         );
         await VerifyMemoryAllocation(check, directory);

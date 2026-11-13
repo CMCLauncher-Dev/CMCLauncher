@@ -32,30 +32,24 @@ public sealed partial class MainWindow
             await frpcVersionsLoad;
             page = "settings";
             await RenderAsync();
-            var initialDownloads = Descendants(PageBody)
-                .OfType<Expander>()
-                .Single(e => e.Tag?.ToString() == "frpc-download-panel");
+            await frpcVersionsLoad;
             check(
-                !initialDownloads.IsExpanded,
-                "frpc client management is collapsed at the end of settings"
+                Descendants(PageBody)
+                    .OfType<Border>()
+                    .Any(e => e.Tag?.ToString() == "frpc-download-panel")
+                    && !Descendants(PageBody)
+                        .OfType<Expander>()
+                        .Any(e => e.Tag?.ToString() == "frpc-download-panel"),
+                "frpc client management is an always-visible card in settings"
             );
-            initialDownloads.IsExpanded = true;
-            await Task.Delay(100);
-            await frpcVersionsLoad;
-            var moreReleases = Descendants(PageBody)
-                .OfType<Button>()
-                .Single(b => b.Content?.ToString() == Ui("Load more releases"));
-            (
-                (Microsoft.UI.Xaml.Automation.Provider.IInvokeProvider)
-                    new Microsoft.UI.Xaml.Automation.Peers.ButtonAutomationPeer(
-                        moreReleases
-                    ).GetPattern(Microsoft.UI.Xaml.Automation.Peers.PatternInterface.Invoke)
-            ).Invoke();
-            await Task.Delay(100);
-            await frpcVersionsLoad;
             check(
-                frpcOnlineVersions.Count == 3,
-                "frpc historical version button loads the next online release page"
+                !Descendants(PageBody)
+                    .OfType<Button>()
+                    .Any(b =>
+                        b.Content?.ToString() == Ui("Refresh releases")
+                        || b.Content?.ToString() == Ui("Load more releases")
+                    ),
+                "compact client management omits release refresh and pagination buttons"
             );
             page = "frpc";
             await RenderAsync();
