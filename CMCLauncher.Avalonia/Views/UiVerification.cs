@@ -349,6 +349,7 @@ public sealed partial class MainWindow
             checks.Add("PASS schematic tree");
             await ExportPackPage(instance);
             checks.Add("PASS modpack export");
+            await VerifyFrpcParity(checks);
             await VerifyPfpParity(checks);
             await VerifyCommunityFilterParity(checks);
 

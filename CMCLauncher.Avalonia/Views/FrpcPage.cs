@@ -35,6 +35,7 @@ public sealed partial class MainWindow
                 await session.Save();
             }
         };
+        editor.Tag = "frpc-editor";
         editor.MinHeight = 260;
         async Task ReadProfile()
         {
@@ -164,6 +165,7 @@ public sealed partial class MainWindow
         identity.Children.Add(formatField);
         var create = new Expander
         {
+            Tag = "frpc-new-panel",
             Header = Ui("New configuration"),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Content = Stack(
@@ -247,6 +249,7 @@ public sealed partial class MainWindow
         }
         var import = new Expander
         {
+            Tag = "frpc-import-panel",
             Header = Ui("Import configuration"),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Content = Stack(
