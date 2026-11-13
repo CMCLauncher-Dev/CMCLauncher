@@ -110,11 +110,10 @@ public sealed partial class MainWindow
             );
             download.Children.Add(
                 Action(
-                    "Manage downloaded clients",
-                    (_, _) =>
+                    "Download Terracotta",
+                    async (_, _) =>
                     {
-                        page = "settings";
-                        expandedNavigation = "settings";
+                        await Run(terracotta.Install, "Download Terracotta");
                         Render();
                     },
                     true

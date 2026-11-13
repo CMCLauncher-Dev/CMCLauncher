@@ -98,7 +98,7 @@ public sealed partial class MainWindow
                             "GitHub",
                             () =>
                             {
-                                Open("https://github.com/com-in/CMCLauncher");
+                                Open("https://github.com/CMCLauncher-Dev/CMCLauncher");
                                 return Task.CompletedTask;
                             }
                         ),
@@ -114,7 +114,9 @@ public sealed partial class MainWindow
                             "License",
                             () =>
                             {
-                                Open("https://github.com/com-in/CMCLauncher/blob/main/LICENSE");
+                                Open(
+                                    "https://github.com/CMCLauncher-Dev/CMCLauncher/blob/main/LICENSE"
+                                );
                                 return Task.CompletedTask;
                             }
                         )

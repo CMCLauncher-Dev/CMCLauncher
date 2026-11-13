@@ -61,7 +61,7 @@ Architecture: amd64
 Maintainer: com-in <com-in@users.noreply.github.com>
 Section: games
 Priority: optional
-Homepage: https://github.com/com-in/CMCLauncher
+Homepage: https://github.com/CMCLauncher-Dev/CMCLauncher
 Installed-Size: {(size + 1023) // 1024}
 Depends: libc6 (>= 2.34), libgcc-s1, libstdc++6, zlib1g, libicu70 | libicu72 | libicu74 | libicu76 | libicu77 | libicu78, libssl3 | libssl3t64, libfontconfig1, libx11-6, libxrandr2, libxi6, libxcursor1, libxrender1, libice6, libsm6
 Recommends: libsecret-tools, libglib2.0-bin
@@ -87,7 +87,7 @@ Version: {base}
 Release: {release}
 Summary: Minecraft launcher
 License: AGPL-3.0-only
-URL: https://github.com/com-in/CMCLauncher
+URL: https://github.com/CMCLauncher-Dev/CMCLauncher
 BuildArch: x86_64
 AutoReqProv: no
 Requires: glibc >= 2.34, libgcc, libstdc++, zlib, libicu, libssl.so.3()(64bit), libcrypto.so.3()(64bit), fontconfig, libX11, libXrandr, libXi, libXcursor, libXrender, libICE, libSM

@@ -66,7 +66,15 @@ public sealed partial class MainWindow
                         T(
                             "The component is downloaded from the official release only when you click Download. The launcher does not include it."
                         ),
-                        Btn("Manage downloaded clients", () => Navigate("settings"), true)
+                        Btn(
+                            "Download Terracotta",
+                            async () =>
+                            {
+                                await session.Run("Download Terracotta", client.Install);
+                                await Navigate("terracotta");
+                            },
+                            true
+                        )
                     )
                 )
             );

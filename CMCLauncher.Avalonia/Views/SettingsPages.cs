@@ -746,57 +746,74 @@ public sealed partial class MainWindow
                                         await session.Save();
                                     }
                                 ),
-                                Btn(
+                                ConfirmationButton(
                                     "Remove from list",
+                                    "Remove Java entry?",
                                     async () =>
                                     {
                                         JavaManager.Remove(session.Store.Config.Settings, java);
                                         await session.Save();
                                         Draw();
-                                    }
+                                    },
+                                    "Remove"
                                 )
                             )
                         )
                     )
                 );
         }
+        async Task Scan(string? folder = null)
+        {
+            await session.Run(
+                "Scan Java",
+                async ct =>
+                {
+                    var candidates = await Task.Run(
+                        () => JavaManager.Candidates(session.Store, folder, ct).ToArray(),
+                        ct
+                    );
+                    foreach (var path in candidates)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        if (
+                            session.Store.Config.Settings.IgnoredJavaPaths.Contains(
+                                path,
+                                StringComparer.Ordinal
+                            )
+                        )
+                            continue;
+                        try
+                        {
+                            JavaManager.Register(
+                                session.Store.Config.Settings,
+                                await JavaManager.Inspect(path, ct)
+                            );
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            session.Log("DEBUG", ex.Message);
+                        }
+                    }
+                    await session.Save();
+                }
+            );
+            Draw();
+        }
         Draw();
         return Stack(
             Row(
+                Btn("Scan Java", () => Scan()),
                 Btn(
-                    "Scan Java",
+                    "Scan folder",
                     async () =>
                     {
-                        await session.Run(
-                            "Scan Java",
-                            async ct =>
-                            {
-                                var candidates = await Task.Run(
-                                    () => JavaManager.Candidates(session.Store, null, ct).ToArray(),
-                                    ct
-                                );
-                                foreach (var path in candidates)
-                                {
-                                    try
-                                    {
-                                        JavaManager.Register(
-                                            session.Store.Config.Settings,
-                                            await JavaManager.Inspect(path, ct)
-                                        );
-                                    }
-                                    catch (OperationCanceledException)
-                                    {
-                                        throw;
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        session.Log("DEBUG", ex.Message);
-                                    }
-                                }
-                                await session.Save();
-                            }
-                        );
-                        Draw();
+                        var folder = await Folder();
+                        if (folder != null)
+                            await Scan(folder);
                     }
                 ),
                 Btn(
