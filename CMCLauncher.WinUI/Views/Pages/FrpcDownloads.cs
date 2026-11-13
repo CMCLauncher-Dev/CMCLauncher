@@ -184,6 +184,11 @@ public sealed partial class MainWindow
         panel.Unloaded += (_, _) => cancellation.Cancel();
         PageBody.Children.Add(panel);
         Populate();
-        frpcVersionsLoad = frpcOnlineVersions.Count == 0 ? Load() : Task.CompletedTask;
+        downloadVersion.DropDownOpened += async (_, _) =>
+        {
+            if (frpcOnlineVersions.Count == 0 && frpcVersionsLoad.IsCompleted)
+                frpcVersionsLoad = Load();
+            await frpcVersionsLoad;
+        };
     }
 }

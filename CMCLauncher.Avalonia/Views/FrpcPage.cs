@@ -267,12 +267,12 @@ public sealed partial class MainWindow
         fields.Children.Add(remove);
         var card = Card(Stack(T("frpc", 15, true), fields, message));
         card.Padding = new global::Avalonia.Thickness(12);
-        var loaded = false;
-        card.AttachedToVisualTree += async (_, _) =>
+        var loading = false;
+        online.DropDownOpened += async (_, _) =>
         {
-            if (loaded)
+            if (loading || online.ItemCount > 0)
                 return;
-            loaded = true;
+            loading = true;
             try
             {
                 var releases = await session.Frpc.Releases(1, ct);
@@ -283,6 +283,10 @@ public sealed partial class MainWindow
             catch (Exception ex)
             {
                 message.Text = ex.Message;
+            }
+            finally
+            {
+                loading = false;
             }
         };
         clients.SelectionChanged += async (_, _) =>
