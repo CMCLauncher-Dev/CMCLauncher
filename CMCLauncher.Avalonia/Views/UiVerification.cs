@@ -20,6 +20,38 @@ public sealed partial class MainWindow
         var checks = new List<string>();
         try
         {
+            if (OperatingSystem.IsLinux())
+            {
+                foreach (
+                    var (text, culture) in new[]
+                    {
+                        ("设置实例资源存档日本語", "zh-CN"),
+                        ("العربية", "ar"),
+                    }
+                )
+                foreach (var character in text.Distinct())
+                {
+                    if (
+                        !FontManager.Current.TryMatchCharacter(
+                            character,
+                            FontStyle.Normal,
+                            FontWeight.Normal,
+                            FontStretch.Normal,
+                            FontFamily.Default,
+                            System.Globalization.CultureInfo.GetCultureInfo(culture),
+                            out var matched
+                        )
+                        || !FontManager.Current.TryGetGlyphTypeface(matched, out var glyphs)
+                        || glyphs.GetGlyph(character) == 0
+                    )
+                        throw new IOException(
+                            "Missing interface font glyph: U+"
+                                + ((int)character).ToString("X4")
+                                + ". Install Noto CJK and Arabic fonts."
+                        );
+                }
+                checks.Add("PASS Linux CJK and Arabic interface font glyphs are available");
+            }
             if (
                 ConstrainWindowPosition(
                     new PixelPoint(2800, 1800),
