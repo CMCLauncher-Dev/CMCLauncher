@@ -8,4 +8,4 @@ Deploy with GitHub Pages by setting the source to `Deploy from a branch`, select
 
 The website's download links point to GitHub Releases.
 
-The project is licensed under the GNU General Public License v3.0. See [`LICENSE`](LICENSE) for the full text. Source repository: [com-in/CMCLauncher](https://github.com/com-in/CMCLauncher).
+The project is licensed under the GNU Affero General Public License v3.0. See [`LICENSE`](LICENSE) for the full text. Source repository: [com-in/CMCLauncher](https://github.com/com-in/CMCLauncher).

@@ -1,4 +1,4 @@
-﻿using CMCLauncher;
+using CMCLauncher;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
@@ -48,15 +48,9 @@ public sealed class JavaSettingsPage : CMCPage
                     Ui("Scan folder"),
                     async (_, _) =>
                     {
-                        var picker = new FolderPicker();
-                        InitializeWithWindow.Initialize(
-                            picker,
-                            WindowNative.GetWindowHandle(Window)
-                        );
-                        picker.FileTypeFilter.Add("*");
-                        var folder = await picker.PickSingleFolderAsync();
+                        var folder = await Task.FromResult(FolderPickerNative.PickFolder(Window));
                         if (folder != null)
-                            await ScanJava(folder.Path);
+                            await ScanJava(folder);
                     }
                 )
             )

@@ -12,7 +12,7 @@
 <a href="https://github.com/CMCLauncher-Dev/CMCLauncher/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/CMCLauncher-Dev/CMCLauncher?style=flat-square&amp;color=2088ff" /></a>
 <a href="https://github.com/CMCLauncher-Dev/CMCLauncher/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/CMCLauncher-Dev/CMCLauncher/total?style=flat-square&amp;color=35b879" /></a>
 <a href="https://github.com/CMCLauncher-Dev/CMCLauncher/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CMCLauncher-Dev/CMCLauncher/ci.yml?branch=main&amp;style=flat-square&amp;label=build" /></a>
-<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-7654c4?style=flat-square" /></a>
+<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-7654c4?style=flat-square" /></a>
 <br />
 <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078d4?style=flat-square" />
 <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8-512bd4?style=flat-square" />
@@ -263,6 +263,6 @@ dotnet run --project CMCLauncher.Tests/Windows/CMCLauncher.Tests.csproj -c Relea
 
 ## ライセンス
 
-CMCLauncher は [GNU General Public License v3.0](LICENSE) で配布されています。サードパーティの依存関係はそれぞれのライセンスを保持します。
+CMCLauncher は [GNU Affero General Public License v3.0](LICENSE) で配布されています。サードパーティの依存関係はそれぞれのライセンスを保持します。
 
 Minecraft、Mod、統合パックはそれぞれの所有者に帰属します。CMCLauncher は Mojang Studios、Microsoft、NetEase とは関係ありません。
