@@ -135,7 +135,7 @@ dotnet run --project CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj
 dotnet publish CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -c Release -r linux-x64 --self-contained true -o .artifacts/avalonia-linux
 ```
 
-Windows uses WinUI. Publish Avalonia with `linux-x64` or `osx-arm64` for Linux/macOS. See the [frontend notes](CMCLauncher.Avalonia/README.md) for credential-store requirements and platform verification status, and [Linux packages](docs/LINUX_PACKAGES.md) for installation and compatibility. CI packages Unix applications as TAR archives to retain executable permissions.
+Windows uses WinUI. Publish Avalonia with `linux-x64`, `osx-arm64` (Apple Silicon), or `osx-x64` (Intel) for Linux/macOS. See the [frontend notes](CMCLauncher.Avalonia/README.md) for credential-store requirements and platform verification status, and [Linux packages](docs/LINUX_PACKAGES.md) for installation and compatibility. CI packages Unix applications as TAR archives to retain executable permissions.
 
 ### Tests
 

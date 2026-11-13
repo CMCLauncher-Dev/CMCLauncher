@@ -2,8 +2,35 @@
 
 import argparse
 import os
+import struct
 from pathlib import Path
 import tarfile
+
+
+def validate_apphost(path: Path, rid: str) -> None:
+    with path.open("rb") as stream:
+        header = stream.read(8)
+        if rid == "linux-x64":
+            if header[:4] != b"\x7fELF":
+                raise ValueError("The app host does not match the target platform.")
+            return
+        expected = {"osx-arm64": 0x0100000C, "osx-x64": 0x01000007}[rid]
+        if len(header) != 8:
+            raise ValueError("The Mach-O app host header is incomplete.")
+        if header[:4] == b"\xcf\xfa\xed\xfe":
+            architectures = [struct.unpack("<I", header[4:8])[0]]
+        elif header[:4] == b"\xca\xfe\xba\xbe":
+            count = struct.unpack(">I", header[4:8])[0]
+            if not 0 < count <= 32:
+                raise ValueError("Invalid universal Mach-O architecture table.")
+            records = stream.read(count * 20)
+            if len(records) != count * 20:
+                raise ValueError("Incomplete universal Mach-O architecture table.")
+            architectures = [struct.unpack_from(">I", records, index * 20)[0] for index in range(count)]
+        else:
+            raise ValueError("The app host does not match the target platform.")
+        if expected not in architectures:
+            raise ValueError("The Mach-O app host architecture does not match the requested RID.")
 
 
 def package(publish: Path, output: Path, rid: str) -> None:
@@ -14,11 +41,7 @@ def package(publish: Path, output: Path, rid: str) -> None:
     required = ("CMCLauncher.Avalonia", "CMCLauncher.Avalonia.dll", "CMCLauncher.Core.dll")
     if not all((publish / name).is_file() for name in required):
         raise ValueError("Desktop runtime files are missing.")
-    with (publish / required[0]).open("rb") as stream:
-        magic = stream.read(4)
-    allowed = {b"\x7fELF"} if rid == "linux-x64" else {b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe"}
-    if magic not in allowed:
-        raise ValueError("The app host does not match the target platform.")
+    validate_apphost(publish / required[0], rid)
     files = sorted(publish.rglob("*"))
     key = os.environ.get("CURSEFORGE_API_KEY", "").encode()
     for file in files:
@@ -65,6 +88,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--publish", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--rid", choices=("linux-x64", "osx-arm64"), required=True)
+    parser.add_argument("--rid", choices=("linux-x64", "osx-arm64", "osx-x64"), required=True)
     options = parser.parse_args()
     package(options.publish, options.output, options.rid)

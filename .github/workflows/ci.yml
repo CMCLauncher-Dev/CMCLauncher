@@ -29,6 +29,8 @@ jobs:
             rid: linux-x64
           - os: macos-latest
             rid: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -37,6 +39,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check desktop packaging
+        run: python -B scripts/test-package-desktop.py
+      - name: Check macOS platform integration
+        if: runner.os == 'macOS'
+        run: dotnet run --project CMCLauncher.Tests/MacOS/CMCLauncher.MacOS.Tests.csproj -c Release
       - name: Check APT recovery helper
         if: runner.os == 'Linux'
         run: python -B scripts/test-ci-apt-install.py
@@ -67,6 +74,9 @@ jobs:
             $versionArguments = @("-p:Version=$version", "-p:InformationalVersion=$version")
           }
           dotnet publish CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o .artifacts/avalonia-publish -p:CurseForgeConfigurationFile="$env:RUNNER_TEMP/curseforge-api.json" @versionArguments
+      - name: Verify macOS runtime activation
+        if: runner.os == 'macOS'
+        run: .artifacts/avalonia-publish/CMCLauncher.Avalonia --verify-platform-runtime '${{ matrix.rid }}'
       - name: Remove temporary desktop credentials
         if: always()
         shell: pwsh

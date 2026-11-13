@@ -8,7 +8,7 @@ Run from the repository root:
 dotnet run --project CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj
 ```
 
-Publish with RID `linux-x64` or `osx-arm64` (cross-publishing from Windows is supported):
+Publish with RID `linux-x64`, `osx-arm64` (Apple Silicon), or `osx-x64` (Intel) (cross-publishing from Windows is supported):
 
 ```sh
 dotnet publish CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -c Release -r linux-x64 --self-contained true -o .artifacts/avalonia-linux

@@ -103,21 +103,50 @@ public sealed class MacOSLauncherPlatform : LauncherPlatform
         }
     }
 
-    public override IEnumerable<string> JavaHomes()
-    {
-        foreach (
-            var root in new[]
-            {
+    public override IEnumerable<string> JavaHomes() =>
+        DiscoverJavaHomes(
+            [
                 "/Library/Java/JavaVirtualMachines",
                 Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Library/Java/JavaVirtualMachines"
                 ),
-            }
+            ],
+            ["/opt/homebrew/opt", "/usr/local/opt"]
+        );
+
+    internal static IEnumerable<string> DiscoverJavaHomes(
+        IEnumerable<string> bundleRoots,
+        IEnumerable<string> brewRoots
+    )
+    {
+        var found = new HashSet<string>(StringComparer.Ordinal);
+        void Add(string home)
+        {
+            if (File.Exists(Path.Combine(home, "bin", "java")))
+                found.Add(home);
+        }
+        foreach (
+            var (root, brew) in bundleRoots
+                .Select(p => (p, false))
+                .Concat(brewRoots.Select(p => (p, true)))
         )
-            if (Directory.Exists(root))
-                foreach (var jdk in Directory.EnumerateDirectories(root))
-                    yield return Path.Combine(jdk, "Contents/Home");
+        {
+            try
+            {
+                if (!Directory.Exists(root))
+                    continue;
+                foreach (var jdk in Directory.EnumerateDirectories(root, brew ? "openjdk*" : "*"))
+                    Add(
+                        brew
+                            ? Path.Combine(jdk, "libexec", "openjdk.jdk", "Contents", "Home")
+                            : Path.Combine(jdk, "Contents", "Home")
+                    );
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return found;
     }
 
     public override Task MoveToTrash(string path) =>

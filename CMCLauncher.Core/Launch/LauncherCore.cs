@@ -1445,14 +1445,20 @@ public sealed partial class LauncherCore : IDisposable
         }
         try
         {
-            if (store.Config.Settings.PreferHighPerformanceGpu)
+            if (
+                MinecraftPlatform.OsName == "windows"
+                && store.Config.Settings.PreferHighPerformanceGpu
+            )
             {
                 await GameGpuPreference.Apply(store, java);
                 Log?.Invoke(
                     "Windows GPU preference verified: high performance · " + Path.GetFullPath(java)
                 );
             }
-            else if (store.Config.Settings.ManagedGpuPreferences.Count > 0)
+            else if (
+                MinecraftPlatform.OsName == "windows"
+                && store.Config.Settings.ManagedGpuPreferences.Count > 0
+            )
                 await GameGpuPreference.Restore(store);
         }
         catch (Exception ex)
@@ -1595,10 +1601,7 @@ public sealed partial class LauncherCore : IDisposable
     )
     {
         // Flattened profiles may repeat libraries; NeoForge's union filesystem rejects duplicate paths.
-        classpath = classpath
-            .Select(Path.GetFullPath)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        classpath = classpath.Select(Path.GetFullPath).Distinct(JavaManager.PathComparer).ToList();
         var values = new Dictionary<string, string>
         {
             ["natives_directory"] = natives,
@@ -1662,7 +1665,7 @@ public sealed partial class LauncherCore : IDisposable
                     Path.PathSeparator,
                     jvm[i + 1]
                         .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Distinct(JavaManager.PathComparer)
                 );
         if (!jvm.Any(a => a.StartsWith("-Djava.library.path=", StringComparison.Ordinal)))
             jvm.Add("-Djava.library.path=" + natives);
@@ -1692,6 +1695,17 @@ public sealed partial class LauncherCore : IDisposable
                     jvm[i] += "," + clientFile;
             }
         }
+        // GLFW requires Cocoa's first thread. Some imported/modded profiles omit Mojang's JVM section.
+        // Do not force this on LWJGL 2/AWT profiles or add a second copy of an existing option.
+        if (
+            MinecraftPlatform.OsName == "osx"
+            && EffectiveLibraries(version)
+                .Any(lib =>
+                    lib.S("name").StartsWith("org.lwjgl:lwjgl-glfw:", StringComparison.Ordinal)
+                )
+            && !result.Concat(jvm).Contains("-XstartOnFirstThread", StringComparer.Ordinal)
+        )
+            result.Add("-XstartOnFirstThread");
         result.AddRange(jvm);
         if (version["logging"]?["client"] is JsonNode log)
             result.Add(

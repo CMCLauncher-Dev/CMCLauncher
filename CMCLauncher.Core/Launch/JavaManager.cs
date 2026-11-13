@@ -12,6 +12,25 @@ public static class JavaManager
     public static string JavaExecutable =>
         MinecraftPlatform.OsName == "windows" ? "java.exe" : "java";
 
+    internal static StringComparer PathComparer =>
+        MinecraftPlatform.OsName == "windows"
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+    static StringComparison PathComparison =>
+        MinecraftPlatform.OsName == "windows"
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+    internal static bool IsMacSystemStub(string path) =>
+        MinecraftPlatform.OsName == "osx"
+        && (
+            path is "/usr/bin/java" or "/bin/java"
+            || path.StartsWith(
+                "/System/Library/Frameworks/JavaVM.framework/",
+                StringComparison.Ordinal
+            )
+        );
+
     internal static bool CompatibleArchitecture(string architecture) =>
         System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture switch
         {
@@ -49,18 +68,13 @@ public static class JavaManager
             )
                 yield return discovered;
         }
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(PathComparer);
         await foreach (var path in LaunchCandidates())
         {
             ct.ThrowIfCancellationRequested();
             if (!seen.Add(path))
                 continue;
-            if (
-                store.Config.Settings.IgnoredJavaPaths.Contains(
-                    path,
-                    StringComparer.OrdinalIgnoreCase
-                )
-            )
+            if (store.Config.Settings.IgnoredJavaPaths.Contains(path, PathComparer))
                 continue;
             try
             {
@@ -83,6 +97,11 @@ public static class JavaManager
     public static string Normalize(string path)
     {
         path = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
+        if (
+            MinecraftPlatform.OsName == "osx"
+            && File.Exists(Path.Combine(path, "Contents", "Home", "bin", "java"))
+        )
+            path = Path.Combine(path, "Contents", "Home");
         if (Directory.Exists(path))
             path = Path.Combine(
                 path,
@@ -123,6 +142,10 @@ public static class JavaManager
     public static async Task<JavaInstallation> Inspect(string path, CancellationToken ct)
     {
         path = Normalize(path);
+        if (IsMacSystemStub(path))
+            throw new IOException(
+                "Select a JDK's Contents/Home/bin/java, not the macOS system Java placeholder."
+            );
         if (!File.Exists(path))
             throw new FileNotFoundException("找不到 Java 可执行文件", path);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -159,31 +182,25 @@ public static class JavaManager
     // 将 Java 安装信息注册到设置中（去重、从忽略列表移除）
     public static void Register(Settings settings, JavaInstallation java)
     {
-        settings.IgnoredJavaPaths.RemoveAll(p =>
-            string.Equals(p, java.Path, StringComparison.OrdinalIgnoreCase)
-        );
-        settings.JavaInstallations.RemoveAll(j =>
-            string.Equals(j.Path, java.Path, StringComparison.OrdinalIgnoreCase)
-        );
+        settings.IgnoredJavaPaths.RemoveAll(p => string.Equals(p, java.Path, PathComparison));
+        settings.JavaInstallations.RemoveAll(j => string.Equals(j.Path, java.Path, PathComparison));
         settings.JavaInstallations.Add(java);
     }
 
     // 从注册列表移除 Java，加入忽略列表避免重新扫描回来
     public static void Remove(Settings settings, JavaInstallation java)
     {
-        settings.JavaInstallations.RemoveAll(j =>
-            string.Equals(j.Path, java.Path, StringComparison.OrdinalIgnoreCase)
-        );
-        if (!settings.IgnoredJavaPaths.Contains(java.Path, StringComparer.OrdinalIgnoreCase))
+        settings.JavaInstallations.RemoveAll(j => string.Equals(j.Path, java.Path, PathComparison));
+        if (!settings.IgnoredJavaPaths.Contains(java.Path, PathComparer))
             settings.IgnoredJavaPaths.Add(java.Path);
-        if (string.Equals(settings.JavaPath, java.Path, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(settings.JavaPath, java.Path, PathComparison))
             settings.JavaPath = "";
     }
 
     // 扫描本机所有可能存在的 Java 路径：PATH → JAVA_HOME → 注册表 → 预置目录
     public static IEnumerable<string> Candidates(Store store, string? folder, CancellationToken ct)
     {
-        var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var found = new HashSet<string>(PathComparer);
         void Add(string? path)
         {
             if (string.IsNullOrWhiteSpace(path))
@@ -191,7 +208,7 @@ public static class JavaManager
             try
             {
                 var full = Normalize(path);
-                if (File.Exists(full))
+                if (!IsMacSystemStub(full) && File.Exists(full))
                     found.Add(full);
             }
             catch { }
@@ -209,37 +226,41 @@ public static class JavaManager
             Add(java.Path);
         foreach (var path in LauncherPlatform.Current.JavaHomes())
             Add(path);
-        var roots =
-            folder != null
-                ? new[] { folder }
-                : new[]
+        var roots = new List<string>();
+        if (folder != null)
+            roots.Add(folder);
+        else
+        {
+            roots.Add(Path.Combine(store.Root, "runtimes"));
+            roots.Add(
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".jdks"
+                )
+            );
+            var data = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            roots.Add(
+                MinecraftPlatform.OsName switch
                 {
-                    Path.Combine(store.Root, "runtimes"),
-                    Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                        "Java"
-                    ),
-                    Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                        "Eclipse Adoptium"
-                    ),
-                    Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                        "Microsoft"
-                    ),
-                    Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                        "Zulu"
-                    ),
-                    Path.Combine(
+                    "osx" => Path.Combine(data, "minecraft", "runtime"),
+                    "windows" => Path.Combine(data, ".minecraft", "runtime"),
+                    _ => Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                        ".jdks"
+                        ".minecraft",
+                        "runtime"
                     ),
-                    Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        ".minecraft/runtime"
-                    ),
-                };
+                }
+            );
+            if (MinecraftPlatform.OsName == "windows")
+            {
+                var programFiles = Environment.GetFolderPath(
+                    Environment.SpecialFolder.ProgramFiles
+                );
+                foreach (var vendor in new[] { "Java", "Eclipse Adoptium", "Microsoft", "Zulu" })
+                    if (!string.IsNullOrWhiteSpace(programFiles))
+                        roots.Add(Path.Combine(programFiles, vendor));
+            }
+        }
         foreach (var root in roots)
         {
             // 限制深度和访问数量，也跳过联接，避免扫描目录无限扩散。
@@ -268,6 +289,18 @@ public static class JavaManager
         }
         return found;
     }
+
+    // Java 8 JDK archives contain both bin/java and jre/bin/java. Prefer the outer JDK,
+    // which also supplies the compiler and tools required by loader installers.
+    internal static string? DownloadedJavaExecutable(string root) =>
+        Directory
+            .EnumerateFiles(root, JavaExecutable, SearchOption.AllDirectories)
+            .Where(path => Path.GetFileName(Path.GetDirectoryName(path)) == "bin")
+            .OrderBy(path =>
+                Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar).Length
+            )
+            .ThenBy(path => path, PathComparer)
+            .FirstOrDefault();
 
     // 从 Adoptium API 下载指定大版本的 Temurin JDK 并安装到 runtimes 目录
     public static async Task<JavaInstallation> Download(
@@ -303,9 +336,7 @@ public static class JavaManager
         var destination = Path.Combine(root, $"temurin-{major}-{hash[..12]}");
         if (Directory.Exists(destination))
         {
-            var existing = Directory
-                .EnumerateFiles(destination, JavaExecutable, SearchOption.AllDirectories)
-                .FirstOrDefault();
+            var existing = DownloadedJavaExecutable(destination);
             if (existing != null)
                 return await Inspect(existing, ct);
             throw new Exception("Java 目标目录已存在但不完整，请检查：" + destination);
@@ -326,9 +357,11 @@ public static class JavaManager
             );
             stage("解压并检查 Java");
             await RuntimeArchive.Extract(archive, staging, gzip, 2L * 1024 * 1024 * 1024, ct);
-            var executable = Directory
-                .EnumerateFiles(staging, JavaExecutable, SearchOption.AllDirectories)
-                .Single();
+            var executable =
+                DownloadedJavaExecutable(staging)
+                ?? throw new IOException(
+                    "The Java archive does not contain a Java executable."
+                );
             var inspected = await Inspect(executable, ct);
             if (inspected.Major != major)
                 throw new Exception("下载的 Java 版本不匹配");
