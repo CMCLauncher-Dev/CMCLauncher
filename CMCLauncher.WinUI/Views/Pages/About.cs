@@ -8,7 +8,7 @@ public sealed partial class MainWindow
 {
     void AboutPage()
     {
-        Header("About", "");
+        Header(Ui("About"), "");
         var identity = new Grid { ColumnSpacing = 18 };
         identity.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         identity.ColumnDefinitions.Add(
@@ -46,11 +46,15 @@ public sealed partial class MainWindow
         PageBody.Children.Add(Card(identity));
         PageBody.Children.Add(BuildLauncherUpdateSettings());
         PageBody.Children.Add(
-            AcknowledgementCards("Contributors", AboutAcknowledgements.Contributors, true)
+            AcknowledgementCards(
+                Ui("Contributors"),
+                AboutAcknowledgements.Contributors,
+                true
+            )
         );
         PageBody.Children.Add(
             AcknowledgementCards(
-                "Open-source projects and services",
+                Ui("Open-source projects and services"),
                 AboutAcknowledgements.Projects,
                 false
             )

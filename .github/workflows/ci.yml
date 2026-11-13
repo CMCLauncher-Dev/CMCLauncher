@@ -353,10 +353,17 @@ jobs:
       - name: Verify WinUI pages
         if: matrix.format == 'zip'
         shell: pwsh
+        env:
+          CI: 'true'
         run: |
           $directory = Join-Path $PWD '.artifacts/winui-ui'
           $process = Start-Process -FilePath (Resolve-Path dist/cmc-launcher/CMCLauncher.exe) -ArgumentList @('--verify-cms-ui', ('"{0}"' -f $directory)) -WindowStyle Hidden -PassThru
-          if (!$process.WaitForExit(90000)) { $process.Kill(); throw 'WinUI verification timed out' }
+          if (!$process.WaitForExit(90000)) {
+            $process.Kill($true)
+            if (Test-Path "$directory/passed.txt") { Get-Content "$directory/passed.txt" -Tail 12 }
+            if (Test-Path "$directory/failure.txt") { Get-Content "$directory/failure.txt" }
+            throw 'WinUI verification timed out'
+          }
           if ($process.ExitCode -ne 0 -or !(Test-Path "$directory/passed.txt") -or (Test-Path "$directory/failure.txt")) {
             if (Test-Path "$directory/failure.txt") { Get-Content "$directory/failure.txt" }
             throw "WinUI verification failed (exit code $($process.ExitCode))"

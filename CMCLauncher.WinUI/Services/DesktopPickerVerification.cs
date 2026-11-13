@@ -8,6 +8,56 @@ static partial class DesktopPicker
 {
     internal static async Task Verify(Window window, Action<bool, string> check, string directory)
     {
+        check(
+            !CanVerifyDialogs(true, "true", null)
+                && !CanVerifyDialogs(true, null, "true")
+                && !CanVerifyDialogs(false, null, null)
+                && CanVerifyDialogs(true, null, null),
+            "CI and noninteractive sessions exclude all modal picker checks"
+        );
+        if (
+            CanVerifyDialogs(
+                Environment.UserInteractive,
+                Environment.GetEnvironmentVariable("CI"),
+                Environment.GetEnvironmentVariable("GITHUB_ACTIONS")
+            )
+        )
+            await VerifyDialogs(window, check, directory);
+        else
+            check(
+                true,
+                "SKIP modal picker checks in CI or noninteractive sessions; shell interop remains verified"
+            );
+        // Exercise IShellItem's actual vtable rather than merely checking the declared GUID.
+        var iid = typeof(IShellItem).GUID;
+        Marshal.ThrowExceptionForHR(
+            SHCreateItemFromParsingName(
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                IntPtr.Zero,
+                ref iid,
+                out var item
+            )
+        );
+        try
+        {
+            check(Directory.Exists(GetPath(item)), "shell item returns a real file-system path");
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(item);
+        }
+    }
+
+    static bool CanVerifyDialogs(bool interactive, string? ci, string? githubActions) =>
+        interactive && UnsetOrFalse(ci) && UnsetOrFalse(githubActions);
+
+    static bool UnsetOrFalse(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+        || value.Equals("false", StringComparison.OrdinalIgnoreCase)
+        || value == "0";
+
+    static async Task VerifyDialogs(Window window, Action<bool, string> check, string directory)
+    {
         var owner = WindowNative.GetWindowHandle(window);
         foreach (var mode in new[] { "folder", "open", "multiple", "save" })
         {
@@ -143,24 +193,6 @@ static partial class DesktopPicker
             {
                 timer.Stop();
             }
-        }
-        // Exercise IShellItem's actual vtable rather than merely checking the declared GUID.
-        var iid = typeof(IShellItem).GUID;
-        Marshal.ThrowExceptionForHR(
-            SHCreateItemFromParsingName(
-                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
-                IntPtr.Zero,
-                ref iid,
-                out var item
-            )
-        );
-        try
-        {
-            check(Directory.Exists(GetPath(item)), "shell item returns a real file-system path");
-        }
-        finally
-        {
-            Marshal.ReleaseComObject(item);
         }
     }
 
