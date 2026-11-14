@@ -25,6 +25,7 @@
     "A mod failed to load (check the error above)": "Не удалось загрузить мод (см. ошибку выше)",
     "JVM reported a fatal error (crash report saved)": "JVM сообщила о фатальной ошибке (отчёт сохранён)",
     "Show scrollbars": "Показывать полосы прокрутки",
+    "Liquid glass effect": "Эффект жидкого стекла",
     "No Java installation was found on PATH.": "Java не найдена в PATH.",
     "No compatible loader versions found.": "Совместимые версии загрузчика не найдены.",
     "No matching versions. Try a different version number or release type.": "Нет подходящих версий. Измените номер или тип версии.",

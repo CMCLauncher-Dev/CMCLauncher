@@ -100,11 +100,21 @@ public sealed partial class MainWindow
     }
 
     // 图标字体按字形绘制，不能跟普通文本一起替换为用户字体。
+    // 窗口级背景材质（液态玻璃/云母）。Win11 生效，旧系统自动无效果。
+    void ApplyBackdrop(bool enabled)
+    {
+        if (enabled && SystemBackdrop is not DesktopAcrylicBackdrop)
+            SystemBackdrop = new DesktopAcrylicBackdrop();
+        else if (!enabled && SystemBackdrop is not null)
+            SystemBackdrop = null;
+    }
+
     void ApplyPersonalization()
     {
         if (Content == null)
             return;
         var settings = store.Config.Settings;
+        ApplyBackdrop(settings.MicaEffect);
         ScrollBarAppearance.Show = settings.ShowScrollBars;
         var scale = double.IsFinite(settings.UiScale) ? Math.Clamp(settings.UiScale, .8, 1.5) : 1;
         var buttonScale = double.IsFinite(settings.UiButtonScale)
@@ -308,6 +318,21 @@ public sealed partial class MainWindow
             settings.ShowScrollBars = showScrollBars.IsOn;
             await SaveAppearance();
         };
+        var micaEffect = new ToggleSwitch
+        {
+            Header = Ui("Liquid glass effect"),
+            IsOn = settings.MicaEffect,
+            Tag = "mica-effect",
+        };
+        micaEffect.Toggled += async (_, _) =>
+        {
+            if (syncingAppearanceControls)
+                return;
+            settings.MicaEffect = micaEffect.IsOn;
+            ApplyBackdrop(micaEffect.IsOn);
+            ApplyTheme();
+            await SaveAppearance();
+        };
         var scale = new NumberBox
         {
             Header = Ui("Control size / %"),
@@ -403,7 +428,7 @@ public sealed partial class MainWindow
                 new StackPanel
                 {
                     Spacing = 12,
-                    Children = { showScrollBars, scale, buttonScale, menuScale, font, fontSize },
+                    Children = { showScrollBars, micaEffect, scale, buttonScale, menuScale, font, fontSize },
                 }
             )
         );
@@ -580,6 +605,7 @@ public sealed partial class MainWindow
             try
             {
                 showScrollBars.IsOn = settings.ShowScrollBars;
+                micaEffect.IsOn = settings.MicaEffect;
                 foreach (var control in AppearanceElements(PageBody))
                 {
                     if (control is ComboBox combo && combo.Header?.ToString() == Ui("Appearance"))

@@ -25,6 +25,7 @@
     "A mod failed to load (check the error above)": "Échec du chargement d'un mod (voir l'erreur ci-dessus)",
     "JVM reported a fatal error (crash report saved)": "Erreur fatale JVM signalée (rapport de crash enregistré)",
     "Show scrollbars": "Afficher les barres de défilement",
+    "Liquid glass effect": "Effet de verre liquide",
     "No Java installation was found on PATH.": "Aucune installation Java dans le PATH.",
     "No compatible loader versions found.": "Aucune version compatible du chargeur.",
     "No matching versions. Try a different version number or release type.": "Aucune version correspondante. Changez de numéro ou de type.",

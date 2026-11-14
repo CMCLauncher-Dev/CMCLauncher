@@ -3,6 +3,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.UI;
 using Windows.UI.ViewManagement;
 
 namespace CMCLauncher.WinUI;
@@ -43,16 +44,20 @@ public sealed partial class MainWindow
         RefreshVersionDeletePalette();
         if (page == "frpc")
             RefreshFrpcPalette();
+        var micaEnabled = store.Config.Settings.MicaEffect;
+        // 开启液态玻璃时把内容/标题栏背景降为半透明，让 Mica 材质从窗口末端透出。
+        Color Backdrop(Color c) =>
+            micaEnabled ? Color.FromArgb(0x8F, c.R, c.G, c.B) : c;
         var bg = lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkBg;
         var sidebar = lightTheme ? ThemeTokens.LightSidebar : ThemeTokens.DarkSidebar;
         var text = lightTheme ? ThemeTokens.LightText : ThemeTokens.DarkText;
         var muted = lightTheme ? ThemeTokens.LightMuted : ThemeTokens.DarkMuted;
         var accent = lightTheme ? ThemeTokens.LightAccent : ThemeTokens.LightAccentText;
         var bgBrush = Brush(bg);
-        WindowBackground.Color = bgBrush.Color;
+        WindowBackground.Color = Backdrop(bgBrush.Color);
         if (Sidebar.Parent is Panel contentGrid)
-            contentGrid.Background = bgBrush;
-        Sidebar.Background = Brush(sidebar);
+            contentGrid.Background = new SolidColorBrush(Backdrop(bgBrush.Color));
+        Sidebar.Background = new SolidColorBrush(Backdrop(Brush(sidebar).Color));
         Sidebar.BorderBrush = new SolidColorBrush(
             RawColor(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorderAlt)
         );
@@ -80,8 +85,8 @@ public sealed partial class MainWindow
         CommunityFilterApplyButton.BorderBrush = ComboAccentBrush;
         TaskCountBadge.Background = Brush(PrimaryColor);
         TaskCountText.Foreground = new SolidColorBrush(Colors.White);
-        CustomTitleBar.Background = Brush(bg);
-        TitleBrandBackground.Background = Brush(sidebar);
+        CustomTitleBar.Background = new SolidColorBrush(Backdrop(Brush(bg).Color));
+        TitleBrandBackground.Background = new SolidColorBrush(Backdrop(Brush(sidebar).Color));
         TitleLabel.Foreground = Brush(text);
         foreach (var card in themeCards.Concat(taskCards))
             ApplyCardTheme(card);
@@ -89,7 +94,7 @@ public sealed partial class MainWindow
         if (AppWindowTitleBar.IsCustomizationSupported())
         {
             var bar = AppWindow.TitleBar;
-            bar.BackgroundColor = Brush(bg).Color;
+            bar.BackgroundColor = Backdrop(Brush(bg).Color);
             bar.ForegroundColor = Brush(text).Color;
             bar.ButtonBackgroundColor = Colors.Transparent;
             bar.ButtonForegroundColor = Brush(text).Color;
@@ -101,7 +106,7 @@ public sealed partial class MainWindow
                 lightTheme ? ThemeTokens.LightTitlebarPressed : ThemeTokens.DarkTitlebarPressed
             ).Color;
             bar.ButtonPressedForegroundColor = Brush(text).Color;
-            bar.InactiveBackgroundColor = Brush(bg).Color;
+            bar.InactiveBackgroundColor = Backdrop(Brush(bg).Color);
             bar.InactiveForegroundColor = Brush(muted).Color;
             bar.ButtonInactiveBackgroundColor = Colors.Transparent;
             bar.ButtonInactiveForegroundColor = Brush(muted).Color;

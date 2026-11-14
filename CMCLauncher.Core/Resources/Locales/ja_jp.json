@@ -25,6 +25,7 @@
     "A mod failed to load (check the error above)": "MOD の読み込みに失敗しました（上のエラーを確認してください）",
     "JVM reported a fatal error (crash report saved)": "JVM で致命的エラーが発生しました（クラッシュレポートが保存されました）",
     "Show scrollbars": "スクロールバーを表示",
+    "Liquid glass effect": "リキッドガラス効果",
     "No Java installation was found on PATH.": "PATH に Java が見つかりません。",
     "No compatible loader versions found.": "対応するローダーバージョンが見つかりません。",
     "No matching versions. Try a different version number or release type.": "一致するバージョンがありません。番号や種類を変更してください。",

@@ -25,6 +25,7 @@
     "A mod failed to load (check the error above)": "有模组加载失败（请查看其上方的错误）",
     "JVM reported a fatal error (crash report saved)": "JVM 报告了致命错误（崩溃报告已保存）",
     "Show scrollbars": "显示滚动条",
+    "Liquid glass effect": "液态玻璃效果",
     "No Java installation was found on PATH.": "PATH 中未找到 Java。",
     "No compatible loader versions found.": "没有找到兼容的加载器版本。",
     "No matching versions. Try a different version number or release type.": "没有匹配的版本，请尝试其他版本号或版本类型。",
