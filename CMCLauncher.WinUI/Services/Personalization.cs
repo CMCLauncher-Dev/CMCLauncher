@@ -105,15 +105,18 @@ public sealed partial class MainWindow
     // 图标字体按字形绘制，不能跟普通文本一起替换为用户字体。
     DesktopAcrylicController? acrylicBackdropController;
     SystemBackdropConfiguration? acrylicBackdropConfig;
+    ICompositionSupportsSystemBackdrop? backdropTarget;
 
     // 窗口级背景材质（液态玻璃）。用底层 DesktopAcrylicController 直接把 Acrylic 自带的白色着色压暗，
     // 让窗口近乎直接映射窗口下方的颜色与内容；Win11 最完整，Win10 1809+ 同样可用。
+    // Add/Remove 必须使用同一个 target 引用，因此把窗口 target 缓存为字段，避免每次 As<>() 生成新 RCW 导致移除失败。
     void ApplyBackdrop(bool enabled)
     {
         if (enabled)
         {
             if (acrylicBackdropController is null)
             {
+                backdropTarget ??= this.As<ICompositionSupportsSystemBackdrop>();
                 var controller = new DesktopAcrylicController
                 {
                     TintColor = Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF),
@@ -125,7 +128,7 @@ public sealed partial class MainWindow
                     IsInputActive = true,
                     Theme = SystemBackdropTheme.Default,
                 };
-                controller.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
+                controller.AddSystemBackdropTarget(backdropTarget);
                 controller.SetSystemBackdropConfiguration(config);
                 acrylicBackdropController = controller;
                 acrylicBackdropConfig = config;
@@ -133,8 +136,8 @@ public sealed partial class MainWindow
         }
         else if (acrylicBackdropController is not null)
         {
+            acrylicBackdropController.RemoveSystemBackdropTarget(backdropTarget);
             acrylicBackdropController.SetSystemBackdropConfiguration(null);
-            acrylicBackdropController.RemoveSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
             acrylicBackdropController.Dispose();
             acrylicBackdropController = null;
             acrylicBackdropConfig = null;
@@ -361,9 +364,21 @@ public sealed partial class MainWindow
             if (syncingAppearanceControls)
                 return;
             settings.MicaEffect = micaEffect.IsOn;
-            ApplyBackdrop(micaEffect.IsOn);
-            ApplyTheme();
-            await SaveAppearance();
+            try
+            {
+                ApplyBackdrop(micaEffect.IsOn);
+            }
+            catch (Exception ex)
+            {
+                // 材质切换不应中断设置保存或背景刷新，记录后继续恢复不透明背景。
+                RuntimeLog.Write("ERROR", $"Liquid glass backdrop: {ex}");
+            }
+            finally
+            {
+                // 无论材质是否切换成功，都用最新设置刷新背景与标题栏颜色。
+                ApplyTheme();
+                await SaveAppearance();
+            }
         };
         var scale = new NumberBox
         {
