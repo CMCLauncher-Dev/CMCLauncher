@@ -339,6 +339,8 @@ public sealed partial class MainWindow
                     AdaptCard(card, detail, open);
                     card.Tag = "community-result";
                     ToolTipService.SetToolTip(card, item.Description);
+                    // 搜索结果加载后自动把标题/摘要翻译为界面语言（原文写入 Tag 供恢复）。
+                    _ = AutoTranslateSearchCardAsync(item.Name, item.Description, title, summary);
                     var projectCard = CompactCard(card);
                     projectCard.Tapped += async (_, tap) =>
                     {
@@ -387,6 +389,50 @@ public sealed partial class MainWindow
                     loading = false;
                     SyncPager();
                 }
+            }
+        }
+        // 搜索结果加载后自动把标题/摘要翻译为界面语言（原文写入 Tag 供恢复）。
+
+        async Task AutoTranslateSearchCardAsync(
+            string originalTitle,
+            string originalDescription,
+            TextBlock title,
+            TextBlock summary
+        )
+        {
+            try
+            {
+                var settings = Store.Config.Settings;
+                if (!settings.ModTranslationEnabled)
+                    return;
+                var target = settings.LauncherLanguage;
+                if (ModTranslation.ServiceLanguage(target) == "en")
+                    return;
+                using var request =
+                    CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
+                request.CancelAfter(TimeSpan.FromSeconds(30));
+                var t1 = ModTranslation.TranslateAsync(
+                    Core.Http,
+                    originalTitle,
+                    "en_us",
+                    target,
+                    request.Token
+                );
+                var t2 = ModTranslation.TranslateAsync(
+                    Core.Http,
+                    originalDescription,
+                    "en_us",
+                    target,
+                    request.Token
+                );
+                title.Text = await t1;
+                summary.Text = await t2;
+                title.Tag = originalTitle;
+                summary.Tag = originalDescription;
+            }
+            catch
+            {
+                // 翻译失败或已取消时保留原文。
             }
         }
         previous.Click += async (_, _) => await BeginLoad(state.Page - 1, state.Query);

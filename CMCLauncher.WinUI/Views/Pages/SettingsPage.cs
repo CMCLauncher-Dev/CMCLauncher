@@ -367,6 +367,18 @@ public sealed class SettingsPage : CMCPage
             12
         );
 
+        var modTranslate = new ToggleSwitch
+        {
+            Header = Ui("Translate installed mods"),
+            IsOn = settings.ModTranslationEnabled,
+            OnContent = Ui("context.settingspage.on"),
+            OffContent = Ui("Off"),
+        };
+        var translateHint = Text(
+            Ui("Translates mod language files via a free web API. Mod text is sent to the translation service; the original files are never modified."),
+            12
+        );
+
         var windowMode = new BelowComboBox
         {
             Header = Ui("Default window mode"),
@@ -697,6 +709,15 @@ public sealed class SettingsPage : CMCPage
             gamePriority
         );
         Section("Memory and Java", automaticMemory, memoryPanel, customJvmArgs, jvmHint);
+        Section(
+            "Mod translation",
+            modTranslate,
+            translateHint,
+            Text(
+                "Translates mod language files only while enabled and only for installed mods you translate from the Mod management page. Translations are cached as local resource packs and do not modify your mod files.",
+                12
+            )
+        );
         var advancedNetwork = new StackPanel { Spacing = 12 };
         advancedNetwork.Children.Add(proxyUser);
         advancedNetwork.Children.Add(proxyPassword);
@@ -830,6 +851,11 @@ public sealed class SettingsPage : CMCPage
         {
             settings.IgnoreSslErrors = ignoreSslErrors.IsOn;
             Core.ConfigureNetwork();
+            await PersistSettings();
+        };
+        modTranslate.Toggled += async (_, _) =>
+        {
+            settings.ModTranslationEnabled = modTranslate.IsOn;
             await PersistSettings();
         };
 

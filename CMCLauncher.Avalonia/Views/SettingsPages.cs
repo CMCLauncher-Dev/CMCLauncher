@@ -261,6 +261,13 @@ public sealed partial class MainWindow
             OnContent = Ui("context.settingspage.on"),
             OffContent = Ui("Off"),
         };
+        var modTranslate = new ToggleSwitch
+        {
+            Content = Ui("Translate installed mods"),
+            IsChecked = settings.ModTranslationEnabled,
+            OnContent = Ui("context.settingspage.on"),
+            OffContent = Ui("Off"),
+        };
         string NetworkSettings() =>
             JsonSerializer.Serialize(
                 new
@@ -359,6 +366,7 @@ public sealed partial class MainWindow
                 )
                     settings.DownloadMirror = mirrorValue;
                 settings.ExpandProjectIntroduction = introduction.IsChecked == true;
+                settings.ModTranslationEnabled = modTranslate.IsChecked == true;
                 await session.Save();
                 if (NetworkSettings() != previousNetwork)
                     session.ConfigureNetwork();
@@ -514,6 +522,14 @@ public sealed partial class MainWindow
                 Field("Process priority", priority)
             ),
             Section("Memory and Java", autoMemory, memoryPanel, Field("Custom JVM arguments", jvm)),
+            Section(
+                "Mod translation",
+                modTranslate,
+                T(
+                    "Translates mod language files only while enabled and only for installed mods you translate from the Mod management page. Mod text is sent to a free translation service; original files are never modified.",
+                    12
+                )
+            ),
             Section(
                 "Downloads and network",
                 Field("Download threads", threads),

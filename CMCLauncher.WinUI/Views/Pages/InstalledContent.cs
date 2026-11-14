@@ -441,6 +441,95 @@ public sealed partial class MainWindow
                             }
                         )
                     );
+                    if (contentType == "mod")
+                    {
+                        // 始终从 mod 通用的 en_us 语言文件翻译到启动器界面语言。
+                        const string source = "en_us";
+                        var target = store.Config.Settings.LauncherLanguage;
+                        row.Children.Add(
+                        Action(
+                            Ui("Translate"),
+                            async (sender, _) =>
+                            {
+                                var anchor = (FrameworkElement)sender;
+                                if (!store.Config.Settings.ModTranslationEnabled)
+                                {
+                                    await ConfirmPop(
+                                        anchor,
+                                        Ui("Translate"),
+                                        Ui("Enable Mod translation in Settings first."),
+                                        Ui("Got it")
+                                    );
+                                    return;
+                                }
+                                var modPath = ContentManager.Locate(
+                                    gameDir,
+                                    contentType,
+                                    targetWorld,
+                                    item.File
+                                );
+                                var entries = await Task.Run(() =>
+                                    ModTranslation.ReadLang(modPath, source)
+                                );
+                                if (entries == null || entries.Count == 0)
+                                {
+                                    await ConfirmPop(
+                                        anchor,
+                                        Ui("Translate"),
+                                        Ui("No lang file found in this mod."),
+                                        Ui("Got it")
+                                    );
+                                    return;
+                                }
+                                if (
+                                    ModTranslation.ServiceLanguage(target) == "en"
+                                )
+                                {
+                                    await ConfirmPop(
+                                        anchor,
+                                        Ui("Translate"),
+                                        Ui("This mod is already in the selected language."),
+                                        Ui("Got it")
+                                    );
+                                    return;
+                                }
+                                var modId =
+                                    ContentManager.ModIds(modPath).FirstOrDefault()
+                                    ?? Path.GetFileNameWithoutExtension(item.File.Replace(".disabled", ""));
+                                await Run(
+                                    async ct =>
+                                    {
+                                        Report("Translating mod…");
+                                        var translated = await ModTranslation.TranslateBatchAsync(
+                                            core.Http,
+                                            entries,
+                                            source,
+                                            target,
+                                            ct
+                                        );
+                                        var targetPath = ModTranslation.WriteResourcePack(
+                                            gameDir,
+                                            modPath,
+                                            modId,
+                                            translated,
+                                            source,
+                                            target
+                                        );
+                                        if (targetPath != null)
+                                            await store.Save();
+                                    },
+                                    name: "Mod translation"
+                                );
+                                await ConfirmPop(
+                                    anchor,
+                                    Ui("Translate"),
+                                    Ui("Translation saved. Load the resource pack in-game."),
+                                    Ui("Got it")
+                                );
+                            }
+                        )
+                    );
+                    }
                     foreach (var button in row.Children.OfType<Button>())
                     {
                         button.MinWidth = 48;

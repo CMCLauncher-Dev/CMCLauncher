@@ -90,6 +90,8 @@ public sealed class Settings
     public string LauncherLanguage { get; set; } = "en_us";
     public bool CheckLauncherUpdates { get; set; } = true;
     public bool ReceiveBetaUpdates { get; set; }
+    public bool ModTranslationEnabled { get; set; }
+    public string ModTranslationService { get; set; } = "mymemory";
     public bool ContinuousStatsSampling { get; set; } = true;
     public string InstanceView { get; set; } = "list";
     public List<HomeCardPlacement> HomeCards { get; set; } =

@@ -299,7 +299,8 @@ public sealed partial class MainWindow
                                     await ContentPage(instance, kind, world);
                                 }
                             ),
-                            DeleteFile(path, () => ContentPage(instance, kind, world))
+                            DeleteFile(path, () => ContentPage(instance, kind, world)),
+                            Btn("Translate", () => TranslateMod(instance, root, world, item))
                         )
                     )
                 );
@@ -362,6 +363,61 @@ public sealed partial class MainWindow
                 await refresh();
             }
         );
+
+    async Task TranslateMod(Instance instance, string root, string? world, ContentItem item)
+    {
+        var settings = session.Store.Config.Settings;
+        if (!settings.ModTranslationEnabled)
+        {
+            await Confirm("Translate", Ui("Enable Mod translation in Settings first."));
+            return;
+        }
+        var path = ContentManager.Locate(root, "mod", world, item.File);
+        // 始终从 mod 通用的 en_us 语言文件翻译到启动器界面语言。
+        const string source = "en_us";
+        var target = settings.LauncherLanguage;
+        var entries = await Task.Run(() => ModTranslation.ReadLang(path, source));
+        if (entries == null || entries.Count == 0)
+        {
+            await Confirm("Translate", Ui("No lang file found in this mod."));
+            return;
+        }
+        if (ModTranslation.ServiceLanguage(target) == "en")
+        {
+            await Confirm(
+                "Translate",
+                Ui("This mod is already in the selected language.")
+            );
+            return;
+        }
+        var modId =
+            ContentManager.ModIds(path).FirstOrDefault()
+            ?? Path.GetFileNameWithoutExtension(item.File.Replace(".disabled", ""));
+        await session.Run(
+            "Mod translation",
+            async ct =>
+            {
+                session.ReportStatus(Ui("Translating mod…"));
+                var translated = await ModTranslation.TranslateBatchAsync(
+                    session.Core.Http,
+                    entries,
+                    source,
+                    target,
+                    ct
+                );
+                ModTranslation.WriteResourcePack(
+                    root,
+                    path,
+                    modId,
+                    translated,
+                    source,
+                    target
+                );
+                await session.Store.Save();
+            }
+        );
+        await Confirm("Translate", Ui("Translation saved. Load the resource pack in-game."));
+    }
 
     async Task CheckModUpdates(Instance instance)
     {

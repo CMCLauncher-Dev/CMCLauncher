@@ -478,6 +478,7 @@ public sealed partial class MainWindow
                 Grid.SetColumn(details, 2);
                 card.Children.Add(details);
                 list.Children.Add(Card(card));
+                _ = AutoTranslateCardAsync(item.Name, item.Description, title, description);
             }
             var totalPages = Math.Max(1, (state.Result.TotalHits + 15) / 16);
             pageLabel.Text = $"{state.Page + 1}/{totalPages}";
@@ -485,6 +486,51 @@ public sealed partial class MainWindow
             previous.IsEnabled = state.Page > 0;
             next.IsEnabled = state.Result.HasNext;
             status.Text = state.Result.Warning ?? $"{state.Result.TotalHits:N0}";
+        }
+        // 搜索结果加载后自动把标题/摘要翻译为界面语言（原文写入 Tag 供恢复）。
+        async Task AutoTranslateCardAsync(
+            string originalTitle,
+            string originalDescription,
+            TextBlock title,
+            TextBlock description
+        )
+        {
+            try
+            {
+                var settings = session.Store.Config.Settings;
+                if (!settings.ModTranslationEnabled)
+                    return;
+                var target = settings.LauncherLanguage;
+                if (ModTranslation.ServiceLanguage(target) == "en")
+                    return;
+                using var request =
+                    CancellationTokenSource.CreateLinkedTokenSource(
+                        navigationRequest?.Token ?? default
+                    );
+                request.CancelAfter(TimeSpan.FromSeconds(30));
+                var titleTask = ModTranslation.TranslateAsync(
+                    session.Core.Http,
+                    originalTitle,
+                    "en_us",
+                    target,
+                    request.Token
+                );
+                var descTask = ModTranslation.TranslateAsync(
+                    session.Core.Http,
+                    originalDescription,
+                    "en_us",
+                    target,
+                    request.Token
+                );
+                title.Text = await titleTask;
+                description.Text = await descTask;
+                title.Tag = originalTitle;
+                description.Tag = originalDescription;
+            }
+            catch
+            {
+                // 翻译失败或已取消时保留原文。
+            }
         }
         async Task Search(int page, bool submit = false)
         {
