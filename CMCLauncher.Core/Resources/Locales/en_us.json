@@ -987,6 +987,8 @@
     "The game exited with code {0}.": "The game exited with code {0}.",
     "Game memory": "Game memory",
     "The game crashed": "The game crashed",
+    "Instance debug mode": "Instance debug mode",
+    "Game logs": "Game logs",
     "Game exited": "Game exited",
     "The game exited unexpectedly; a crash report summary is ready.": "The game exited unexpectedly; a crash report summary is ready.",
     "Game updates": "Game updates",

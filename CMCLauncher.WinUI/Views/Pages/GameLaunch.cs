@@ -16,6 +16,16 @@ namespace CMCLauncher.WinUI;
 
 public sealed partial class MainWindow
 {
+    void StartInstanceDebugLog(Instance instance)
+    {
+        debugWindow?.CloseSafe();
+        debugWindow = null;
+        if (!instance.DebugMode)
+            return;
+        debugWindow = new GameDebugWindow(lightTheme, PrimaryColor, instance.Name, Ui);
+        debugWindow.Activate();
+    }
+
     // 修改任意窗口标题；游戏主窗口出现后按设置重命名。
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     static extern bool SetWindowText(IntPtr hWnd, string text);
@@ -68,12 +78,12 @@ public sealed partial class MainWindow
         launching = true;
         launchProgressValue = 0;
         RefreshLaunchCard("正在准备启动…");
-        debugWindow?.CloseSafe();
-        debugWindow = new GameDebugWindow(lightTheme, PrimaryColor, instance.Name);
-        debugWindow.Activate();
+        StartInstanceDebugLog(instance);
         var progress = new Progress<(double Value, string Stage)>(update =>
-            UpdateLaunchProgress(update.Value, update.Stage)
-        );
+        {
+            UpdateLaunchProgress(update.Value, update.Stage);
+            debugWindow?.SetProgress(update.Value, Ui(update.Stage));
+        });
         try
         {
             await Run(
@@ -123,14 +133,17 @@ public sealed partial class MainWindow
                         ct,
                         progress
                     );
-                    GameExitRestart.Watch(
-                        launchedGame,
-                        LauncherUpdateInstaller.Executable,
-                        Path.Combine(store.Root, "logs", "game-exit-restart.log")
-                    );
+                    var visibilityOnLaunch = store.Config.Settings.LauncherVisibility;
+                    var acknowledgeExit = visibilityOnLaunch is "close" or "hide_close"
+                        ? (Action)(() => { })
+                        : GameExitRestart.Watch(
+                            launchedGame,
+                            LauncherUpdateInstaller.Executable,
+                            Path.Combine(store.Root, "logs", "game-exit-restart.log")
+                        );
                     game = launchedGame;
                     runningInstanceId = instance.Id;
-                    // 游戏退出后的重启由独立监视进程负责，避免弹窗阻塞退出；退出后按用户偏好恢复或关闭窗口。
+                    // 界面正常处理退出时通知监视进程；只有界面失去响应才由它恢复启动器。
                     var monitoringDone = new TaskCompletionSource(
                         TaskCreationOptions.RunContinuationsAsynchronously
                     );
@@ -138,11 +151,11 @@ public sealed partial class MainWindow
                     {
                         try
                         {
-                            // WaitForExitAsync also handles a process that exited before this call
-                            // and waits for the redirected output streams to finish.
-                            await launchedGame.WaitForExitAsync();
+                            // Observe kernel exit without waiting for inherited output pipes to close.
+                            while (!launchedGame.HasExited)
+                                await Task.Delay(250);
                             await monitoringDone.Task;
-                            AddLog(UiFormat("{0}: game exited, restarting CMCLauncher", instance.Name));
+                            AddLog(instance.Name + ": game exited; applying launcher visibility setting");
                         }
                         catch (Exception ex)
                         {
@@ -156,9 +169,26 @@ public sealed partial class MainWindow
                                 game = null;
                                 runningInstanceId = null;
                             }
-                            launchedGame.Dispose();
-                            launcherExitBehavior = null;
-                            Close();
+                            try
+                            {
+                                acknowledgeExit();
+                            }
+                            catch (Exception ex)
+                            {
+                                AddLog("Game-exit acknowledgment failed: " + ex.Message);
+                            }
+                            debugWindow?.SetProgress(100, Ui("Game exited"));
+                            RefreshLaunchCard();
+                            try
+                            {
+                                if (!ct.IsCancellationRequested)
+                                    await HandleGameExit(instance, launchedGame, launchStarted);
+                            }
+                            finally
+                            {
+                                launchedGame.Dispose();
+                                ApplyLauncherVisibilityOnExit();
+                            }
                         }
                     }
                     _ = ObserveExit();
@@ -180,8 +210,7 @@ public sealed partial class MainWindow
                             await Task.Delay(250, ct);
                         }
                         UpdateLaunchProgress(100, "游戏窗口已出现");
-                        debugWindow?.CloseSafe();
-                        debugWindow = null;
+                        debugWindow?.SetProgress(100, Ui("Game is running"));
                         if (!string.IsNullOrWhiteSpace(store.Config.Settings.GameWindowTitle))
                             SetWindowText(
                                 launchedGame.MainWindowHandle,
@@ -210,11 +239,19 @@ public sealed partial class MainWindow
             Report("游戏正在运行");
             ApplyLaunchVisibility();
         }
+        catch (OperationCanceledException)
+        {
+            debugWindow?.SetProgress(0, Ui("Cancelled"));
+            throw;
+        }
+        catch (Exception ex)
+        {
+            debugWindow?.SetProgress(0, ex.Message);
+            throw;
+        }
         finally
         {
             launching = false;
-            debugWindow?.CloseSafe();
-            debugWindow = null;
             RefreshLaunchCard();
         }
     }

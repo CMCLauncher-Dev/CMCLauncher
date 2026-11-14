@@ -614,6 +614,8 @@
     "The game exited with code {0}.": "Игра завершилась с кодом {0}.",
     "Game memory": "Память игры",
     "The game crashed": "Игра вылетела",
+    "Instance debug mode": "Режим отладки экземпляра",
+    "Game logs": "Журнал игры",
     "Game exited": "Игра завершена",
     "The game exited unexpectedly; a crash report summary is ready.": "Игра завершилась неожиданно; сводка отчёта о сбое готова.",
     "Launcher updates": "Обновления запускателя",

@@ -773,6 +773,8 @@
     "The game exited with code {0}.": "ゲームが終了コード {0} で終了しました。",
     "Game memory": "ゲームメモリ",
     "The game crashed": "ゲームがクラッシュしました",
+    "Instance debug mode": "インスタンスのデバッグモード",
+    "Game logs": "ゲームログ",
     "Game exited": "ゲームが終了しました",
     "The game exited unexpectedly; a crash report summary is ready.": "ゲームが予期せず終了しました。クラッシュレポートの要約が用意されています。",
     "Game updates": "ゲームの更新",

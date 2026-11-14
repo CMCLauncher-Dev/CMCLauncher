@@ -523,7 +523,7 @@ public sealed partial class MainWindow
                                                     version.Id
                                                 );
                                         }
-                                    });
+                                    }, Ui(project.Type == "modpack" ? "安装整合包" : "安装") + " · " + project.Name);
                                 },
                                 true
                             );

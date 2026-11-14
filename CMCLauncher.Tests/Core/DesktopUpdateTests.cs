@@ -13,6 +13,8 @@ static class DesktopUpdateTests
                 "CMCLauncher-Avalonia-win-x64.zip",
                 "CMCLauncher-win-x64.zip",
                 "CMCLauncher-Avalonia-linux-x64.tar.gz",
+                "CMCLauncher-Avalonia-osx-arm64.tar.gz",
+                "CMCLauncher-Avalonia-osx-x64.tar.gz",
             }
         )
             assets.Add(
@@ -20,7 +22,7 @@ static class DesktopUpdateTests
                 {
                     ["name"] = name,
                     ["browser_download_url"] =
-                        "https://github.com/com-in/CMCLauncher/releases/download/CMCL-v2.0.0-release/"
+                        "https://github.com/CMCLauncher-Dev/CMCLauncher/releases/download/CMCL-v2.0.0-release/"
                         + name,
                     ["size"] = 10,
                 }
@@ -42,6 +44,12 @@ static class DesktopUpdateTests
                 != "CMCLauncher-Avalonia-linux-x64.tar.gz"
         )
             throw new Exception("Frontend update assets were mixed.");
+        foreach (var rid in new[] { "osx-arm64", "osx-x64" })
+            if (
+                LauncherUpdates.ParseReleases(json, false, rid)[0].Asset?.Name
+                != "CMCLauncher-Avalonia-" + rid + ".tar.gz"
+            )
+                throw new Exception("Migrated macOS update asset was not recognized: " + rid);
         var package = Path.Combine(root, "desktop.zip");
         using (var zip = ZipFile.Open(package, ZipArchiveMode.Create))
         {

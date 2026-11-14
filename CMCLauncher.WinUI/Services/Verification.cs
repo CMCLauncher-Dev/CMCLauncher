@@ -184,6 +184,28 @@ public sealed partial class MainWindow
         }
         await SwitchLanguage("zh_cn");
         await RenderAsync();
+        var savedTaskPageTitle = PageTitle.Text;
+        try
+        {
+            PageTitle.Text = "";
+            await Run(_ =>
+            {
+                Tasks();
+                Check(
+                    Descendants(TaskDrawerBody).OfType<TextBlock>().Any(text =>
+                        text.Text == "安装 · Sodium" && text.Visibility == Visibility.Visible),
+                    "resource installation task keeps its project title with an empty page header"
+                );
+                return Task.CompletedTask;
+            }, "安装 · Sodium");
+        }
+        finally
+        {
+            PageTitle.Text = savedTaskPageTitle;
+        }
+
+        await VerifyInstanceDebugMode(Check);
+        await VerifyCrashExit(Check, directory);
         await VerifyFeedbackAndSchematics(Check, directory);
         await VerifyFrpcPage(Check, directory);
         await VerifyToolboxUi(Check, directory);

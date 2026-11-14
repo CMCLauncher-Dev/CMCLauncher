@@ -614,6 +614,8 @@
     "The game exited with code {0}.": "أُغلق اللعبة برمز {0}.",
     "Game memory": "ذاكرة اللعبة",
     "The game crashed": "تعطلت اللعبة",
+    "Instance debug mode": "وضع تصحيح أخطاء النسخة",
+    "Game logs": "سجلات اللعبة",
     "Game exited": "أُغلقت اللعبة",
     "The game exited unexpectedly; a crash report summary is ready.": "أُغلقت اللعبة بشكل غير متوقع؛ ملخص تقرير الخطأ جاهز.",
     "Launcher updates": "تحديثات المشغّل",

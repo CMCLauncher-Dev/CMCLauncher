@@ -18,10 +18,10 @@ public sealed class GameDebugWindow : Window
     readonly TextBox logView;
     bool closed;
 
-    public GameDebugWindow(bool lightTheme, string accentHex, string gameName)
+    public GameDebugWindow(bool lightTheme, string accentHex, string gameName, Func<string, string> translate)
     {
         this.lightTheme = lightTheme;
-        Title = "CMCLauncher · " + gameName + " 调试";
+        Title = "CMCLauncher · " + gameName + " · " + translate("Game logs");
 
         var bg = FromHex(lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkBg);
         var surface = FromHex(lightTheme ? ThemeTokens.LightSurface : ThemeTokens.DarkSurface);
@@ -47,7 +47,7 @@ public sealed class GameDebugWindow : Window
 
         var title = new TextBlock
         {
-            Text = "游戏启动调试",
+            Text = translate("Game logs"),
             Foreground = new SolidColorBrush(text),
             FontSize = 16,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
@@ -55,7 +55,7 @@ public sealed class GameDebugWindow : Window
 
         stageText = new TextBlock
         {
-            Text = "正在准备启动…",
+            Text = translate("Preparing"),
             Foreground = new SolidColorBrush(muted),
             FontSize = 13,
             Margin = new Thickness(0, 0, 0, 2),

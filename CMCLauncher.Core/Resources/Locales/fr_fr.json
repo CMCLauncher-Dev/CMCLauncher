@@ -614,6 +614,8 @@
     "The game exited with code {0}.": "Le jeu s'est terminé avec le code {0}.",
     "Game memory": "Mémoire du jeu",
     "The game crashed": "Le jeu a planté",
+    "Instance debug mode": "Mode débogage de l’instance",
+    "Game logs": "Journaux du jeu",
     "Game exited": "Jeu terminé",
     "The game exited unexpectedly; a crash report summary is ready.": "Le jeu s'est terminé inopinément ; un résumé du rapport de crash est prêt.",
     "Launcher updates": "Mises à jour du lanceur",

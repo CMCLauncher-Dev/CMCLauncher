@@ -223,6 +223,8 @@ internal static class Program
             "portable directory fallback and concurrent native language staging preserve user data"
         );
         await InstallerDependencyTests.Run(Path.Combine(root, "installer-dependencies"));
+        await GameExitRestartTests.Run(Path.Combine(root, "game-exit"));
+        Pass("handled game exit preserves the launcher process without watchdog restart");
         await LaunchAuditTests.Run(Path.Combine(root, "launch-audit"));
         Pass(
             "cold and warm process launch, native isolation, output drain, concurrent downloads and profile reimport"

@@ -148,6 +148,7 @@ public sealed class Instance
     public string? VersionId { get; set; }
     public DateTime? LastPlayed { get; set; }
     public bool Favorite { get; set; }
+    public bool DebugMode { get; set; }
 
     public override string ToString() => $"{Name}  ·  {GameVersion} / {Loader}";
 }

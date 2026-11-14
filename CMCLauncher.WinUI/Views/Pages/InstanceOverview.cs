@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace CMCLauncher.WinUI;
@@ -69,6 +69,21 @@ public sealed partial class MainWindow
 
         var management = new StackPanel { Spacing = 10 };
         management.Children.Add(Text(Ui("Version management"), 15, true));
+        var debug = new ToggleSwitch
+        {
+            Header = Ui("Instance debug mode"),
+            IsOn = instance.DebugMode,
+            Tag = "instance-debug-mode",
+            OnContent = Ui("context.settingspage.on"),
+            OffContent = Ui("Off"),
+        };
+        debug.Toggled += async (_, _) =>
+        {
+            instance.DebugMode = debug.IsOn;
+            try { await store.Save(); }
+            catch (Exception ex) { await Error(ex); }
+        };
+        management.Children.Add(debug);
         management.Children.Add(
             Buttons(
                 Action(

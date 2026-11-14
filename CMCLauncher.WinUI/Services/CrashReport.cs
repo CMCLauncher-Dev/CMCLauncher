@@ -11,6 +11,9 @@ namespace CMCLauncher.WinUI;
 
 public sealed partial class MainWindow
 {
+    internal Func<ContentDialog, Task<ContentDialogResult>> showCrashReportDialog =
+        async dialog => await dialog.ShowAsync();
+
     // 正常退出且没有本次新产生的崩溃文件时，不弹报告对话框。
     async Task HandleGameExit(Instance instance, Process process, DateTimeOffset launchStarted)
     {
@@ -29,6 +32,14 @@ public sealed partial class MainWindow
                 )
             )
                 return;
+            // A crash needs a visible dialog owner even when the launcher was hidden
+            // or minimized for play. A clean exit returns before changing the window.
+            await RestoreLauncherWindowAsync();
+            AppWindow.Show();
+            if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter
+                && presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)
+                presenter.Restore();
+            Activate();
             while (dialogOpen)
                 await Task.Delay(150);
             var logSnapshot = logs.ToArray();
@@ -119,7 +130,7 @@ public sealed partial class MainWindow
             dialogOpen = true;
             try
             {
-                var result = await dialog.ShowAsync();
+                var result = await showCrashReportDialog(dialog);
                 if (result == ContentDialogResult.Primary)
                     await ExportCrashReport(report);
             }

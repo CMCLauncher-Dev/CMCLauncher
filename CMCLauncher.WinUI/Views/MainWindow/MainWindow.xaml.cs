@@ -223,6 +223,8 @@ public sealed partial class MainWindow : Window
         RuntimeLog.Write("INFO", "应用启动 · 程序目录=" + AppContext.BaseDirectory);
         Closed += (_, _) =>
         {
+            debugWindow?.CloseSafe();
+            debugWindow = null;
             updateLifetime.Cancel();
             statsTimer?.Stop();
             RuntimeLog.Written -= RuntimeLogWritten;

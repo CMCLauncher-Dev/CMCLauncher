@@ -38,7 +38,7 @@ public sealed class CmsBlueprints : IDisposable
         };
         http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(25) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd(
-            "CMCLauncher/1.0 (+https://github.com/com-in/CMCLauncher)"
+            "CMCLauncher/1.0 (+https://github.com/CMCLauncher-Dev/CMCLauncher)"
         );
         cache = new CmsCache(cacheRoot);
         interval = () => Math.Clamp(settings.CmsRequestIntervalMs, 1500, 60000);

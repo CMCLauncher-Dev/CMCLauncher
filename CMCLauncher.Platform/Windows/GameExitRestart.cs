@@ -6,9 +6,13 @@ namespace CMCLauncher;
 // A separate OS process survives a hidden, closed or unresponsive launcher.
 public static class GameExitRestart
 {
-    public static void Watch(Process game, string executable, string logFile)
+    public static Action Watch(Process game, string executable, string logFile)
     {
         using var owner = Process.GetCurrentProcess();
+        var acknowledgment = Path.Combine(
+            Path.GetDirectoryName(logFile)!,
+            "game-exit-" + Guid.NewGuid().ToString("N") + ".ack"
+        );
         static string Quote(string value) => "'" + value.Replace("'", "''") + "'";
         var script = $$"""
             $ErrorActionPreference = 'Stop'
@@ -24,6 +28,16 @@ public static class GameExitRestart
                 $ownerProcess = Find-Process {{owner.Id}} {{owner.StartTime.ToUniversalTime().Ticks}}
                 $gameProcess = Find-Process {{game.Id}} {{game.StartTime.ToUniversalTime().Ticks}}
                 if ($null -ne $gameProcess) { $gameProcess.WaitForExit(); $gameProcess.Dispose() }
+                $acknowledgment = {{Quote(acknowledgment)}}
+                $deadline = [Diagnostics.Stopwatch]::StartNew()
+                while ($deadline.Elapsed.TotalSeconds -lt 10) {
+                    if ([IO.File]::Exists($acknowledgment)) {
+                        [IO.File]::Delete($acknowledgment)
+                        if ($null -ne $ownerProcess) { $ownerProcess.Dispose() }
+                        return
+                    }
+                    Start-Sleep -Milliseconds 250
+                }
                 if ($null -ne $ownerProcess) {
                     if (!$ownerProcess.HasExited) {
                         $null = $ownerProcess.CloseMainWindow()
@@ -77,5 +91,8 @@ public static class GameExitRestart
         using var watcher =
             Process.Start(info)
             ?? throw new IOException("Could not start the game-exit restart monitor.");
+        // The UI acknowledges only after it has processed game exit. No acknowledgment
+        // means the independent monitor still recovers a closed or unresponsive launcher.
+        return () => File.WriteAllText(acknowledgment, "handled");
     }
 }
