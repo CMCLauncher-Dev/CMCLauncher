@@ -121,6 +121,9 @@ public sealed partial class MainWindow
     {
         if (Content == null)
             return;
+        // CI 验证无交互会话没有 DWM 合成，挂载系统 backdrop 会原生崩溃，验证时跳过液态玻璃。
+        if (Verifying)
+            return;
         if (acrylicBackdropController is null)
         {
             var controller = new DesktopAcrylicController

@@ -74,11 +74,14 @@ public sealed partial class MainWindow : Window
     internal readonly Queue<string> logs = new();
     internal TextBox? logView;
     bool dialogOpen;
+    // 验证模式运行在 CI 无交互会话，系统 backdrop 挂载会触发原生崩溃，须跳过液态玻璃。
+    internal bool Verifying;
     internal StackPanel PageBody = new() { Spacing = 11 };
 
     // UI 验证使用单独的数据目录，避免改动日常使用的实例和账号配置。
     public MainWindow(string[] args)
     {
+        Verifying = args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui");
         store = new Store(
             args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui")
                 ? Path.Combine(Path.GetFullPath(args[1]), "data")
