@@ -93,6 +93,10 @@ public sealed partial class MainWindow
         }
         var cpuTrend = Trend();
         var memoryTrend = Trend();
+        var diskTrend = Trend();
+        var diskPct = T(Ui("Unavailable"));
+        var networkDown = T(Ui("Unavailable"));
+        var networkUp = T(Ui("Unavailable"));
         var graphicsHistory = new Dictionary<string, Queue<double>>(StringComparer.Ordinal);
         void Update()
         {
@@ -122,6 +126,23 @@ public sealed partial class MainWindow
             }
             if (telemetry.Graphics.Count == 0)
                 graphics.Children.Add(T("GPU telemetry is unavailable on this host."));
+            Draw(diskTrend.Line, telemetry.DiskHistory);
+            if (telemetry.Network is { } network)
+            {
+                networkDown.Text =
+                    network.DownloadBytesPerSecond is { } down
+                        ? FormatRate(down)
+                        : Ui("Unavailable");
+                networkUp.Text =
+                    network.UploadBytesPerSecond is { } up
+                        ? FormatRate(up)
+                        : Ui("Unavailable");
+            }
+            else
+            {
+                networkDown.Text = Ui("Unavailable");
+                networkUp.Text = Ui("Unavailable");
+            }
             using var current = Process.GetCurrentProcess();
             process.Text = $"{current.WorkingSet64 / 1048576d:N1} MiB · PID {current.Id}";
             runtime.Text = (DateTime.Now - current.StartTime).ToString(@"d\.hh\:mm\:ss");
@@ -147,11 +168,13 @@ public sealed partial class MainWindow
                         $"{drive.AvailableFreeSpace / 1073741824d:N1} / {drive.TotalSize / 1073741824d:N1} GiB";
                     diskBar.Value =
                         100d * (drive.TotalSize - drive.AvailableFreeSpace) / drive.TotalSize;
+                    diskPct.Text = $"{diskBar.Value:N1}%";
                 }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 disk.Text = Ui("Unavailable");
+                diskPct.Text = Ui("Unavailable");
             }
         }
         var cards = new[]
@@ -159,6 +182,20 @@ public sealed partial class MainWindow
             Card(Stack(T("CPU usage", 18, true), cpu, cpuTrend.View)),
             Card(Stack(T("Memory usage", 18, true), memory, memoryTrend.View)),
             Card(Stack(T("Graphics", 18, true), graphics)),
+            Card(
+                Stack(
+                    T("Disk activity", 18, true),
+                    diskTrend.View,
+                    StatRow(Ui("Game storage"), diskPct)
+                )
+            ),
+            Card(
+                Stack(
+                    T("Network", 18, true),
+                    StatRow(Ui("Download"), networkDown),
+                    StatRow(Ui("Upload"), networkUp)
+                )
+            ),
             Card(
                 Stack(
                     T("System environment", 18, true),
@@ -261,6 +298,13 @@ public sealed partial class MainWindow
         };
         return body;
     }
+
+    static string FormatRate(double bytesPerSecond) =>
+        bytesPerSecond > 1024d * 1024 * 1024
+            ? $"{bytesPerSecond / 1024 / 1024 / 1024:N2} GB/s"
+            : bytesPerSecond > 1024 * 1024
+                ? $"{bytesPerSecond / 1024 / 1024:N1} MB/s"
+                : $"{bytesPerSecond / 1024:N1} KB/s";
 
     Control AboutPage() =>
         Stack(

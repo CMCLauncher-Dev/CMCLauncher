@@ -121,6 +121,11 @@ public sealed partial class MainWindow
         var budget = Text("", 14);
         var disk = Text("", 14);
         var diskBar = new ProgressBar { Minimum = 0, Maximum = 100 };
+        var diskPct = Text(Ui("Not available"), 14);
+        var diskTrend = StatsTrend("disk");
+        var networkDown = Text(Ui("Not available"), 14);
+        var networkUp = Text(Ui("Not available"), 14);
+        var networkTrend = StatsRateTrend("network");
         var library = Text("", 14);
         StackPanel Section(string title, params UIElement[] content)
         {
@@ -132,6 +137,25 @@ public sealed partial class MainWindow
         }
         cards.Add(Card(Section("CPU usage", cpuTrend.View)));
         cards.Add(Card(Section("Memory usage", memValue, memoryTrend.View)));
+        cards.Add(
+            Card(
+                Section(
+                    "Disk activity",
+                    diskTrend.View,
+                    StatRow(Ui("Game storage"), diskPct)
+                )
+            )
+        );
+        cards.Add(
+            Card(
+                Section(
+                    "Network",
+                    StatRow(Ui("Download"), networkDown),
+                    StatRow(Ui("Upload"), networkUp),
+                    networkTrend.View
+                )
+            )
+        );
         cards.Add(
             Card(
                 Section(
@@ -393,14 +417,32 @@ public sealed partial class MainWindow
                         drive.TotalSize > 0
                             ? 100.0 * (drive.TotalSize - drive.AvailableFreeSpace) / drive.TotalSize
                             : 0;
+                    diskPct.Text = diskBar.Value.ToString("0.0") + "% occupied";
+                    diskTrend.Add(diskBar.Value);
                 }
                 catch (IOException)
                 {
                     disk.Text = Ui("Not available");
+                    diskPct.Text = Ui("Not available");
                 }
                 catch (UnauthorizedAccessException)
                 {
                     disk.Text = Ui("Not available");
+                    diskPct.Text = Ui("Not available");
+                }
+                var network = LauncherPlatform.Current.NetworkUsage();
+                if (network != null && network.DownloadBytesPerSecond != null)
+                    networkTrend.Add(network.DownloadBytesPerSecond.Value);
+                if (network != null)
+                {
+                    networkDown.Text =
+                        network.DownloadBytesPerSecond == null
+                            ? Ui("Not available")
+                            : StatsFormatRate(network.DownloadBytesPerSecond.Value);
+                    networkUp.Text =
+                        network.UploadBytesPerSecond == null
+                            ? Ui("Not available")
+                            : StatsFormatRate(network.UploadBytesPerSecond.Value);
                 }
                 _ = RefreshGraphics();
             }
@@ -493,6 +535,78 @@ public sealed partial class MainWindow
         return row;
     }
 
+    // 速率采用自适应缩放：以 60 个样本中的最大值为满刻度绘制，右上方实时补充数值。
+    (FrameworkElement View, Action<double> Add) StatsRateTrend(string key)
+    {
+        if (!statsHistory.TryGetValue(key, out var samples))
+            statsHistory[key] = samples = new Queue<double>();
+        var canvas = new Canvas { Height = 90, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var current = Text("—", 14, true);
+        current.HorizontalAlignment = HorizontalAlignment.Right;
+        current.VerticalAlignment = VerticalAlignment.Top;
+        current.Margin = new Thickness(0, 4, 8, 0);
+        var frame = new Grid { Children = { canvas, current } };
+        var color = Brush(PrimaryColor);
+        void Draw()
+        {
+            canvas.Children.Clear();
+            var width = canvas.ActualWidth;
+            if (width <= 0)
+                return;
+            var peak = samples.Count > 0 ? samples.Max() : 0;
+            foreach (var y in new[] { 0d, 45d, 90d })
+                canvas.Children.Add(
+                    new Microsoft.UI.Xaml.Shapes.Line
+                    {
+                        X1 = 0,
+                        X2 = width,
+                        Y1 = y,
+                        Y2 = y,
+                        Stroke = color,
+                        Opacity = 0.15,
+                        StrokeThickness = 1,
+                    }
+                );
+            var line = new Microsoft.UI.Xaml.Shapes.Polyline
+            {
+                Stroke = color,
+                StrokeThickness = 2,
+            };
+            var fill = new Microsoft.UI.Xaml.Shapes.Polygon { Fill = color, Opacity = 0.12 };
+            var values = samples.ToArray();
+            for (var i = 0; i < values.Length; i++)
+            {
+                var ratio = peak > 0 ? values[i] / peak : 0;
+                var point = new Windows.Foundation.Point(
+                    width * (60 - values.Length + i) / 59,
+                    90 * (1 - ratio)
+                );
+                line.Points.Add(point);
+                fill.Points.Add(point);
+            }
+            if (values.Length > 0)
+            {
+                fill.Points.Add(new Windows.Foundation.Point(width, 90));
+                fill.Points.Add(new Windows.Foundation.Point(width * (60 - values.Length) / 59, 90));
+            }
+            canvas.Children.Add(fill);
+            canvas.Children.Add(line);
+        }
+        canvas.SizeChanged += (_, _) => Draw();
+        ToolTipService.SetToolTip(frame, "近期 60 次采样 · 自适应速率");
+        return (
+            frame,
+            value =>
+            {
+                samples.Enqueue(value);
+                if (samples.Count > 60)
+                    samples.Dequeue();
+                current.Text = StatsFormatRate(value);
+                Draw();
+            }
+        );
+    }
+
     // 通过 RtlGetVersion 读取真实 OS 版本，构建「Windows 11 Pro」等友好名称。
     string WindowsName()
     {
@@ -509,6 +623,13 @@ public sealed partial class MainWindow
             ? $"{version} · Build {info.BuildNumber}"
             : $"{version} {type} · Build {info.BuildNumber}";
     }
+
+    static string StatsFormatRate(double bytesPerSecond) =>
+        bytesPerSecond > 1024.0 * 1024 * 1024
+            ? (bytesPerSecond / 1024 / 1024 / 1024).ToString("0.00") + " GB/s"
+            : bytesPerSecond > 1024 * 1024
+                ? (bytesPerSecond / 1024 / 1024).ToString("0.0") + " MB/s"
+                : (bytesPerSecond / 1024).ToString("0.0") + " KB/s";
 
     sealed record StatsGpuAdapter(string Name, double Usage);
 
