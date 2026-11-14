@@ -41,6 +41,15 @@ public sealed partial class MainWindow
         details.Children.Add(Text(Labeled("Build time", LauncherBuildInfo.BuildTime), 12));
         details.Children.Add(Text(Labeled("Commit", LauncherBuildInfo.GitCommit), 12));
         details.Children.Add(Text(Labeled("License", Ui("GNU AGPL v3")), 12));
+        var github = new HyperlinkButton
+        {
+            Content = Ui("GitHub"),
+            NavigateUri = new Uri("https://github.com/CMCLauncher-Dev/CMCLauncher"),
+            Padding = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        github.FontSize = 12;
+        details.Children.Add(github);
         Grid.SetColumn(details, 1);
         identity.Children.Add(details);
         PageBody.Children.Add(Card(identity));
