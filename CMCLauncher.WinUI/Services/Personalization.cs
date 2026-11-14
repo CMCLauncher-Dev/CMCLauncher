@@ -4,8 +4,6 @@ using System.Text.RegularExpressions;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Composition.SystemBackdrops;
-using Microsoft.UI.Composition;
 using Microsoft.Win32;
 using Windows.Storage.Pickers;
 using WinRT;
@@ -102,44 +100,27 @@ public sealed partial class MainWindow
             yield return descendant;
     }
 
-    // 图标字体按字形绘制，不能跟普通文本一起替换为用户字体。
-    DesktopAcrylicController? acrylicBackdropController;
-    ICompositionSupportsSystemBackdrop? backdropTarget;
-
-    SystemBackdropConfiguration NewBackdropConfig() =>
-        new()
-        {
-            IsInputActive = true,
-            Theme = SystemBackdropTheme.Default,
-        };
-
-    // 窗口级背景材质（液态玻璃）。用底层 DesktopAcrylicController 直接把 Acrylic 自带的白色着色压暗，
-    // 让窗口近乎直接映射窗口下方的颜色与内容；Win11 最完整，Win10 1809+ 同样可用。
-    // controller 只向窗口挂载一次，开关通过 SetSystemBackdropConfiguration(有效配置/null) 控制。
-    // 反复 Add/Remove/Dispose 会让同一个窗口二次 Add 材质失效，这是之前"关闭再打开没效果"的根因。
+    // 窗口级液态玻璃。用 Window.SystemBackdrop（框架托管的声明式 backdrop）实现。
+    // DesktopAcrylicBackdrop 是 Acrylic 材质，能实时反射模糊窗口下方的桌面与其它窗口，
+    // 也就是用户所期望的"液态玻璃映射窗口下颜色"的效果；而 MicaBackdrop 只采样壁纸，做不到。
+    // 由 WinUI 自己管理系统材质生命周期，切换开启/关闭只是赋值 backdrop 或 null，
+    // 不会出现手动 DesktopAcrylicController 那种二次挂载失效或 UI 线程同步死锁。
     void ApplyBackdrop(bool enabled)
     {
         if (Content == null)
             return;
-        // CI 验证无交互会话没有 DWM 合成，挂载系统 backdrop 会原生崩溃，验证时跳过液态玻璃。
+        // CI 验证无交互会话没有合成器可用，挂载系统 backdrop 会崩溃，验证时跳过液态玻璃。
         if (Verifying)
             return;
-        if (acrylicBackdropController is null)
+        if (enabled)
         {
-            var controller = new DesktopAcrylicController
-            {
-                TintColor = Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF),
-                TintOpacity = 0.08f,
-                LuminosityOpacity = 0.35f,
-            };
-            backdropTarget = this.As<ICompositionSupportsSystemBackdrop>();
-            controller.AddSystemBackdropTarget(backdropTarget);
-            acrylicBackdropController = controller;
+            if (SystemBackdrop is null)
+                SystemBackdrop = new DesktopAcrylicBackdrop();
         }
-        // 传 null 关闭材质，传新配置开启材质；不销毁 controller，保证可随时重新开启。
-        acrylicBackdropController.SetSystemBackdropConfiguration(
-            enabled ? NewBackdropConfig() : null
-        );
+        else if (SystemBackdrop is not null)
+        {
+            SystemBackdrop = null;
+        }
     }
 
     void ApplyPersonalization()
