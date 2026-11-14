@@ -68,7 +68,8 @@ public sealed partial class MainWindow
     readonly Dictionary<string, Queue<double>> statsHistory = new();
     StatsGpuAdapter[] cachedStatsGpuAdapters = [];
     string StatsGpuCachePath => Path.Combine(store.Root, "cache", "gpu-adapters.json");
-    readonly SemaphoreSlim gpuSampleLock = new(1, 1);
+    bool gpuSamplingBusy;
+    bool gpuResamplePending;
 
     void StatsPage()
     {
@@ -208,7 +209,6 @@ public sealed partial class MainWindow
         sysFirst = true;
         var ownerTimer = statsTimer;
         var sampling = false;
-        var gpuTicks = 0;
         var gpuCharts = new Dictionary<string, (TextBlock Value, Action<double> Add)>();
         void ShowGraphics(StatsGpuAdapter[] adapters, bool append)
         {
@@ -263,24 +263,33 @@ public sealed partial class MainWindow
         ShowGraphics(cachedStatsGpuAdapters, false);
         async Task RefreshGraphics()
         {
-            if (!await gpuSampleLock.WaitAsync(0))
+            if (gpuSamplingBusy)
+            {
+                gpuResamplePending = true;
                 return;
+            }
+            gpuSamplingBusy = true;
             try
             {
-                if (!store.Config.Settings.ContinuousStatsSampling)
+                do
                 {
-                    if (gpuCharts.Count == 0)
+                    gpuResamplePending = false;
+                    if (store.Config.Settings.ContinuousStatsSampling)
+                    {
+                        var adapters = await ReadStatsGpuAdapters();
+                        if (
+                            (page != "stats" && !store.Config.Settings.ContinuousStatsSampling)
+                            || statsTimer != ownerTimer
+                        )
+                            return;
+                        cachedStatsGpuAdapters = adapters;
+                        ShowGraphics(adapters, true);
+                    }
+                    else if (gpuCharts.Count == 0)
+                    {
                         gpuModels.Text = Ui("Continuous sampling off");
-                    return;
-                }
-                var adapters = await ReadStatsGpuAdapters();
-                if (
-                    (page != "stats" && !store.Config.Settings.ContinuousStatsSampling)
-                    || statsTimer != ownerTimer
-                )
-                    return;
-                cachedStatsGpuAdapters = adapters;
-                ShowGraphics(adapters, true);
+                    }
+                } while (gpuResamplePending);
             }
             catch (OperationCanceledException)
             {
@@ -297,7 +306,7 @@ public sealed partial class MainWindow
             }
             finally
             {
-                gpuSampleLock.Release();
+                gpuSamplingBusy = false;
             }
         }
         _ = RefreshGraphics();
@@ -393,8 +402,7 @@ public sealed partial class MainWindow
                 {
                     disk.Text = Ui("Not available");
                 }
-                if (gpuTicks++ % 5 == 0)
-                    _ = RefreshGraphics();
+                _ = RefreshGraphics();
             }
             finally
             {

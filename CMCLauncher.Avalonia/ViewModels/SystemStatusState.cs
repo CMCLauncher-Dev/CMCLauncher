@@ -31,13 +31,12 @@ public sealed class SystemStatusState : IDisposable
         try
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-            var ticks = 0;
             do
             {
                 var cpu = await LauncherPlatform.Current.CpuUsage(ct);
                 var memory = await Task.Run(() => LauncherPlatform.Current.PhysicalMemory(), ct);
                 IReadOnlyList<GraphicsUsage>? graphics = null;
-                if (!verification && ticks++ % 5 == 0)
+                if (!verification)
                     try
                     {
                         graphics = await LauncherPlatform.Current.Graphics(cachePath, ct);
