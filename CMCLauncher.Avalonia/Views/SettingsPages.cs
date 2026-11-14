@@ -526,7 +526,9 @@ public sealed partial class MainWindow
                 "Mod translation",
                 modTranslate,
                 T(
-                    "Translates mod language files only while enabled and only for installed mods you translate from the Mod management page. Mod text is sent to a free translation service; original files are never modified.",
+                    Ui(
+                        "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified."
+                    ),
                     12
                 )
             ),

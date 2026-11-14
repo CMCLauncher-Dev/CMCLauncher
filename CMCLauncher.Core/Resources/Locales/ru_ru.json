@@ -640,6 +640,7 @@
     "Translate": "Перевести",
     "Translating mod…": "Перевод мода…",
     "Translate installed mods": "Переводить установленные моды",
+    "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified.": "Файлы языка модов и тексты списков отправляются в бесплатный сервис перевода только пока перевод модов включён. Оригинальные файлы модов никогда не изменяются.",
     "Enable Mod translation in Settings first.": "Сначала включите перевод модов в настройках.",
     "No lang file found in this mod.": "В этом моде не найден файл языка.",
     "Translation saved. Load the resource pack in-game.": "Перевод сохранён. Загрузите ресурс-пак в игре.",

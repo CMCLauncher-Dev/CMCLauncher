@@ -375,7 +375,9 @@ public sealed class SettingsPage : CMCPage
             OffContent = Ui("Off"),
         };
         var translateHint = Text(
-            Ui("Translates mod language files via a free web API. Mod text is sent to the translation service; the original files are never modified."),
+            Ui(
+                "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified."
+            ),
             12
         );
 
@@ -712,11 +714,7 @@ public sealed class SettingsPage : CMCPage
         Section(
             "Mod translation",
             modTranslate,
-            translateHint,
-            Text(
-                "Translates mod language files only while enabled and only for installed mods you translate from the Mod management page. Translations are cached as local resource packs and do not modify your mod files.",
-                12
-            )
+            translateHint
         );
         var advancedNetwork = new StackPanel { Spacing = 12 };
         advancedNetwork.Children.Add(proxyUser);

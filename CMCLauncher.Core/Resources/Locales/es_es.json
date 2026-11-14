@@ -640,6 +640,7 @@
     "Translate": "Traducir",
     "Translating mod…": "Traduciendo mod…",
     "Translate installed mods": "Traducir los mods instalados",
+    "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified.": "Los archivos de idioma y los textos de las listas solo se envían a un servicio de traducción gratuito cuando la traducción de mods está activada. Los archivos de mod originales nunca se modifican.",
     "Enable Mod translation in Settings first.": "Habilita primero la traducción de mods en Ajustes.",
     "No lang file found in this mod.": "No se encontró un archivo de idioma en este mod.",
     "Translation saved. Load the resource pack in-game.": "Traducción guardada. Carga el paquete de recursos en el juego.",

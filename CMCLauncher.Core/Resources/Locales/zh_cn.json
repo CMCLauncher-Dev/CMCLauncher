@@ -990,6 +990,7 @@
     "Translate": "翻译",
     "Translating mod…": "正在翻译模组…",
     "Translate installed mods": "翻译已安装的模组",
+    "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified.": "仅在启用模组翻译时，模组语言文件和列表文本才会发送到免费翻译服务。原始模组文件永远不会被修改。",
     "Enable Mod translation in Settings first.": "请先在设置中启用模组翻译。",
     "No lang file found in this mod.": "该模组中没有找到语言文件。",
     "Translation saved. Load the resource pack in-game.": "翻译已保存。请在游戏内加载资源包。",

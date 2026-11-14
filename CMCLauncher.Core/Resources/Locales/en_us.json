@@ -991,6 +991,7 @@
     "Translate": "Translate",
     "Translating mod…": "Translating mod…",
     "Translate installed mods": "Translate installed mods",
+    "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified.": "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified.",
     "Enable Mod translation in Settings first.": "Enable Mod translation in Settings first.",
     "No lang file found in this mod.": "No lang file found in this mod.",
     "Translation saved. Load the resource pack in-game.": "Translation saved. Load the resource pack in-game.",

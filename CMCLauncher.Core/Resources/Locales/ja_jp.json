@@ -777,6 +777,7 @@
     "Translate": "翻訳",
     "Translating mod…": "MODを翻訳中…",
     "Translate installed mods": "インストール済みのMODを翻訳",
+    "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified.": "MOD翻訳が有効な間のみ、MOD言語ファイルとリストのテキストは無料の翻訳サービスに送信されます。元のMODファイルは決して変更されません。",
     "Enable Mod translation in Settings first.": "最初に設定でMOD翻訳を有効にしてください。",
     "No lang file found in this mod.": "このMODに言語ファイルが見つかりません。",
     "Translation saved. Load the resource pack in-game.": "翻訳を保存しました。ゲーム内でリソースパックをロードしてください。",

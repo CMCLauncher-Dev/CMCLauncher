@@ -640,6 +640,7 @@
     "Translate": "ترجمة",
     "Translating mod…": "جارٍ ترجمة المود…",
     "Translate installed mods": "ترجمة المودات المثبتة",
+    "Mod language files and list texts are sent to a free translation service only while Mod translation is enabled. Original mod files are never modified.": "يتم إرسال ملفات لغة المودات ونصوص القوائم إلى خدمة ترجمة مجانية فقط عند تفعيل ترجمة المودات. لا يتم تعديل ملفات المود الأصلية أبدًا.",
     "Enable Mod translation in Settings first.": "فعّل ترجمة المودات أولاً في الإعدادات.",
     "No lang file found in this mod.": "لا يوجد ملف لغة في هذا المود.",
     "Translation saved. Load the resource pack in-game.": "تم حفظ الترجمة. حمّل حزمة الموارد داخل اللعبة.",
