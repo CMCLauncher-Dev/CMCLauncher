@@ -483,6 +483,17 @@ public sealed partial class MainWindow
                 )
             )
         );
+        var savedServers = Stack(T("Saved servers", 16, true));
+        savedServers.Children.Add(Btn("Show servers", async () =>
+        {
+            var entries = await Task.Run(() => SavedServers.Read(session.Store.GameDirectory(instance)));
+            while (savedServers.Children.Count > 2) savedServers.Children.RemoveAt(2);
+            if (entries.Count == 0) savedServers.Children.Add(T("No saved servers"));
+            foreach (var server in entries)
+                savedServers.Children.Add(Card(Stack(T(server.Name, 14, true), T(server.Address),
+                    Btn("Copy address", async () => { if (Clipboard != null) await Clipboard.SetTextAsync(server.Address); }))));
+        }));
+        body.Children.Add(Card(savedServers));
         if (body.Children[0] is Border { Child: StackPanel summary })
         {
             var details = new StackPanel { Spacing = 6 };

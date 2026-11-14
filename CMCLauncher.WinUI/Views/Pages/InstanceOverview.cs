@@ -106,5 +106,26 @@ public sealed partial class MainWindow
         var managementCard = Card(management);
         managementCard.Tag = "instance-management";
         PageBody.Children.Add(managementCard);
+        var servers = new StackPanel { Spacing = 10 };
+        servers.Children.Add(Text(Ui("Saved servers"), 15, true));
+        servers.Children.Add(Action("Show servers", async (_, _) =>
+        {
+            var list = await Task.Run(() => SavedServers.Read(store.GameDirectory(instance)));
+            while (servers.Children.Count > 2) servers.Children.RemoveAt(2);
+            if (list.Count == 0) servers.Children.Add(Text(Ui("No saved servers"), 13));
+            foreach (var server in list)
+            {
+                var row = new StackPanel { Spacing = 4 };
+                row.Children.Add(Text(server.Name, 14, true));
+                row.Children.Add(Text(server.Address, 13));
+                row.Children.Add(Action("Copy address", (_, _) =>
+                {
+                    if (!DesktopClipboard.TrySetText(server.Address, out var error))
+                        throw new IOException(error);
+                }));
+                servers.Children.Add(CompactCard(row));
+            }
+        }));
+        PageBody.Children.Add(Card(servers));
     }
 }
