@@ -2,6 +2,10 @@
   "code": "ar_sa",
   "displayName": "العربية",
   "strings": {
+    "Mod dependency issues found": "تم اكتشاف مشكلات في تبعيات التعديلات",
+    "Launch anyway": "تشغيل على أي حال",
+    "Mod \"{0}\" requires the missing dependency \"{1}\"": "التعديل {0} يتطلب التبعية المفقودة {1}",
+    "Mod \"{0}\" requires {1} version \"{2}\" but installed \"{3}\" has version \"{4}\"": "التعديل {0} يتطلب الإصدار {2} من {1}، لكن المثبت {3} له الإصدار {4}",
     "Log analysis": "تحليل السجلات",
     "No common issues detected": "لم يتم اكتشاف مشكلات شائعة",
     "Out of memory (mods may need more RAM)": "نفاد الذاكرة (قد تحتاج التعديلات إلى ذاكرة أكبر)",

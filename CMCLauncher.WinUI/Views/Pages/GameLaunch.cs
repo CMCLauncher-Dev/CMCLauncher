@@ -34,6 +34,37 @@ public sealed partial class MainWindow
     {
         if (task != null)
             throw new Exception("已有任务进行中，请稍候或取消当前任务");
+        // 启动前分析 mods 目录的缺失依赖与版本冲突；有告警先请用户确认。
+        var diagnostics = await Task.Run(() =>
+            ModDependencyChecker.Check(store.GameDirectory(instance))
+        );
+        if (diagnostics.Count > 0)
+        {
+            var body = new StackPanel { Spacing = 6, MaxWidth = 380 };
+            foreach (var issue in diagnostics)
+                body.Children.Add(
+                    new TextBlock
+                    {
+                        Text = UiFormat(issue.MessageKey, issue.Args),
+                        TextWrapping = TextWrapping.Wrap,
+                    }
+                );
+            var anchor = Content as FrameworkElement ?? launchStatusText;
+            if (anchor != null)
+            {
+                var proceed = await ConfirmPop(
+                    anchor,
+                    Ui("Mod dependency issues found"),
+                    body,
+                    Ui("Launch anyway")
+                );
+                if (!proceed)
+                {
+                    AddLog("Canceled launch after dependency warnings.");
+                    return;
+                }
+            }
+        }
         launching = true;
         launchProgressValue = 0;
         RefreshLaunchCard("正在准备启动…");

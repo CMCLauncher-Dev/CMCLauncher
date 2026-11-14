@@ -2,6 +2,10 @@
   "code": "en_us",
   "displayName": "English",
   "strings": {
+    "Mod dependency issues found": "Mod dependency issues found",
+    "Launch anyway": "Launch anyway",
+    "Mod \"{0}\" requires the missing dependency \"{1}\"": "Mod \"{0}\" requires the missing dependency \"{1}\"",
+    "Mod \"{0}\" requires {1} version \"{2}\" but installed \"{3}\" has version \"{4}\"": "Mod \"{0}\" requires {1} version \"{2}\" but installed \"{3}\" has version \"{4}\"",
     "Log analysis": "Log analysis",
     "No common issues detected": "No common issues detected",
     "Out of memory (mods may need more RAM)": "Out of memory (mods may need more RAM)",

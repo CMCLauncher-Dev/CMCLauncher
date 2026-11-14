@@ -2,6 +2,10 @@
   "code": "zh_cn",
   "displayName": "简体中文",
   "strings": {
+    "Mod dependency issues found": "检测到模组依赖问题",
+    "Launch anyway": "仍要启动",
+    "Mod \"{0}\" requires the missing dependency \"{1}\"": "模组 {0} 需要缺少的前置依赖 {1}",
+    "Mod \"{0}\" requires {1} version \"{2}\" but installed \"{3}\" has version \"{4}\"": "模组 {0} 需要 {1} 版本 {2}，但已安装的 {3} 版本为 {4}",
     "Log analysis": "日志分析",
     "No common issues detected": "未检测到常见问题",
     "Out of memory (mods may need more RAM)": "内存不足（模组可能需要更多内存）",

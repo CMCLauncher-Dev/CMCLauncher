@@ -2,6 +2,10 @@
   "code": "ja_jp",
   "displayName": "日本語",
   "strings": {
+    "Mod dependency issues found": "MOD 依存関係に問題が見つかりました",
+    "Launch anyway": "それでも起動",
+    "Mod \"{0}\" requires the missing dependency \"{1}\"": "MOD {0} には不足している依存関係 {1} が必要です",
+    "Mod \"{0}\" requires {1} version \"{2}\" but installed \"{3}\" has version \"{4}\"": "MOD {0} は {1} のバージョン {2} を要求しますが、インストール済み {3} のバージョンは {4} です",
     "Log analysis": "ログ分析",
     "No common issues detected": "一般的な問題は検出されませんでした",
     "Out of memory (mods may need more RAM)": "メモリ不足（MOD にさらに RAM が必要な可能性があります）",

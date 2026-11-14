@@ -2,6 +2,10 @@
   "code": "fr_fr",
   "displayName": "Français",
   "strings": {
+    "Mod dependency issues found": "Problèmes de dépendances de mods détectés",
+    "Launch anyway": "Lancer quand même",
+    "Mod \"{0}\" requires the missing dependency \"{1}\"": "Le mod {0} nécessite la dépendance manquante {1}",
+    "Mod \"{0}\" requires {1} version \"{2}\" but installed \"{3}\" has version \"{4}\"": "Le mod {0} nécessite la version {2} de {1}, mais {3} installé a la version {4}",
     "Log analysis": "Analyse des journaux",
     "No common issues detected": "Aucun problème courant détecté",
     "Out of memory (mods may need more RAM)": "Mémoire insuffisante (les mods peuvent nécessiter plus de RAM)",

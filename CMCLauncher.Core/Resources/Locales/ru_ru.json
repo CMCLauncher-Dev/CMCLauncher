@@ -2,6 +2,10 @@
   "code": "ru_ru",
   "displayName": "Русский",
   "strings": {
+    "Mod dependency issues found": "Обнаружены проблемы зависимостей модов",
+    "Launch anyway": "Всё равно запустить",
+    "Mod \"{0}\" requires the missing dependency \"{1}\"": "Моду {0} требуется отсутствующая зависимость {1}",
+    "Mod \"{0}\" requires {1} version \"{2}\" but installed \"{3}\" has version \"{4}\"": "Мод {0} требует версию {2} для {1}, но у установленного {3} версия {4}",
     "Log analysis": "Анализ журналов",
     "No common issues detected": "Типичных проблем не обнаружено",
     "Out of memory (mods may need more RAM)": "Нехватка памяти (модам может понадобиться больше ОЗУ)",
