@@ -34,7 +34,7 @@ English, Simplified Chinese, Japanese, Russian, French, Spanish and Arabic inter
 | --- | --- | --- | --- | --- |
 | Windows | WinUI 3 | ✅ Supported | Actively maintained | Windows 10 (2004+) / 11, x64 |
 | Linux | Avalonia | ⚠️ Experimental | Experimental updates until stable | Debian-based, Arch-based and Red Hat-based distributions, x64 |
-| macOS | Avalonia | ⚠️ Experimental; **may have serious issues** | Low-priority maintenance | Intel (x64) and Apple M-series (ARM64) |
+| macOS | Avalonia | ⚠️ Early stage; **insufficient testing** | Low-priority maintenance | Intel (x64) and Apple M-series (ARM64) |
 
 Linux and macOS builds are for testing. macOS builds are **not signed or notarized**. Back up your instances before testing.
 

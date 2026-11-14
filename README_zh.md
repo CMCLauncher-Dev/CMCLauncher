@@ -34,7 +34,7 @@
 | --- | --- | --- | --- | --- |
 | Windows | WinUI 3 | ✅支持 | 持续维护 | Windows 10（2004 及以上）/ 11，x64 |
 | Linux | Avalonia | ⚠️实验性 | 实验性更新，直到稳定 | Debian 系、Arch 系、Red Hat 系发行版，x64 |
-| macOS | Avalonia | ⚠️实验性，**可能存在严重问题** | 低优先级维护 | Intel（x64）、Apple M 系列（ARM64） |
+| macOS | Avalonia | ⚠️早期阶段，**缺乏测试** | 低优先级维护 | Intel（x64）、Apple M 系列（ARM64） |
 
 Linux 和 macOS 构建供测试使用。macOS 构建 **尚未签名或公证**。测试前请备份实例。
 

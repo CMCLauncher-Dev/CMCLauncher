@@ -796,8 +796,16 @@ public sealed partial class MainWindow
         var format = Choice(new[] { "Modrinth (.mrpack)", "CurseForge (.zip)" });
         var resources = new CheckBox { Content = Ui("Include resource files"), IsChecked = true };
         body.Children.Add(Row(Btn("Back", InstanceSettings)));
-        body.Children.Add(Field("Modpack name", name));
-        body.Children.Add(Field("Modpack version", version));
+        var identity = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,160"),
+            ColumnSpacing = 12,
+        };
+        identity.Children.Add(Field("Modpack name", name));
+        var versionField = Field("Modpack version", version);
+        Grid.SetColumn(versionField, 1);
+        identity.Children.Add(versionField);
+        body.Children.Add(identity);
         body.Children.Add(Field("Modpack format", format));
         body.Children.Add(resources);
         var tree = new TreeView { MaxHeight = 420 };

@@ -24,21 +24,10 @@ public sealed partial class MainWindow : Window
     {
         DisplayMode = SplitViewDisplayMode.Overlay,
         PanePlacement = SplitViewPanePlacement.Right,
-        OpenPaneLength = 380,
+        OpenPaneLength = 440,
     };
     readonly StackPanel navigation = new() { Spacing = 3 };
     readonly TextBlock pageTitle = new() { FontSize = 26, FontWeight = FontWeight.SemiBold };
-    readonly TextBlock status = new()
-    {
-        MaxLines = 1,
-        TextTrimming = TextTrimming.CharacterEllipsis,
-    };
-    readonly ProgressBar progress = new()
-    {
-        Minimum = 0,
-        Maximum = 100,
-        Height = 4,
-    };
     readonly Border toast = new()
     {
         CornerRadius = new CornerRadius(24),
@@ -167,7 +156,7 @@ public sealed partial class MainWindow : Window
         shell.Children.Add(sidebar);
         var body = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,*,Auto,Auto"),
+            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
             Margin = new Thickness(28, 22),
         };
         body.Children.Add(pageTitle);
@@ -180,31 +169,7 @@ public sealed partial class MainWindow : Window
         drawer.Content = scroll;
         Grid.SetRow(drawer, 1);
         body.Children.Add(drawer);
-        var activity = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-            RowDefinitions = new RowDefinitions("Auto,Auto"),
-            RowSpacing = 6,
-        };
-        activity.Children.Add(status);
-        Grid.SetRow(progress, 1);
-        activity.Children.Add(progress);
-        var cancel = Btn(
-            "Cancel",
-            () =>
-            {
-                session.Cancel();
-                return Task.CompletedTask;
-            }
-        );
-        cancel.IsVisible = false;
-        progress.IsVisible = false;
-        Grid.SetColumn(cancel, 1);
-        Grid.SetRowSpan(cancel, 2);
-        activity.Children.Add(cancel);
-        Grid.SetRow(activity, 2);
-        body.Children.Add(activity);
-        Grid.SetRow(toast, 3);
+        Grid.SetRow(toast, 2);
         body.Children.Add(toast);
         Grid.SetColumn(body, 1);
         shell.Children.Add(body);
@@ -212,19 +177,6 @@ public sealed partial class MainWindow : Window
         Content = scaling;
         session.PropertyChanged += (_, e) =>
         {
-            if (
-                e.PropertyName
-                is nameof(session.Status)
-                    or nameof(session.Progress)
-                    or nameof(session.Busy)
-            )
-            {
-                status.Text = session.Status;
-                progress.IsVisible = session.Busy;
-                progress.IsIndeterminate = !session.Progress.HasValue;
-                progress.Value = session.Progress ?? 0;
-                cancel.IsVisible = session.Busy;
-            }
             if (e.PropertyName == nameof(session.GameRunning) && session.GameRunning)
             {
                 switch (session.Store.Config.Settings.LauncherVisibility)
@@ -347,35 +299,60 @@ public sealed partial class MainWindow : Window
     {
         if (target == "tasks")
         {
-            var tasks = Stack(
-                T("Tasks", 20, true),
-                Btn(
-                    "Close",
-                    () =>
-                    {
-                        drawer.IsPaneOpen = false;
-                        return Task.CompletedTask;
-                    }
-                ),
-                TasksPage()
+            drawer.OpenPaneLength = 440;
+            var close = Btn(
+                "",
+                () =>
+                {
+                    drawer.IsPaneOpen = false;
+                    return Task.CompletedTask;
+                }
             );
-            tasks.Margin = new Thickness(16);
-            var pane = new Grid { RowDefinitions = new RowDefinitions("*,Auto") };
-            pane.Children.Add(new ScrollViewer { Content = tasks });
+            close.MinWidth = close.Width = 34;
+            close.Height = 34;
+            close.Padding = new Thickness(7);
+            close.Content = NavigationIcon("M19,12 H5 M12,5 L5,12 L12,19");
+            ToolTip.SetTip(close, Ui("Close"));
+            global::Avalonia.Automation.AutomationProperties.SetName(close, Ui("Close"));
+            var header = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+                ColumnSpacing = 10,
+            };
+            header.Children.Add(close);
+            var title = T("Tasks", 20, true);
+            title.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(title, 1);
+            header.Children.Add(title);
+            var pane = new Grid
+            {
+                RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+                RowSpacing = 18,
+                Margin = new Thickness(20),
+            };
+            pane.Children.Add(header);
+            var tasks = new ScrollViewer { Content = TasksPage() };
+            Grid.SetRow(tasks, 1);
+            pane.Children.Add(tasks);
             var logs = Btn("", () => Navigate("logs"));
+            logs.MinWidth = logs.Width = 34;
+            logs.Height = 34;
+            logs.Padding = new Thickness(7);
             logs.Content = new global::Avalonia.Controls.Shapes.Path
             {
-                Data = global::Avalonia.Media.Geometry.Parse(
+                Data = Geometry.Parse(
                     "M3,1 L13,1 L17,5 L17,19 L3,19 Z M13,1 L13,5 L17,5 M6,9 L14,9 M6,12 L14,12 M6,15 L12,15"
                 ),
                 Width = 18,
                 Height = 20,
+                Stroke = textBrush,
+                StrokeThickness = 1.5,
+                Fill = Brushes.Transparent,
             };
             ToolTip.SetTip(logs, Ui("Runtime logs"));
             global::Avalonia.Automation.AutomationProperties.SetName(logs, Ui("Runtime logs"));
             logs.HorizontalAlignment = HorizontalAlignment.Right;
-            logs.Margin = new Thickness(12);
-            Grid.SetRow(logs, 1);
+            Grid.SetRow(logs, 2);
             pane.Children.Add(logs);
             drawer.Pane = pane;
             drawer.IsPaneOpen = true;
@@ -407,7 +384,6 @@ public sealed partial class MainWindow : Window
                 "frpc" => "frpc",
                 "pfp" => "MinecraftPFP",
                 "stats" => "System status",
-                "tasks" => "Tasks",
                 "about" => "About",
                 _ => "Community resources",
             }
@@ -434,7 +410,6 @@ public sealed partial class MainWindow : Window
                 "frpc" => await FrpcPage(token),
                 "pfp" => PfpPage(),
                 "stats" => StatsPage(),
-                "tasks" => TasksPage(),
                 "about" => AboutPage(),
                 _ => T("Page not found"),
             };
@@ -704,10 +679,11 @@ public sealed partial class MainWindow : Window
         {
             Content = Ui(title),
             Padding = new Thickness(
-                14 * session.Store.Config.Settings.UiButtonScale,
-                8 * session.Store.Config.Settings.UiButtonScale
+                12 * session.Store.Config.Settings.UiButtonScale,
+                7 * session.Store.Config.Settings.UiButtonScale
             ),
-            MinHeight = 38 * session.Store.Config.Settings.UiButtonScale,
+            MinWidth = 84 * session.Store.Config.Settings.UiButtonScale,
+            MinHeight = 34 * session.Store.Config.Settings.UiButtonScale,
             CornerRadius = new CornerRadius(5),
         };
         if (primary)
@@ -759,6 +735,7 @@ public sealed partial class MainWindow : Window
             Background = Background,
             Foreground = Foreground,
         };
+        PrepareDialog(window);
         window.MaxHeight = Math.Max(240, Math.Min(700, Bounds.Height - 40));
         var layout = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto") };
         var heading = T(title, 20, true);

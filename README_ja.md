@@ -34,7 +34,7 @@ Minecraft Java Edition 向けの Windows ネイティブランチャーです。
 | --- | --- | --- | --- | --- |
 | Windows | WinUI 3 | ✅ 対応 | 継続的に保守 | Windows 10（2004 以降）/ 11、x64 |
 | Linux | Avalonia | ⚠️ 実験段階 | 安定するまで実験的な更新を継続 | Debian 系、Arch 系、Red Hat 系ディストリビューション、x64 |
-| macOS | Avalonia | ⚠️ 実験段階。**重大な問題が発生する可能性があります** | 保守の優先度は低め | Intel（x64）、Apple M シリーズ（ARM64） |
+| macOS | Avalonia | ⚠️ 開発初期段階。**テスト不足** | 保守の優先度は低め | Intel（x64）、Apple M シリーズ（ARM64） |
 
 Linux と macOS のビルドはテスト用です。macOS ビルドは **署名・公証されていません**。テスト前にインスタンスをバックアップしてください。
 

@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Threading;
+using CMCLauncher.Avalonia.ViewModels;
 
 namespace CMCLauncher.Avalonia.Views;
 
@@ -1098,75 +1099,103 @@ public sealed partial class MainWindow
 
     Control LogsPage()
     {
-        var debug = new CheckBox
+        var debug = new ToggleSwitch
         {
-            Content = Ui("DEBUG mode"),
             IsChecked = session.Store.Config.Settings.DebugLogging,
+            OnContent = "DEBUG",
+            OffContent = "DEBUG",
+            VerticalAlignment = VerticalAlignment.Center,
+            Tag = "debug-logging",
         };
+        ToolTip.SetTip(debug, Ui("DEBUG mode"));
+        global::Avalonia.Automation.AutomationProperties.SetName(debug, Ui("DEBUG mode"));
         debug.IsCheckedChanged += async (_, _) =>
         {
             session.Store.Config.Settings.DebugLogging = debug.IsChecked == true;
             await session.Save();
         };
-        var list = new ListBox
-        {
-            ItemsSource = session.Logs,
-            MinHeight = 400,
-            MaxHeight = 650,
-        };
-        return Stack(
-            Row(
-                debug,
-                Btn(
-                    "Copy logs",
-                    async () =>
-                    {
-                        if (Clipboard != null)
-                            await Clipboard.SetTextAsync(
-                                string.Join(Environment.NewLine, session.Logs)
-                            );
-                    }
-                ),
-                Btn(
-                    "Export logs",
-                    async () =>
-                    {
-                        var path = await SaveFile("CMCLauncher-log", ".log");
-                        if (path != null)
-                            await File.WriteAllLinesAsync(path, session.Logs);
-                    }
-                ),
-                Btn(
-                    "Open log folder",
-                    () =>
-                    {
-                        var folder = Path.Combine(session.Store.Root, "logs");
-                        Directory.CreateDirectory(folder);
-                        Open(folder);
-                        return Task.CompletedTask;
-                    }
-                ),
-                Btn(
-                    "Clear",
-                    () =>
-                    {
-                        session.Logs.Clear();
-                        return Task.CompletedTask;
-                    }
-                )
-            ),
-            list
+        var view = Input("", multiline: true);
+        view.IsReadOnly = true;
+        view.MinHeight = 360;
+        view.MaxHeight = 650;
+        view.FontFamily = new global::Avalonia.Media.FontFamily(
+            "Cascadia Mono, Consolas, monospace"
         );
+        view.Tag = "runtime-log-view";
+        void Refresh() => view.Text = string.Join(Environment.NewLine, session.Logs);
+        var toolbar = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto"),
+            ColumnSpacing = 8,
+            Tag = "logs-toolbar",
+        };
+        toolbar.Children.Add(debug);
+        var refresh = Btn(
+            "Refresh",
+            () =>
+            {
+                Refresh();
+                return Task.CompletedTask;
+            }
+        );
+        Grid.SetColumn(refresh, 1);
+        toolbar.Children.Add(refresh);
+        var folder = Btn(
+            "Open log folder",
+            () =>
+            {
+                var path = Path.Combine(session.Store.Root, "logs");
+                Directory.CreateDirectory(path);
+                Open(path);
+                return Task.CompletedTask;
+            }
+        );
+        Grid.SetColumn(folder, 2);
+        toolbar.Children.Add(folder);
+        var dirty = false;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        timer.Tick += (_, _) =>
+        {
+            if (dirty)
+            {
+                dirty = false;
+                Refresh();
+            }
+        };
+        System.Collections.Specialized.NotifyCollectionChangedEventHandler changed = (_, _) =>
+            dirty = true;
+        var body = Stack(toolbar, view);
+        body.AttachedToVisualTree += (_, _) =>
+        {
+            session.Logs.CollectionChanged += changed;
+            Refresh();
+            timer.Start();
+        };
+        body.DetachedFromVisualTree += (_, _) =>
+        {
+            session.Logs.CollectionChanged -= changed;
+            timer.Stop();
+        };
+        return body;
     }
 
     Control TasksPage()
     {
+        var updates = new List<Action>();
+        var empty = T("No tasks in progress", 14);
+        void RefreshCards()
+        {
+            empty.IsVisible = !session.Operations.Any(item => item.IsRunning);
+            foreach (var update in updates.ToArray())
+                update();
+        }
         var list = new ItemsControl { ItemsSource = session.Operations };
         list.ItemTemplate =
-            new global::Avalonia.Controls.Templates.FuncDataTemplate<CMCLauncher.Avalonia.ViewModels.OperationState>(
+            new global::Avalonia.Controls.Templates.FuncDataTemplate<OperationState>(
                 (item, _) =>
                 {
-                    var stage = T("");
+                    var title = T(item.Title, 17, true);
+                    var stage = T("", 13);
                     stage.Bind(
                         TextBlock.TextProperty,
                         new global::Avalonia.Data.Binding(nameof(item.Stage))
@@ -1185,7 +1214,7 @@ public sealed partial class MainWindow
                         ProgressBar.IsIndeterminateProperty,
                         new global::Avalonia.Data.Binding(nameof(item.IsIndeterminate))
                     );
-                    var panel = Stack(T(item.Title, 17, true), stage, bar);
+                    var panel = Stack(title, stage, bar);
                     var received = T("", 12);
                     received.Bind(
                         TextBlock.TextProperty,
@@ -1201,26 +1230,78 @@ public sealed partial class MainWindow
                         TextBlock.TextProperty,
                         new global::Avalonia.Data.Binding(nameof(item.Elapsed))
                     );
-                    panel.Children.Add(elapsed);
-                    if (item == session.Active)
+                    elapsed.VerticalAlignment = VerticalAlignment.Center;
+                    var footer = new Grid
                     {
-                        var cancel = Btn(
-                            "Cancel",
-                            () =>
+                        ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                        ColumnSpacing = 12,
+                    };
+                    footer.Children.Add(elapsed);
+                    var cancellationRequested = item.Stage == Ui("Cancelling…");
+                    var cancel = Btn(
+                        "Cancel task",
+                        () =>
+                        {
+                            if (session.Active == item)
                             {
-                                if (session.Active == item)
-                                    session.Cancel();
-                                return Task.CompletedTask;
+                                cancellationRequested = true;
+                                session.Cancel();
+                                item.Stage = Ui("Cancelling…");
                             }
-                        );
-                        cancel.Bind(
-                            IsVisibleProperty,
-                            new global::Avalonia.Data.Binding(nameof(item.IsRunning))
-                        );
-                        cancel.HorizontalAlignment = HorizontalAlignment.Right;
-                        panel.Children.Add(cancel);
+                            return Task.CompletedTask;
+                        }
+                    );
+                    cancel.HorizontalAlignment = HorizontalAlignment.Right;
+                    cancel.VerticalAlignment = VerticalAlignment.Center;
+                    buttonAvailability.Add(
+                        cancel,
+                        () => item.IsRunning && session.Active == item && !cancellationRequested
+                    );
+                    Grid.SetColumn(cancel, 1);
+                    footer.Children.Add(cancel);
+                    panel.Children.Add(footer);
+                    var heading = T("Recent tasks", 15, true);
+                    var wrapper = Stack(heading, Card(panel));
+                    void Update()
+                    {
+                        title.Text = item.IsRunning ? item.Title : item.Title + " · " + item.State;
+                        title.FontSize =
+                            (item.IsRunning ? 17 : 14)
+                            * session.Store.Config.Settings.UiFontSize
+                            / 14;
+                        panel.Spacing = item.IsRunning ? 10 : 4;
+                        stage.IsVisible = item.IsRunning || item.Stage != item.State;
+                        bar.IsVisible = item.IsRunning;
+                        cancel.IsVisible = item.IsRunning && session.Active == item;
+                        cancel.IsEnabled =
+                            item.IsRunning && session.Active == item && !cancellationRequested;
+                        heading.IsVisible =
+                            !item.IsRunning
+                            && ReferenceEquals(
+                                session.Operations.FirstOrDefault(task => !task.IsRunning),
+                                item
+                            );
                     }
-                    return Card(panel);
+                    System.ComponentModel.PropertyChangedEventHandler changed = (_, args) =>
+                    {
+                        if (args.PropertyName is nameof(item.State) or nameof(item.IsRunning))
+                            RefreshCards();
+                        else if (args.PropertyName == nameof(item.Stage))
+                            Update();
+                    };
+                    wrapper.AttachedToVisualTree += (_, _) =>
+                    {
+                        updates.Add(Update);
+                        item.PropertyChanged += changed;
+                        RefreshCards();
+                    };
+                    wrapper.DetachedFromVisualTree += (_, _) =>
+                    {
+                        updates.Remove(Update);
+                        item.PropertyChanged -= changed;
+                    };
+                    Update();
+                    return wrapper;
                 }
             );
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -1228,9 +1309,23 @@ public sealed partial class MainWindow
         {
             foreach (var item in session.Operations)
                 item.Tick();
+            RefreshCards();
         };
-        list.AttachedToVisualTree += (_, _) => timer.Start();
-        list.DetachedFromVisualTree += (_, _) => timer.Stop();
-        return list;
+        System.Collections.Specialized.NotifyCollectionChangedEventHandler collectionChanged = (
+            _,
+            _
+        ) => RefreshCards();
+        list.AttachedToVisualTree += (_, _) =>
+        {
+            session.Operations.CollectionChanged += collectionChanged;
+            RefreshCards();
+            timer.Start();
+        };
+        list.DetachedFromVisualTree += (_, _) =>
+        {
+            session.Operations.CollectionChanged -= collectionChanged;
+            timer.Stop();
+        };
+        return Stack(empty, list);
     }
 }

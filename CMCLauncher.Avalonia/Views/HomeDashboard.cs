@@ -593,6 +593,7 @@ public sealed partial class MainWindow
             var state = T("", 12);
             var launchProgress = new ProgressBar
             {
+                Tag = "home-launch-progress",
                 Minimum = 0,
                 Maximum = 100,
                 Height = 5,
@@ -622,22 +623,39 @@ public sealed partial class MainWindow
                     return Task.CompletedTask;
                 }
             );
-            var readiness = Stack(state, launchProgress, cancel);
+            var launchPercent = T("0%", 12);
+            launchPercent.MinWidth = 32;
+            launchPercent.VerticalAlignment = VerticalAlignment.Center;
+            cancel.Width = cancel.MinWidth = 28;
+            cancel.Height = cancel.MinHeight = 28;
+            cancel.Padding = new Thickness(5);
+            var launchRow = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"),
+                ColumnSpacing = 8,
+            };
+            launchRow.Children.Add(launchProgress);
+            Grid.SetColumn(launchPercent, 1);
+            launchRow.Children.Add(launchPercent);
+            Grid.SetColumn(cancel, 2);
+            launchRow.Children.Add(cancel);
+            var readiness = Stack(state, launchRow);
             footer.Children.Add(readiness);
             Grid.SetColumn(launch, 1);
             footer.Children.Add(launch);
             body.Children.Add(footer);
             void RefreshLaunch()
             {
-                state.Text = session.Busy
+                state.Text = session.Launching
                     ? session.Status
                     : Ui(
                         current == null ? "从选择版本开始"
                         : session.Account == null ? "添加账号后即可启动"
                         : "已准备就绪"
                     );
-                launchProgress.IsVisible = cancel.IsVisible = session.Busy;
-                launchProgress.IsIndeterminate = !session.Progress.HasValue;
+                launchRow.IsVisible = session.Launching;
+                launchProgress.IsIndeterminate = false;
+                launchPercent.Text = (session.Progress ?? 0).ToString("0") + "%";
                 launchProgress.Value = session.Progress ?? 0;
                 launch.IsEnabled = !session.Busy && !session.GameRunning;
             }

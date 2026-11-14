@@ -84,10 +84,30 @@ public sealed partial class MainWindow
             status.Text = state.Message;
             foreach (var entry in state.Items)
             {
-                var labels = Stack(
-                    T(entry.Title, 17, true),
-                    T(entry.Author, 12),
-                    T(entry.Downloads + " · " + entry.Versions + " · " + entry.Size, 12),
+                var labels = Stack(T(entry.Title, 15, true));
+                labels.Spacing = 5;
+                foreach (
+                    var value in new[]
+                    {
+                        entry.Author,
+                        entry.Downloads.Length > 0 ? Ui("Downloads: ") + entry.Downloads : "",
+                        entry.Versions,
+                        entry.Size,
+                    }
+                )
+                    if (value.Length > 0)
+                        labels.Children.Add(T(value, 12));
+                if (entry.Description.Length > 0)
+                {
+                    var description = T(
+                        entry.Description.Replace('\r', ' ').Replace('\n', ' '),
+                        12
+                    );
+                    description.MaxLines = 1;
+                    description.TextTrimming = TextTrimming.CharacterEllipsis;
+                    labels.Children.Add(description);
+                }
+                labels.Children.Add(
                     Btn(
                         "View blueprint details",
                         () =>
@@ -100,13 +120,19 @@ public sealed partial class MainWindow
                 );
                 var card = new Grid
                 {
-                    ColumnDefinitions = new ColumnDefinitions("100,*"),
-                    ColumnSpacing = 14,
+                    ColumnDefinitions = new ColumnDefinitions("120,*"),
+                    ColumnSpacing = 12,
                 };
-                card.Children.Add(Preview(entry.ImageUrl, blueprintSource == "cms"));
+                var picture = Preview(entry.ImageUrl, blueprintSource == "cms");
+                picture.Width = 120;
+                picture.Height = 90;
+                picture.VerticalAlignment = VerticalAlignment.Top;
+                card.Children.Add(picture);
                 Grid.SetColumn(labels, 1);
                 card.Children.Add(labels);
-                results.Children.Add(Card(card));
+                var container = Card(card);
+                container.Padding = new Thickness(11, 7);
+                results.Children.Add(container);
             }
             previous.IsEnabled = state.Page > 1;
             next.IsEnabled = state.Next;
@@ -208,6 +234,7 @@ public sealed partial class MainWindow
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
         };
+        PrepareDialog(window);
         var accepted = Btn(
             "I understand (3s)",
             () =>

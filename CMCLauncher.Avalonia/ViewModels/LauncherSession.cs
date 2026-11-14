@@ -42,6 +42,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
     public bool Busy => task != null;
     public bool ExitWatchdogRunning { get; private set; }
     public bool GameRunning => game is { HasExited: false };
+    public bool Launching { get; private set; }
     public Instance? Selected
     {
         get => selected;
@@ -244,7 +245,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
 
     public void EnsureFilesIdle()
     {
-        if (GameRunning)
+        if (GameRunning || Launching)
             throw new IOException(Ui("Close the game before changing instance files."));
     }
 
@@ -274,6 +275,23 @@ public sealed class LauncherSession : ObservableState, IDisposable
     }
 
     public async Task LaunchSelected(CancellationToken ct)
+    {
+        if (Launching)
+            throw new IOException(Ui("The game is already running."));
+        Launching = true;
+        Changed(nameof(Launching));
+        try
+        {
+            await LaunchSelectedCore(ct);
+        }
+        finally
+        {
+            Launching = false;
+            Changed(nameof(Launching));
+        }
+    }
+
+    async Task LaunchSelectedCore(CancellationToken ct)
     {
         if (Selected is not { } instance || Account is not { } identity)
             throw new IOException(Ui("Select an instance and account."));

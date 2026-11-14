@@ -37,6 +37,7 @@ public sealed partial class MainWindow
             Grid.SetRow(summary, 1);
             content.Children.Add(summary);
             var open = Btn("Open", () => Navigate(target), true);
+            open.HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Left;
             Grid.SetRow(open, 2);
             content.Children.Add(open);
             var card = Card(content);
@@ -372,6 +373,7 @@ public sealed partial class MainWindow
                 Background = Background,
                 Foreground = Foreground,
             };
+            PrepareDialog(dialog);
             var confirm = Btn(
                 "Join room",
                 () =>

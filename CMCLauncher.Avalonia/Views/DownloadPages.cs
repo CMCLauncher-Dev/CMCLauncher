@@ -350,6 +350,7 @@ public sealed partial class MainWindow
                     )
                 );
                 advanced.Margin = new Thickness(18);
+                drawer.OpenPaneLength = 540;
                 drawer.Pane = new ScrollViewer { Content = advanced };
                 drawer.IsPaneOpen = true;
                 return Task.CompletedTask;

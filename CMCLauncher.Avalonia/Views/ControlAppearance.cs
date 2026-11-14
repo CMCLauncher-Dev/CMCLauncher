@@ -10,7 +10,21 @@ public sealed partial class MainWindow
 {
     readonly SolidColorBrush controlSurfaceBrush = new(Color.Parse("#F1F2F5"));
 
-    void ConfigureControlAppearance()
+    void PrepareDialog(Window dialog)
+    {
+        dialog.RequestedThemeVariant = ActualThemeVariant;
+        dialog.Background = surfaceBrush;
+        dialog.Foreground = textBrush;
+        dialog.FontFamily = FontFamily;
+        dialog.FontSize = FontSize;
+        dialog.Classes.Set(
+            "custom-appearance",
+            session.Store.Config.Settings.ColorPreset != "native"
+        );
+        ConfigureControlAppearance(dialog.Styles);
+    }
+
+    void ConfigureControlAppearance(Styles? target = null)
     {
         foreach (
             var selector in new Func<Selector?, Selector>[]
@@ -20,7 +34,7 @@ public sealed partial class MainWindow
                 s => s.Class("custom-appearance").Descendant().OfType<NumericUpDown>(),
             }
         )
-            Styles.Add(
+            (target ?? Styles).Add(
                 new Style(selector)
                 {
                     Setters =
