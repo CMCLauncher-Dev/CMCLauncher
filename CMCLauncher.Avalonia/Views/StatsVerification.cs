@@ -21,7 +21,7 @@ public sealed partial class MainWindow
                 .GetVisualDescendants()
                 .OfType<Grid>()
                 .Single(c => Equals(c.Tag, "stats-dashboard"));
-            if (dashboard.Children.OfType<Border>().Count() != 6)
+            if (dashboard.Children.OfType<Border>().Count() != 8)
                 throw new IOException("System status is missing WinUI dashboard sections.");
             foreach (var width in new[] { 850d, 1280d })
             {
@@ -30,7 +30,7 @@ public sealed partial class MainWindow
                 dashboard.UpdateLayout();
                 var narrow = dashboard.Bounds.Width < 700;
                 if (
-                    dashboard.RowDefinitions.Count != (narrow ? 6 : 3)
+                    dashboard.RowDefinitions.Count != (narrow ? 8 : 4)
                     || dashboard.Children.Any(c => Grid.GetColumnSpan(c) != (narrow ? 2 : 1))
                 )
                     throw new IOException("System status columns do not adapt like WinUI.");
@@ -39,7 +39,7 @@ public sealed partial class MainWindow
             bitmap.Render(this);
             bitmap.Save(Path.Combine(VerificationDirectory!, "system-status.png"));
             checks.Add(
-                "PASS system status CPU/memory trends, six dashboard sections and responsive columns"
+                "PASS system status CPU/memory trends, eight dashboard sections and responsive columns"
             );
         }
         finally
