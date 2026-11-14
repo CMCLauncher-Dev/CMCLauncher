@@ -235,6 +235,12 @@ public sealed partial class MainWindow
                 var items = await listContent(gameDir, contentType, targetWorld);
                 if (version != renderVersion)
                     return;
+                var missingDeps =
+                    contentType == "mod"
+                        ? await Task.Run(() => ContentManager.MissingDependencies(gameDir))
+                        : null;
+                if (version != renderVersion)
+                    return;
                 var total = items.Count;
                 var processed = 0;
                 var visible = 0;
@@ -359,6 +365,25 @@ public sealed partial class MainWindow
                     stack.Children.Add(
                         Text(string.Join(" · ", stateLabels.Where(x => x.Length > 0)), 12)
                     );
+                    if (missingDeps != null)
+                    {
+                        var dependent = item.File.Replace(".disabled", "");
+                        var deps = missingDeps
+                            .Where(m => string.Equals(m.Dependent, dependent, StringComparison.OrdinalIgnoreCase))
+                            .Select(m => m.Missing)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                        if (deps.Count > 0)
+                        {
+                            var warning = Text(
+                                Ui("Missing dependencies: ") + string.Join(", ", deps),
+                                12,
+                                true
+                            );
+                            warning.Foreground = Brush(lightTheme ? "#C5402E" : "#F08070");
+                            stack.Children.Add(warning);
+                        }
+                    }
                     ToolTipService.SetToolTip(stack, item.Description + "\n" + item.File);
                     if (contentType != "mod" && item.Description.Length > 0)
                     {

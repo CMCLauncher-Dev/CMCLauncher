@@ -795,6 +795,7 @@
     "{0} releases loaded": "已加载 {0} 个版本",
     "Canceled": "已取消",
     "Enabled": "已启用",
+    "Missing dependencies: ": "缺少前置依赖： ",
     "A world with this name already exists: ": "已存在同名存档：",
     "A version with this name already exists. Choose another name.": "已存在同名版本，请更换名称。",
     "Installed · ": "已安装 · ",

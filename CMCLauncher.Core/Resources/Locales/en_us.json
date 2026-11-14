@@ -796,6 +796,7 @@
     "{0} releases loaded": "{0} releases loaded",
     "Canceled": "Canceled",
     "Enabled": "Enabled",
+    "Missing dependencies: ": "Missing dependencies: ",
     "A world with this name already exists: ": "A world with this name already exists: ",
     "A version with this name already exists. Choose another name.": "A version with this name already exists. Choose another name.",
     "Installed · ": "Installed · ",

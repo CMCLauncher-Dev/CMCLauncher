@@ -423,6 +423,7 @@
     "{0} releases loaded": "Загружено релизов: {0}",
     "Canceled": "Отменено",
     "Enabled": "Включено",
+    "Missing dependencies: ": "Отсутствующие зависимости: ",
     "A world with this name already exists: ": "Мир с таким именем уже существует: ",
     "A version with this name already exists. Choose another name.": "Версия с таким именем уже существует. Выберите другое имя.",
     "Installed · ": "Установлено · ",

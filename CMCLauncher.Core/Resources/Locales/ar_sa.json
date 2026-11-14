@@ -423,6 +423,7 @@
     "{0} releases loaded": "تم تحميل {0} إصدارًا",
     "Canceled": "تم الإلغاء",
     "Enabled": "مفعَّل",
+    "Missing dependencies: ": "تبعيات مفقودة: ",
     "A world with this name already exists: ": "يوجد عالم بهذا الاسم بالفعل: ",
     "A version with this name already exists. Choose another name.": "يوجد إصدار بهذا الاسم بالفعل. اختر اسمًا آخر.",
     "Installed · ": "مثبَّت · ",

@@ -423,6 +423,7 @@
     "{0} releases loaded": "{0} versions chargées",
     "Canceled": "Annulé",
     "Enabled": "Activé",
+    "Missing dependencies: ": "Dépendances manquantes : ",
     "A world with this name already exists: ": "Un monde portant ce nom existe déjà : ",
     "A version with this name already exists. Choose another name.": "Une version portant ce nom existe déjà. Choisissez un autre nom.",
     "Installed · ": "Instalé · ",

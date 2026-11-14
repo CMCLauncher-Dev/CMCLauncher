@@ -91,6 +91,25 @@ public sealed partial class MainWindow
             body.Children.Add(T("No content found."));
             return;
         }
+        if (kind == "mod")
+        {
+            var savedView = instanceViewRevision;
+            var missing = await Task.Run(() => ContentManager.MissingDependencies(root));
+            if (savedView != instanceViewRevision || route != "instance-settings")
+                return;
+            if (missing.Count > 0)
+            {
+                var summary = Stack(
+                    T(
+                        Ui("Missing dependencies: ") + string.Join(", ", missing.Select(m => m.Missing).Distinct()),
+                        12,
+                        true
+                    )
+                );
+                summary.Spacing = 2;
+                body.Children.Add(summary);
+            }
+        }
         var list = new ListBox
         {
             ItemsSource = items,

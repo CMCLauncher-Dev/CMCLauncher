@@ -582,6 +582,7 @@
     "{0} releases loaded": "{0} 個のリリースを読み込みました",
     "Canceled": "キャンセルしました",
     "Enabled": "有効",
+    "Missing dependencies: ": "依存関係が不足: ",
     "A world with this name already exists: ": "同名のワールドが既に存在します: ",
     "A version with this name already exists. Choose another name.": "同名のバージョンが既に存在します。別の名前を選択してください。",
     "Installed · ": "インストール済み · ",

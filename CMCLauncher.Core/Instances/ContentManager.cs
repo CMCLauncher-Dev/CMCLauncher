@@ -77,6 +77,79 @@ public static class ContentManager
         return ids;
     }
 
+    // 这些 id 由 Minecraft 或加载器提供，不算作可安装的 Mod 前置依赖。
+    static readonly HashSet<string> SystemModProviders = new(
+        new[] { "minecraft", "java", "fabricloader", "quilt_loader", "forge", "neoforge" },
+        StringComparer.OrdinalIgnoreCase
+    );
+
+    // 从 JAR 包中提取必需的前置 Mod id（Fabric/Quilt 的 depends、Forge/NeoForge 的 dependencies）。
+    public static List<string> RequiredDependencies(string file)
+    {
+        var deps = new List<string>();
+        try
+        {
+            using var zip = ZipFile.OpenRead(file);
+            string? Read(string path)
+            {
+                var entry = zip.GetEntry(path);
+                if (entry == null || entry.Length > 2 * 1024 * 1024)
+                    return null;
+                using var reader = new StreamReader(entry.Open());
+                return reader.ReadToEnd();
+            }
+            foreach (var path in new[] { "fabric.mod.json", "quilt.mod.json" })
+                if (Read(path) is string json)
+                {
+                    var data = JsonNode.Parse(json);
+                    var node =
+                        path.StartsWith("quilt") ? data?["quilt_loader"]?["depends"] : data?["depends"];
+                    if (node is JsonObject depends)
+                        foreach (var dep in depends)
+                            if (!SystemModProviders.Contains(dep.Key))
+                                deps.Add(dep.Key);
+                }
+            foreach (var path in new[] { "META-INF/mods.toml", "META-INF/neoforge.mods.toml" })
+                if (Read(path) is string toml)
+                    foreach (
+                        Match block in Regex.Matches(
+                            toml,
+                            @"(?ms)^\s*\[\[.*?\]\]\s*$(.*?)(?=^\s*\[|\z)"
+                        )
+                    )
+                    {
+                        bool required = Regex.IsMatch(
+                            block.Groups[1].Value,
+                            @"(?m)^\s*type\s*=\s*[""']required[""']"
+                        );
+                        if (!required)
+                            continue;
+                        var id = Regex
+                            .Match(block.Groups[1].Value, "(?m)^\\s*modId\\s*=\\s*[\"']([^\"']+)")
+                            .Groups[1].Value;
+                        if (id.Length > 0 && !SystemModProviders.Contains(id))
+                            deps.Add(id);
+                    }
+        }
+        catch (Exception ex)
+            when (ex is IOException or InvalidDataException or System.Text.Json.JsonException) { }
+        return deps.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    // 检查实例 mods 目录中已启用 Mod 的缺失前置，返回 (前置 id, 依赖它的 Mod 文件名) 对。
+    public static List<(string Missing, string Dependent)> MissingDependencies(string game)
+    {
+        var installed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in List(game, "mod").Where(m => m.Enabled))
+            installed.UnionWith(ModIds(Locate(game, "mod", null, item.File)));
+        var result = new List<(string, string)>();
+        foreach (var item in List(game, "mod").Where(m => m.Enabled))
+            foreach (var dep in RequiredDependencies(Locate(game, "mod", null, item.File)))
+                if (!installed.Contains(dep))
+                    result.Add((dep, item.File));
+        return result.Distinct().ToList();
+    }
+
     // 从 JAR 包中提取 Mod 图标（返回 PNG 字节数组）
     public static byte[]? Icon(string file)
     {
