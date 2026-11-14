@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Text;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Text;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
 
@@ -54,6 +57,53 @@ public sealed partial class MainWindow
                     Opacity = .8,
                 }
             );
+            content.Children.Add(
+                new TextBlock
+                {
+                    Text = Ui("Log analysis"),
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 6, 0, 0),
+                }
+            );
+            if (report.Analysis.Count == 0)
+            {
+                content.Children.Add(
+                    new TextBlock
+                    {
+                        Text = Ui("No common issues detected"),
+                        Foreground = new SolidColorBrush(Microsoft.UI.Colors.Green),
+                        TextWrapping = TextWrapping.Wrap,
+                    }
+                );
+            }
+            else
+            {
+                foreach (var issue in report.Analysis)
+                {
+                    var item = new StackPanel { Spacing = 2 };
+                    item.Children.Add(
+                        new TextBlock
+                        {
+                            Text = Ui(issue.TitleKey),
+                            FontWeight = FontWeights.SemiBold,
+                            Foreground = new SolidColorBrush(Microsoft.UI.Colors.OrangeRed),
+                            TextWrapping = TextWrapping.Wrap,
+                        }
+                    );
+                    item.Children.Add(
+                        new TextBlock
+                        {
+                            Text = issue.Line,
+                            FontSize = 11,
+                            Opacity = .7,
+                            TextWrapping = TextWrapping.Wrap,
+                            MaxLines = 3,
+                            TextTrimming = TextTrimming.CharacterEllipsis,
+                        }
+                    );
+                    content.Children.Add(item);
+                }
+            }
             var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
             {
                 XamlRoot = Content.XamlRoot,
@@ -97,7 +147,12 @@ public sealed partial class MainWindow
     }
 }
 
-public sealed record CrashReport(string FileName, string Summary, string Text)
+public sealed record CrashReport(
+    string FileName,
+    string Summary,
+    string Text,
+    IReadOnlyList<LogIssue> Analysis
+)
 {
     public static string? LatestCrashFile(
         Store store,
@@ -161,7 +216,8 @@ public sealed record CrashReport(string FileName, string Summary, string Text)
         return new CrashReport(
             "CMCLauncher-error-report-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt",
             summary,
-            text
+            text,
+            LogAnalyzer.Analyze(text)
         );
     }
 
