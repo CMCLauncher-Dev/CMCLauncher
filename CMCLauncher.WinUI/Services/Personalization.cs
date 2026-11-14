@@ -104,44 +104,39 @@ public sealed partial class MainWindow
 
     // 图标字体按字形绘制，不能跟普通文本一起替换为用户字体。
     DesktopAcrylicController? acrylicBackdropController;
-    SystemBackdropConfiguration? acrylicBackdropConfig;
     ICompositionSupportsSystemBackdrop? backdropTarget;
+
+    SystemBackdropConfiguration NewBackdropConfig() =>
+        new()
+        {
+            IsInputActive = true,
+            Theme = SystemBackdropTheme.Default,
+        };
 
     // 窗口级背景材质（液态玻璃）。用底层 DesktopAcrylicController 直接把 Acrylic 自带的白色着色压暗，
     // 让窗口近乎直接映射窗口下方的颜色与内容；Win11 最完整，Win10 1809+ 同样可用。
-    // Add/Remove 必须使用同一个 target 引用，因此把窗口 target 缓存为字段，避免每次 As<>() 生成新 RCW 导致移除失败。
+    // controller 只向窗口挂载一次，开关通过 SetSystemBackdropConfiguration(有效配置/null) 控制。
+    // 反复 Add/Remove/Dispose 会让同一个窗口二次 Add 材质失效，这是之前"关闭再打开没效果"的根因。
     void ApplyBackdrop(bool enabled)
     {
-        if (enabled)
+        if (Content == null)
+            return;
+        if (acrylicBackdropController is null)
         {
-            if (acrylicBackdropController is null)
+            var controller = new DesktopAcrylicController
             {
-                backdropTarget ??= this.As<ICompositionSupportsSystemBackdrop>();
-                var controller = new DesktopAcrylicController
-                {
-                    TintColor = Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF),
-                    TintOpacity = 0.08f,
-                    LuminosityOpacity = 0.35f,
-                };
-                var config = new SystemBackdropConfiguration
-                {
-                    IsInputActive = true,
-                    Theme = SystemBackdropTheme.Default,
-                };
-                controller.AddSystemBackdropTarget(backdropTarget);
-                controller.SetSystemBackdropConfiguration(config);
-                acrylicBackdropController = controller;
-                acrylicBackdropConfig = config;
-            }
+                TintColor = Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF),
+                TintOpacity = 0.08f,
+                LuminosityOpacity = 0.35f,
+            };
+            backdropTarget = this.As<ICompositionSupportsSystemBackdrop>();
+            controller.AddSystemBackdropTarget(backdropTarget);
+            acrylicBackdropController = controller;
         }
-        else if (acrylicBackdropController is not null)
-        {
-            acrylicBackdropController.RemoveSystemBackdropTarget(backdropTarget);
-            acrylicBackdropController.SetSystemBackdropConfiguration(null);
-            acrylicBackdropController.Dispose();
-            acrylicBackdropController = null;
-            acrylicBackdropConfig = null;
-        }
+        // 传 null 关闭材质，传新配置开启材质；不销毁 controller，保证可随时重新开启。
+        acrylicBackdropController.SetSystemBackdropConfiguration(
+            enabled ? NewBackdropConfig() : null
+        );
     }
 
     void ApplyPersonalization()
