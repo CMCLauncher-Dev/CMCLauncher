@@ -272,21 +272,35 @@ public sealed partial class MainWindow
         await completion.Task;
     }
 
-    // 游戏退出后按先前选择的可见性设置恢复或关闭启动器窗口。你大爷的给我提点好的诉求行不行
+    // 游戏退出后，依据先前选择的可见性偏好恢复/关闭启动器窗口。
     void ApplyLauncherVisibilityOnExit()
     {
+        // 一次性消费：仅当退出前确实设置了退出行为才处理，随后复位，防止重复触发。
         if (launcherExitBehavior is not { } behavior)
             return;
         launcherExitBehavior = null;
-        DispatcherQueue.TryEnqueue(() =>
-        {
-            if (behavior == "close")
-                Close();
-            else if (behavior == "reopen" && AppWindow.Presenter is OverlappedPresenter presenter)
-                AppWindow.Show();
-        });
+
+        DispatcherQueue.TryEnqueue(() => ApplyWindowBehavior(behavior));
     }
 
+    // 将字符串行为码映射为具体的窗口副作用。
+    void ApplyWindowBehavior(string behavior)
+    {
+        // 分派表：把「行为标识 -> 副作用」的对应关系收敛到一处，方便后续扩展新行为。
+        var dispatchTable = new Dictionary<string, Action?>
+        {
+            ["close"] = Close,
+            ["reopen"] = () =>
+            {
+                if (AppWindow.Presenter is OverlappedPresenter presenter)
+                    AppWindow.Show();
+            },
+        };
+
+        // 未知行为码视为空操作 —— 保守地忽略，避免误关窗或误显示。
+        dispatchTable.GetValueOrDefault(behavior)?.Invoke();
+    }
+//猜你看不懂-—-fuzhu
     // 并发依赖的进度回调可能乱序，显示值只前进，不往回跳。
     void UpdateLaunchProgress(double value, string stage)
     {
