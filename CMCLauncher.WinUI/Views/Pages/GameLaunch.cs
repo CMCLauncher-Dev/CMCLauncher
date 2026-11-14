@@ -130,7 +130,7 @@ public sealed partial class MainWindow
                     );
                     game = launchedGame;
                     runningInstanceId = instance.Id;
-                    // 游戏退出后的重启由独立监视进程负责，避免弹窗阻塞退出。
+                    // 游戏退出后的重启由独立监视进程负责，避免弹窗阻塞退出；退出后按用户偏好恢复或关闭窗口。
                     var monitoringDone = new TaskCompletionSource(
                         TaskCreationOptions.RunContinuationsAsynchronously
                     );
