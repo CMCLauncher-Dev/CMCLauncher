@@ -4,8 +4,11 @@ using System.Text.RegularExpressions;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Composition;
 using Microsoft.Win32;
 using Windows.Storage.Pickers;
+using WinRT;
 using WinRT.Interop;
 
 namespace CMCLauncher.WinUI;
@@ -100,13 +103,42 @@ public sealed partial class MainWindow
     }
 
     // 图标字体按字形绘制，不能跟普通文本一起替换为用户字体。
-    // 窗口级背景材质（液态玻璃/云母）。Win11 生效，旧系统自动无效果。
+    DesktopAcrylicController? acrylicBackdropController;
+    SystemBackdropConfiguration? acrylicBackdropConfig;
+
+    // 窗口级背景材质（液态玻璃）。用底层 DesktopAcrylicController 直接把 Acrylic 自带的白色着色压暗，
+    // 让窗口近乎直接映射窗口下方的颜色与内容；Win11 最完整，Win10 1809+ 同样可用。
     void ApplyBackdrop(bool enabled)
     {
-        if (enabled && SystemBackdrop is not DesktopAcrylicBackdrop)
-            SystemBackdrop = new DesktopAcrylicBackdrop();
-        else if (!enabled && SystemBackdrop is not null)
-            SystemBackdrop = null;
+        if (enabled)
+        {
+            if (acrylicBackdropController is null)
+            {
+                var controller = new DesktopAcrylicController
+                {
+                    TintColor = Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF),
+                    TintOpacity = 0.08f,
+                    LuminosityOpacity = 0.35f,
+                };
+                var config = new SystemBackdropConfiguration
+                {
+                    IsInputActive = true,
+                    Theme = SystemBackdropTheme.Default,
+                };
+                controller.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
+                controller.SetSystemBackdropConfiguration(config);
+                acrylicBackdropController = controller;
+                acrylicBackdropConfig = config;
+            }
+        }
+        else if (acrylicBackdropController is not null)
+        {
+            acrylicBackdropController.SetSystemBackdropConfiguration(null);
+            acrylicBackdropController.RemoveSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
+            acrylicBackdropController.Dispose();
+            acrylicBackdropController = null;
+            acrylicBackdropConfig = null;
+        }
     }
 
     void ApplyPersonalization()

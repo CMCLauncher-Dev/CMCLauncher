@@ -116,7 +116,10 @@ public sealed partial class MainWindow
     // 新建与已显示的卡片采用同一取色规则，避免首次进入页面时仍使用旧的表面色。
     void ApplyCardTheme(Border card)
     {
-        card.Background = new SolidColorBrush(SoftSurfaceColor());
+        var surface = SoftSurfaceColor();
+        if (store.Config.Settings.MicaEffect)
+            surface = Color.FromArgb(0x30, surface.R, surface.G, surface.B);
+        card.Background = new SolidColorBrush(surface);
         card.BorderBrush = Brush(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorder);
     }
 
