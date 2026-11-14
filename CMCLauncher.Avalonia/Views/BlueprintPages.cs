@@ -396,8 +396,10 @@ public sealed partial class MainWindow
                             Path.GetFileName(downloaded),
                             Path.GetExtension(downloaded)
                         );
-                        if (destination != null)
-                            File.Copy(downloaded, destination, true);
+                        if (destination == null)
+                            session.Cancel();
+                        ct.ThrowIfCancellationRequested();
+                        File.Copy(downloaded, destination!, true);
                     }
                 }
                 finally

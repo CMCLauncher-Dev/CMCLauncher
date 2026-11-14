@@ -507,6 +507,7 @@ public sealed partial class MainWindow
                                             target,
                                             ct
                                         );
+                                        ct.ThrowIfCancellationRequested();
                                         var targetPath = ModTranslation.WriteResourcePack(
                                             gameDir,
                                             modPath,

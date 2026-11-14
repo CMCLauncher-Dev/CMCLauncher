@@ -393,7 +393,7 @@ public sealed partial class MainWindow
         var modId =
             ContentManager.ModIds(path).FirstOrDefault()
             ?? Path.GetFileNameWithoutExtension(item.File.Replace(".disabled", ""));
-        await session.Run(
+        var completed = await session.Run(
             "Mod translation",
             async ct =>
             {
@@ -405,6 +405,7 @@ public sealed partial class MainWindow
                     target,
                     ct
                 );
+                ct.ThrowIfCancellationRequested();
                 ModTranslation.WriteResourcePack(
                     root,
                     path,
@@ -416,7 +417,8 @@ public sealed partial class MainWindow
                 await session.Store.Save();
             }
         );
-        await Confirm("Translate", Ui("Translation saved. Load the resource pack in-game."));
+        if (completed)
+            await Confirm("Translate", Ui("Translation saved. Load the resource pack in-game."));
     }
 
     async Task CheckModUpdates(Instance instance)
@@ -434,7 +436,7 @@ public sealed partial class MainWindow
                 .Select(record => record.S("file"))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        await session.Run(
+        var checkedUpdates = await session.Run(
             "Checking mod updates",
             async ct =>
             {
@@ -512,6 +514,8 @@ public sealed partial class MainWindow
                 }
             }
         );
+        if (!checkedUpdates)
+            return;
         if (updates.Children.Count == 0)
             updates.Children.Add(T("No compatible updates found."));
         foreach (var failure in failures)

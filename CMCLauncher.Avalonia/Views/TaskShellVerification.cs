@@ -65,6 +65,17 @@ public sealed partial class MainWindow
                 throw new IOException("Completed task cards still show obsolete progress bars.");
             drawer.IsPaneOpen = false;
         }
+        // Cancellation is a distinct outcome so callers cannot show success afterward.
+        var canceled = session.Run(
+            "Cancellation verification",
+            ct => Task.Delay(Timeout.InfiniteTimeSpan, ct)
+        );
+        session.Cancel();
+        if (await canceled || session.Busy || session.Active != null)
+            throw new IOException("Canceled tasks returned success or retained active state.");
+        if (!await session.Run("Recovery verification", _ => Task.CompletedTask))
+            throw new IOException("A canceled task prevented the next operation from succeeding.");
+        checks.Add("PASS cancellation outcome and subsequent task recovery");
         await Navigate("logs");
         var toolbar = pageContent
             .GetVisualDescendants()

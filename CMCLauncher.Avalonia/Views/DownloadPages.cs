@@ -931,8 +931,10 @@ public sealed partial class MainWindow
                                 ct
                             );
                     var target = await SaveFile(Path.GetFileName(file), Path.GetExtension(file));
-                    if (target != null)
-                        File.Copy(file, target, true);
+                    if (target == null)
+                        session.Cancel();
+                    ct.ThrowIfCancellationRequested();
+                    File.Copy(file, target!, true);
                 }
                 finally
                 {
