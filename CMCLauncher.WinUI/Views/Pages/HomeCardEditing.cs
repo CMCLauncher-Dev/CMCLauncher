@@ -138,6 +138,7 @@ public sealed partial class MainWindow
             homeDropHandled = false;
         };
     }
+//不写注释应该没啥问题吧）fuzhu
 
     void HomeCard_DragOver(object sender, DragEventArgs args)
     {
@@ -254,3 +255,4 @@ public sealed partial class MainWindow
         );
     }
 }
+//死ide啥叫不存在名称服了

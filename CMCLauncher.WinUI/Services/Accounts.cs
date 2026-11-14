@@ -76,7 +76,7 @@ public sealed partial class MainWindow
                                                 );
                                                 return;
                                             }
-                                            AddLog("复制设备代码失败：" + failure);
+                                            AddLog(UiFormat("Failed to copy device code: {0}", failure));
                                             loginStatus.Text = Ui(
                                                 "Copy failed. Copy the device code above manually."
                                             );
@@ -121,7 +121,7 @@ public sealed partial class MainWindow
                                             );
                                         else
                                         {
-                                            AddLog("自动复制设备代码失败：" + copyError);
+                                            AddLog(UiFormat("Auto-copy device code failed: {0}", copyError));
                                             loginStatus.Text = Ui(
                                                 "Could not copy automatically. Copy the device code above manually."
                                             );

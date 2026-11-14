@@ -142,7 +142,7 @@ public sealed partial class MainWindow
                             // and waits for the redirected output streams to finish.
                             await launchedGame.WaitForExitAsync();
                             await monitoringDone.Task;
-                            AddLog(instance.Name + "：游戏已退出，正在重启 CMCLauncher");
+                            AddLog(UiFormat("{0}: game exited, restarting CMCLauncher", instance.Name));
                         }
                         catch (Exception ex)
                         {
@@ -272,7 +272,7 @@ public sealed partial class MainWindow
         await completion.Task;
     }
 
-    // 游戏退出后按先前选择的可见性设置恢复或关闭启动器窗口。
+    // 游戏退出后按先前选择的可见性设置恢复或关闭启动器窗口。你大爷的给我提点好的诉求行不行
     void ApplyLauncherVisibilityOnExit()
     {
         if (launcherExitBehavior is not { } behavior)

@@ -128,7 +128,7 @@ public sealed class JavaSettingsPage : CMCPage
                                 }
                                 catch (Exception ex)
                                 {
-                                    AddLog("跳过 " + path + "：" + ex.Message);
+                                    AddLog(UiFormat("Skipped {0}: {1}", path, ex.Message));
                                 }
                             }
                             await Store.Save();
@@ -228,11 +228,11 @@ public sealed class JavaSettingsPage : CMCPage
                     }
                     catch (Exception ex)
                     {
-                        AddLog("Java 扫描跳过 " + path + "：" + ex.Message);
+                        AddLog(UiFormat("Java scan skipped {0}: {1}", path, ex.Message));
                     }
                 }
                 await Store.Save();
-                AddLog($"扫描完成，识别 {added} 个 Java。");
+                AddLog(UiFormat("Scan finished, detected {0} Java installation(s).", added));
             },
             Ui("Scan Java")
         );

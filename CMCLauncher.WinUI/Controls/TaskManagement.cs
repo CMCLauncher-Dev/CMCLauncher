@@ -329,7 +329,7 @@ public sealed partial class MainWindow
             RuntimeLog.Debug("Task exception: " + ex);
             work.State = "失败";
             work.Stage = ex.Message;
-            AddLog(work.Name + "：失败 · " + ex.Message);
+            AddLog(UiFormat("{0}: failed · {1}", work.Name, ex.Message));
             throw;
         }
         finally

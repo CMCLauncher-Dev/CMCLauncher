@@ -105,3 +105,4 @@ public sealed class LogsPage : CMCPage
 
     double PageViewportWidth() => PageBody.ActualWidth;
 }
+//别问为啥用中文定义，我是为了方便调试「fuzhu」

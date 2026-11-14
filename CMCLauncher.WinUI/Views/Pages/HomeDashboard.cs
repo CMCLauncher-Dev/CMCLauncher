@@ -830,7 +830,7 @@ public sealed partial class MainWindow
             }
             catch (Exception ex)
             {
-                AddLog("投影检测失败：" + ex.Message);
+                AddLog(UiFormat("Projector detection failed: {0}", ex.Message));
             }
             if (
                 generation != renderVersion
