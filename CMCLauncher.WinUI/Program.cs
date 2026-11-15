@@ -231,14 +231,16 @@ public sealed partial class CMCApp : Application
     {
         window = new MainWindow(this.args);
         window.Activate();
-        if (this.args.Length == 2 && (this.args[0] is "--verify-ui" or "--verify-cms-ui"))
+        if (this.args.Length == 2 && (this.args[0] is "--verify-ui" or "--verify-cms-ui" or "--verify-datapack-ui"))
         {
             var directory = Path.GetFullPath(this.args[1]);
             Directory.CreateDirectory(directory);
             try
             {
                 await Task.Delay(600);
-                if (this.args[0] == "--verify-cms-ui")
+                if (this.args[0] == "--verify-datapack-ui")
+                    await window.VerifyDataPackUi(directory);
+                else if (this.args[0] == "--verify-cms-ui")
                     await window.VerifyCmsUi(directory);
                 else
                     await window.VerifyUi(directory);

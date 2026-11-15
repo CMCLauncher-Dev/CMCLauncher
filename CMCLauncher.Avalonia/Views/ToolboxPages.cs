@@ -12,6 +12,7 @@ public sealed partial class MainWindow
         {
             ColumnDefinitions = new ColumnDefinitions("*,*,*"),
             ColumnSpacing = 12,
+            RowSpacing = 12,
             VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top,
         };
         foreach (
@@ -24,6 +25,7 @@ public sealed partial class MainWindow
                     "Create a profile picture from a Minecraft skin and export it as PNG.",
                     "pfp"
                 ),
+                ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator"),
             }
         )
         {
@@ -42,7 +44,10 @@ public sealed partial class MainWindow
             content.Children.Add(open);
             var card = Card(content);
             card.Padding = new global::Avalonia.Thickness(11, 7);
-            Grid.SetColumn(card, cards.Children.Count);
+            var index = cards.Children.Count;
+            if (index % 3 == 0) cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetColumn(card, index % 3);
+            Grid.SetRow(card, index / 3);
             cards.Children.Add(card);
         }
         return cards;

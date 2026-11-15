@@ -177,9 +177,9 @@ public sealed partial class MainWindow : Window
         {
             RuntimeLog.Write("ERROR", "Failed to set layered window style: " + ex);
         }
-        Verifying = args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui");
+        Verifying = args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui" or "--verify-datapack-ui");
         store = new Store(
-            args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui")
+            args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui" or "--verify-datapack-ui")
                 ? Path.Combine(Path.GetFullPath(args[1]), "data")
                 : null
         );
@@ -262,7 +262,7 @@ public sealed partial class MainWindow : Window
         InitializeTerracotta();
         importedMetadataLoad = LoadImportedMetadata();
         InitializeFrpc(
-            args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui")
+            args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui" or "--verify-datapack-ui")
                 ? Path.Combine(Path.GetFullPath(args[1]), "program", "frpc", "configs")
                 : null
         );

@@ -262,7 +262,7 @@ public sealed partial class MainWindow
             "page:"
             + (
                 page is "resource-detail" or "blueprint-detail" ? resourceReturnPage
-                : page is "frpc" or "terracotta" or "minecraft-pfp" ? "toolbox"
+                : page is "frpc" or "terracotta" or "minecraft-pfp" or "datapack-generator" ? "toolbox"
                 : page
             );
         var keys = navigationButtons.Keys.ToList();
@@ -430,6 +430,9 @@ public sealed partial class MainWindow
                 case "more":
                 case "toolbox":
                     MorePage();
+                    break;
+                case "datapack-generator":
+                    DataPackGeneratorPage();
                     break;
                 case "terracotta":
                     TerracottaPage();

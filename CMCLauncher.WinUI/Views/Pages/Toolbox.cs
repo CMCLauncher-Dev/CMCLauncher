@@ -34,7 +34,7 @@ public sealed partial class MainWindow
     void ToolboxPage()
     {
         Header("Toolbox", "Utilities");
-        var cards = new Grid { ColumnSpacing = 12, VerticalAlignment = VerticalAlignment.Top };
+        var cards = new Grid { ColumnSpacing = 12, RowSpacing = 12, VerticalAlignment = VerticalAlignment.Top };
         for (var i = 0; i < 3; i++)
             cards.ColumnDefinitions.Add(
                 new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
@@ -49,6 +49,7 @@ public sealed partial class MainWindow
                     "Create a profile picture from a Minecraft skin and export it as PNG.",
                     "minecraft-pfp"
                 ),
+                ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator"),
             }
         )
         {
@@ -76,7 +77,10 @@ public sealed partial class MainWindow
             open.HorizontalAlignment = HorizontalAlignment.Left;
             content.Children.Add(open);
             var card = CompactCard(content);
-            Grid.SetColumn(card, cards.Children.Count);
+            var index = cards.Children.Count;
+            if (index % 3 == 0) cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetColumn(card, index % 3);
+            Grid.SetRow(card, index / 3);
             cards.Children.Add(card);
         }
         PageBody.Children.Add(cards);

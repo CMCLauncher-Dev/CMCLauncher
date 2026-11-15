@@ -114,7 +114,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         var arguments = Program.Arguments;
-        Verifying = arguments.Length == 2 && arguments[0] == "--verify-ui";
+        Verifying = arguments.Length == 2 && (arguments[0] is "--verify-ui" or "--verify-datapack-ui");
         if (Verifying)
             pageContent.PageTransition = null;
         VerificationDirectory = Verifying ? Path.GetFullPath(arguments[1]) : null;
@@ -244,7 +244,10 @@ public sealed partial class MainWindow : Window
                 await session.Core.RefreshImportedMetadata();
                 await Navigate("home");
                 if (Verifying)
-                    await VerifyUi();
+                {
+                    if (arguments[0] == "--verify-datapack-ui") await VerifyDataPackUi();
+                    else await VerifyUi();
+                }
                 else if (session.Store.Config.Settings.MinecraftDirectorySetupPending)
                     await FirstRun();
                 if (!Verifying && session.Store.Config.Settings.CheckLauncherUpdates)
@@ -379,6 +382,7 @@ public sealed partial class MainWindow : Window
                 "java" => "Java",
                 "accounts" => "Accounts",
                 "logs" => "Runtime logs",
+                "datapack-generator" => "Data pack generator",
                 "toolbox" => "Toolbox",
                 "terracotta" => "Terracotta",
                 "frpc" => "frpc",
@@ -405,6 +409,7 @@ public sealed partial class MainWindow : Window
                 "java" => JavaPage(),
                 "accounts" => AccountsPage(),
                 "logs" => LogsPage(),
+                "datapack-generator" => DataPackGeneratorPage(),
                 "toolbox" => ToolboxPage(),
                 "terracotta" => TerracottaPage(),
                 "frpc" => await FrpcPage(token),

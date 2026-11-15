@@ -138,6 +138,7 @@ public sealed partial class MainWindow
                     "accounts",
                     "logs",
                     "toolbox",
+                    "datapack-generator",
                     "terracotta",
                     "frpc",
                     "pfp",
@@ -385,6 +386,7 @@ public sealed partial class MainWindow
             await VerifyStatsParity(checks);
             await VerifyFrpcParity(checks);
             await VerifyPfpParity(checks);
+            await VerifyDataPackParity(checks);
             await VerifyCommunityFilterParity(checks);
 
             foreach (var theme in new[] { "light", "dark" })

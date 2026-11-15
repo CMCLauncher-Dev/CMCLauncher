@@ -12,7 +12,7 @@ public sealed partial class MainWindow
         page = "toolbox";
         expandedNavigation = "more";
         await RenderAsync();
-        check(themeCards.Count == 3, "toolbox presents three independent tool cards");
+        check(themeCards.Count == 4, "toolbox presents four independent tool cards");
         check(
             navigationButtons.ContainsKey("page:toolbox")
                 && !navigationButtons.ContainsKey("page:frpc")
@@ -24,7 +24,7 @@ public sealed partial class MainWindow
             .OfType<Button>()
             .Where(b => b.Content?.ToString() == Ui("Open"))
             .ToArray();
-        check(open.Length == 3, "each tool card has an open button");
+        check(open.Length == 4, "each tool card has an open button");
         (
             (IInvokeProvider)new ButtonAutomationPeer(open[1]).GetPattern(PatternInterface.Invoke)
         ).Invoke();

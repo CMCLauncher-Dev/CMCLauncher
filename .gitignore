@@ -12,3 +12,5 @@ CMCLauncher.WinUI/artifacts/
 test-extract/
 .vscode/
 scripts/clean-project.ps1
+# Visual Studio local caches and workspace state
+**/.vs/
