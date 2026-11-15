@@ -224,6 +224,8 @@ static class DataPackAdvancedTests
                 "custom"
             )
         );
+        DataPackEntryEditor.Build(Change(DataPackEntryEditor.Create(DataPackEntryKind.Tag), ("values", "minecraft:air")), "1.21.2", "custom");
+        Reject(() => DataPackEntryEditor.Build(Change(DataPackEntryEditor.Create(DataPackEntryKind.ShapelessRecipe), ("ingredients", "minecraft:air")), "1.21.2", "custom"));
         // A full source override is authoritative even when guided fields cannot express its schema.
         DataPackEntryEditor.Build(
             Change(

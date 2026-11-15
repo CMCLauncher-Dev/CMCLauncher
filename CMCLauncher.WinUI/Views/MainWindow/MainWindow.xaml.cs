@@ -193,6 +193,12 @@ public sealed partial class MainWindow : Window
             rectClip.BottomLeftRadius = rectClip.BottomRightRadius = new Vector2(8, 8);
         void SyncClip()
         {
+            if (IsZoomed(WindowNative.GetWindowHandle(this)))
+            {
+                rootVisual.Clip = null;
+                return;
+            }
+            rootVisual.Clip = rectClip;
             rectClip.Left = 0;
             rectClip.Top = 0;
             rectClip.Right = (float)ModpackDropRoot.ActualWidth;
@@ -231,6 +237,7 @@ public sealed partial class MainWindow : Window
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(TaskDrawerBackButton, Ui("Back"));
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(CustomTitleBar);
+        InitializeFullClientFrame();
         CustomTitleBar.SizeChanged += (_, _) => UpdateTitleBarInset();
         AppWindow.Changed += (_, _) => UpdateTitleBarInset();
         // Frame 加载前先缓存正文，等它准备好后再执行首次导航。

@@ -18,6 +18,7 @@ public sealed partial class MainWindow
                 message + Environment.NewLine
             );
         }
+        await VerifyWindowClientFrame(Check, directory);
         foreach (var theme in new[] { "light", "dark" })
         {
             store.Config.Settings.Theme = theme;
