@@ -2,6 +2,8 @@
   "code": "ja_jp",
   "displayName": "日本語",
   "strings": {
+    "Project repository": "プロジェクトのリポジトリ",
+    "Report an issue": "問題を報告",
     "Skipped {0}: {1}": "スキップ {0}: {1}",
     "Java scan skipped {0}: {1}": "Java スキャンをスキップ {0}: {1}",
     "Scan finished, detected {0} Java installation(s).": "スキャン完了、{0} 個の Java を検出。",

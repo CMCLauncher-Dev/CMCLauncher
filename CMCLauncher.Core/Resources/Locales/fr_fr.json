@@ -2,6 +2,8 @@
   "code": "fr_fr",
   "displayName": "Français",
   "strings": {
+    "Project repository": "Dépôt du projet",
+    "Report an issue": "Signaler un problème",
     "Skipped {0}: {1}": "Ignoré {0} : {1}",
     "Java scan skipped {0}: {1}": "Analyse Java ignorée {0} : {1}",
     "Scan finished, detected {0} Java installation(s).": "Analyse terminée, {0} installation(s) Java détectée(s).",

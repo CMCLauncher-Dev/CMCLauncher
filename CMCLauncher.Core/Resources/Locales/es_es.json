@@ -2,6 +2,8 @@
   "code": "es_es",
   "displayName": "Español",
   "strings": {
+    "Project repository": "Repositorio del proyecto",
+    "Report an issue": "Informar de un problema",
     "Skipped {0}: {1}": "Omitido {0}: {1}",
     "Java scan skipped {0}: {1}": "Escaneo de Java omitido {0}: {1}",
     "Scan finished, detected {0} Java installation(s).": "Escaneo finalizado, se detectaron {0} instalaciones de Java.",

@@ -2,6 +2,8 @@
   "code": "en_us",
   "displayName": "English",
   "strings": {
+    "Project repository": "Project repository",
+    "Report an issue": "Report an issue",
     "Skipped {0}: {1}": "Skipped {0}: {1}",
     "Java scan skipped {0}: {1}": "Java scan skipped {0}: {1}",
     "Scan finished, detected {0} Java installation(s).": "Scan finished, detected {0} Java installation(s).",

@@ -318,10 +318,20 @@ public sealed partial class MainWindow
                     ),
                     Row(
                         Btn(
-                            "GitHub",
+                            "Project repository",
                             () =>
                             {
                                 Open("https://github.com/CMCLauncher-Dev/CMCLauncher");
+                                return Task.CompletedTask;
+                            }
+                        ),
+                        Btn(
+                            "Report an issue",
+                            () =>
+                            {
+                                Open(
+                                    "https://github.com/CMCLauncher-Dev/CMCLauncher/issues/new/choose"
+                                );
                                 return Task.CompletedTask;
                             }
                         ),

@@ -2,6 +2,8 @@
   "code": "ar_sa",
   "displayName": "العربية",
   "strings": {
+    "Project repository": "مستودع المشروع",
+    "Report an issue": "الإبلاغ عن مشكلة",
     "Skipped {0}: {1}": "تم تخطي {0}: {1}",
     "Java scan skipped {0}: {1}": "تم تخطي فحص جافا {0}: {1}",
     "Scan finished, detected {0} Java installation(s).": "اكتمل الفحص، تم اكتشاف {0} من تثبيتات جافا.",

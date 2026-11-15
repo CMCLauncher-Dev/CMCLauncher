@@ -14,6 +14,8 @@ try
             throw new Exception(message);
         Console.WriteLine("PASS " + message);
     }
+    DataPackGeneratorTests.Run(Path.Combine(root, "data-packs"));
+    Check(true, "data pack versions, safe paths, metadata and concurrent creation");
     var child = new System.Diagnostics.ProcessStartInfo("java");
     child.Environment["LD_LIBRARY_PATH"] = "/tmp/appimage/usr/lib";
     child.Environment["CMCLAUNCHER_ORIGINAL_LD_LIBRARY_PATH"] = "/system/custom/lib";

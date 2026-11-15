@@ -43,13 +43,27 @@ public sealed partial class MainWindow
         details.Children.Add(Text(Labeled("License", Ui("GNU AGPL v3")), 12));
         var github = new HyperlinkButton
         {
-            Content = Ui("GitHub"),
+            Content = Ui("Project repository"),
             NavigateUri = new Uri("https://github.com/CMCLauncher-Dev/CMCLauncher"),
             Padding = new Thickness(0),
             VerticalAlignment = VerticalAlignment.Center,
         };
         github.FontSize = 12;
-        details.Children.Add(github);
+        var links = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
+        links.Children.Add(github);
+        links.Children.Add(
+            new HyperlinkButton
+            {
+                Content = Ui("Report an issue"),
+                NavigateUri = new Uri(
+                    "https://github.com/CMCLauncher-Dev/CMCLauncher/issues/new/choose"
+                ),
+                Padding = new Thickness(0),
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+            }
+        );
+        details.Children.Add(links);
         Grid.SetColumn(details, 1);
         identity.Children.Add(details);
         PageBody.Children.Add(Card(identity));

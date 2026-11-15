@@ -2,6 +2,8 @@
   "code": "ru_ru",
   "displayName": "Русский",
   "strings": {
+    "Project repository": "Репозиторий проекта",
+    "Report an issue": "Сообщить о проблеме",
     "Skipped {0}: {1}": "Пропущено {0}: {1}",
     "Java scan skipped {0}: {1}": "Сканирование Java пропущено {0}: {1}",
     "Scan finished, detected {0} Java installation(s).": "Сканирование завершено, обнаружено {0} Java.",
