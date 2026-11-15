@@ -45,10 +45,10 @@ public sealed partial class MainWindow
         if (page == "frpc")
             RefreshFrpcPalette();
         var micaEnabled = store.Config.Settings.MicaEffect;
-        // 开启液态玻璃时把内容/标题栏背景降到很低的不透明度，让 Acrylic 材质从窗口末端透出，
-        // alpha 越低，下方内容反射越清晰。
+        // 开启液态玻璃时给上层内容/标题栏背景保留 15% 不透明度（alpha≈0x26），
+        // 底部仍由 TransparentBackdrop + WS_EX_LAYERED 保持纯透明，透出桌面内容。
         Color Backdrop(Color c) =>
-            micaEnabled ? Color.FromArgb(0x04, c.R, c.G, c.B) : c;
+            micaEnabled ? Color.FromArgb(0x26, c.R, c.G, c.B) : c;
         var bg = lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkBg;
         var sidebar = lightTheme ? ThemeTokens.LightSidebar : ThemeTokens.DarkSidebar;
         var text = lightTheme ? ThemeTokens.LightText : ThemeTokens.DarkText;
@@ -119,7 +119,7 @@ public sealed partial class MainWindow
     {
         var surface = SoftSurfaceColor();
         if (store.Config.Settings.MicaEffect)
-            surface = Color.FromArgb(0x08, surface.R, surface.G, surface.B);
+            surface = Color.FromArgb(0x26, surface.R, surface.G, surface.B);
         card.Background = new SolidColorBrush(surface);
         card.BorderBrush = Brush(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorder);
     }

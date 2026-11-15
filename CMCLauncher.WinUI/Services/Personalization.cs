@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.UI.Composition;
+using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -100,26 +102,39 @@ public sealed partial class MainWindow
             yield return descendant;
     }
 
-    // 窗口级液态玻璃。用 Window.SystemBackdrop（框架托管的声明式 backdrop）实现。
-    // DesktopAcrylicBackdrop 是 Acrylic 材质，能实时反射模糊窗口下方的桌面与其它窗口，
-    // 也就是用户所期望的"液态玻璃映射窗口下颜色"的效果；而 MicaBackdrop 只采样壁纸，做不到。
-    // 由 WinUI 自己管理系统材质生命周期，切换开启/关闭只是赋值 backdrop 或 null，
-    // 不会出现手动 DesktopAcrylicController 那种二次挂载失效或 UI 线程同步死锁。
-    void ApplyBackdrop(bool enabled)
+    // 窗口级液态玻璃：不挂任何系统 backdrop 材质（Mica/Acrylic 的模糊与噪点滤镜全部清除）。
+    // 仅将 SystemBackdrop 置空不够——WinUI 3 合成器会强制把窗口底色填成不透明白/黑。
+    // 因此挂载一个没有内容的自定义 TransparentBackdrop（空 SpriteVisual），
+    // 让合成器渲染管线不提交任何不透明内容，窗口即透出下方桌面。
+    void ApplyBackdrop(bool _)
     {
         if (Content == null)
             return;
-        // CI 验证无交互会话没有合成器可用，挂载系统 backdrop 会崩溃，验证时跳过液态玻璃。
+        // CI 验证无交互会话，跳过透明样式处理。
         if (Verifying)
             return;
-        if (enabled)
+        SystemBackdrop = new TransparentBackdrop();
+    }
+
+    // 继承 SystemBackdrop，但不附加任何系统背景材质（不创建 Mica/Acrylic 控制器）。
+    // 这一版本的 Windows App SDK 不再分派 CompositionBackdropController，
+    // SystemBackdrop 基类的 OnTargetConnected 无返回值；回调保持空实现，
+    // 合成器因此不会为窗口绘制不透明底色，配合各面板/卡片完全透明背景即成纯透明窗口。
+    sealed class TransparentBackdrop : SystemBackdrop
+    {
+        protected override void OnTargetConnected(
+            ICompositionSupportsSystemBackdrop connectedTarget,
+            XamlRoot xamlRoot
+        )
         {
-            if (SystemBackdrop is null)
-                SystemBackdrop = new DesktopAcrylicBackdrop();
+            // 有意留空：不调用 base，也不附加控制器，合成器便不绘制系统背景。
         }
-        else if (SystemBackdrop is not null)
+
+        protected override void OnTargetDisconnected(
+            ICompositionSupportsSystemBackdrop connectedTarget
+        )
         {
-            SystemBackdrop = null;
+            // 有意留空。
         }
     }
 

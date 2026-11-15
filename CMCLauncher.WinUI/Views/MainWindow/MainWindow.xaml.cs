@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -74,13 +75,50 @@ public sealed partial class MainWindow : Window
     internal readonly Queue<string> logs = new();
     internal TextBox? logView;
     bool dialogOpen;
-    // 验证模式运行在 CI 无交互会话，系统 backdrop 挂载会触发原生崩溃，须跳过液态玻璃。
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll")]
+    static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint crKey, byte bAlpha, uint dwFlags);
+
+    [DllImport("dwmapi.dll")]
+    static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS pMarInset);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct MARGINS
+    {
+        public int cxLeftWidth;
+        public int cxRightWidth;
+        public int cyTopHeight;
+        public int cyBottomHeight;
+    }
+
+    const int GWL_EXSTYLE = -20;
+    const int WS_EX_LAYERED = 0x80000;
+    const uint LWA_COLORKEY = 0x1;
+    const uint LWA_ALPHA = 0x2;
+
+    // 验证模式运行在 CI 无交互会话，仅跳过透明样式处理以避免不稳定。
     internal bool Verifying;
     internal StackPanel PageBody = new() { Spacing = 11 };
 
     // UI 验证使用单独的数据目录，避免改动日常使用的实例和账号配置。
     public MainWindow(string[] args)
     {
+        try
+        {
+            var hWnd = WindowNative.GetWindowHandle(this);
+            var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+            SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+        }
+        catch (Exception ex)
+        {
+            RuntimeLog.Write("ERROR", "Failed to set layered window style: " + ex);
+        }
         Verifying = args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui");
         store = new Store(
             args.Length == 2 && (args[0] is "--verify-ui" or "--verify-cms-ui")
