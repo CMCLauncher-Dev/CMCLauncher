@@ -8,6 +8,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
+using System.Numerics;
+using Microsoft.UI.Composition;
+using Microsoft.UI.Xaml.Hosting;
 using Windows.Storage.Pickers;
 using Windows.UI.ViewManagement;
 using WinRT.Interop;
@@ -85,8 +88,32 @@ public sealed partial class MainWindow : Window
     [return: MarshalAs(UnmanagedType.Bool)]
     static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint crKey, byte bAlpha, uint dwFlags);
 
+    [DllImport("user32.dll")]
+    static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        uint uFlags
+    );
+
+    const uint SWP_FRAMECHANGED = 0x0020;
+    const uint SWP_NOMOVE = 0x0002;
+    const uint SWP_NOSIZE = 0x0001;
+    const uint SWP_NOZORDER = 0x0004;
+
     [DllImport("dwmapi.dll")]
     static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS pMarInset);
+
+    [DllImport("dwmapi.dll")]
+    static extern int DwmSetWindowAttribute(
+        IntPtr hWnd,
+        int dwAttribute,
+        ref int pvAttribute,
+        int cbAttribute
+    );
 
     [StructLayout(LayoutKind.Sequential)]
     struct MARGINS
@@ -99,6 +126,10 @@ public sealed partial class MainWindow : Window
 
     const int GWL_EXSTYLE = -20;
     const int WS_EX_LAYERED = 0x80000;
+    // 透明 Backdrop 不提供系统材质，DWM 不会自动绘制圆角，需显式指定四角圆角。
+    const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    const int DWMWCP_ROUND = 2;
+    const int DWMWCP_DONOTROUND = 1;
     const uint LWA_COLORKEY = 0x1;
     const uint LWA_ALPHA = 0x2;
 
@@ -114,6 +145,33 @@ public sealed partial class MainWindow : Window
             var hWnd = WindowNative.GetWindowHandle(this);
             var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
             SetWindowLong(hWnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+            // TransparentBackdrop 不含系统材质，DWM 不会自动圆角窗口，显式开启圆角。
+            var corner = DWMWCP_ROUND;
+            DwmSetWindowAttribute(
+                hWnd,
+                DWMWA_WINDOW_CORNER_PREFERENCE,
+                ref corner,
+                sizeof(int)
+            );
+            // 延伸客户区到整个窗口，使 XAML 内容铺满四边，避免半透明层相对底层内缩。
+            var extend = new MARGINS
+            {
+                cxLeftWidth = -1,
+                cxRightWidth = -1,
+                cyTopHeight = -1,
+                cyBottomHeight = -1,
+            };
+            DwmExtendFrameIntoClientArea(hWnd, ref extend);
+            // 强制刷新窗口框架，让 DwmExtendFrame 立即生效并移除内容内缩。
+            SetWindowPos(
+                hWnd,
+                IntPtr.Zero,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED
+            );
         }
         catch (Exception ex)
         {
@@ -126,8 +184,24 @@ public sealed partial class MainWindow : Window
                 : null
         );
         InitializeComponent();
+        // 透明 Backdrop 无系统材质，DWM 只圆角最底层；上层半透明背景是直角矩形，
+        // 对根内容施加匹配半径的 Composition RectangleClip 裁剪，与 DWM 圆角对齐。
+        var rootVisual = ElementCompositionPreview.GetElementVisual(ModpackDropRoot);
+        var compositor = rootVisual.Compositor;
+        var rectClip = compositor.CreateRectangleClip();
+        rectClip.TopLeftRadius = rectClip.TopRightRadius =
+            rectClip.BottomLeftRadius = rectClip.BottomRightRadius = new Vector2(8, 8);
+        void SyncClip()
+        {
+            rectClip.Left = 0;
+            rectClip.Top = 0;
+            rectClip.Right = (float)ModpackDropRoot.ActualWidth;
+            rectClip.Bottom = (float)ModpackDropRoot.ActualHeight;
+        }
+        ModpackDropRoot.Loaded += (_, _) => SyncClip();
+        ModpackDropRoot.SizeChanged += (_, _) => SyncClip();
+        rootVisual.Clip = rectClip;
         InitializeCommunityFilterDrawer();
-        InitializeFeedback();
         RuntimeLog.DebugEnabled = store.Config.Settings.DebugLogging;
         runtimeLogTimer.Interval = TimeSpan.FromMilliseconds(150);
         runtimeLogTimer.Tick += (_, _) => FlushRuntimeLogs();
