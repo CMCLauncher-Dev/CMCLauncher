@@ -98,6 +98,15 @@ public static class ModTranslation
             return text;
         if (string.Equals(source, target, StringComparison.OrdinalIgnoreCase))
             return text;
+        // 剥离 HTML 标记（如 Modrinth 摘要中的 <g id="…">★</g> 高亮标签），
+        // 避免翻译服务把标签文本当普通文本翻译并遗留原始标签字符。
+        text = Regex.Replace(
+            text,
+            "<[^>]+>",
+            string.Empty,
+            RegexOptions.CultureInvariant,
+            TimeSpan.FromMilliseconds(100)
+        );
         var from = ServiceLanguage(source);
         var to = ServiceLanguage(target);
         var url =

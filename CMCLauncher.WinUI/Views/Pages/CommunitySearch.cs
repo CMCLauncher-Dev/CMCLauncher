@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -16,6 +17,18 @@ namespace CMCLauncher.WinUI;
 public sealed partial class MainWindow
 {
     const int CommunityPageSize = 16;
+
+    // 移除 Modrinth/CurseForge 摘要中的 HTML 标记（如 <g id="…">★</g>）。
+    static string StripHtml(string? text) =>
+        text == null
+            ? ""
+            : Regex.Replace(
+                text,
+                "<[^>]+>",
+                string.Empty,
+                RegexOptions.CultureInvariant,
+                TimeSpan.FromMilliseconds(100)
+            );
 
     sealed record CommunityBrowseState(
         string Query,
@@ -303,9 +316,11 @@ public sealed partial class MainWindow
                     );
                     // NoWrap 不会忽略文本自带的换行，卡片摘要先将空白合并成空格。
                     var summary = Text(
-                        System
-                            .Text.RegularExpressions.Regex.Replace(item.Description, @"\s+", " ")
-                            .Trim(),
+                        System.Text.RegularExpressions.Regex.Replace(
+                            StripHtml(item.Description),
+                            @"\s+",
+                            " "
+                        ).Trim(),
                         12
                     );
                     summary.Tag = "community-summary";
@@ -338,9 +353,9 @@ public sealed partial class MainWindow
                     resultButtons.Add(open);
                     AdaptCard(card, detail, open);
                     card.Tag = "community-result";
-                    ToolTipService.SetToolTip(card, item.Description);
+                    ToolTipService.SetToolTip(card, StripHtml(item.Description));
                     // 搜索结果加载后自动把标题/摘要翻译为界面语言（原文写入 Tag 供恢复）。
-                    _ = AutoTranslateSearchCardAsync(item.Name, item.Description, title, summary);
+                    _ = AutoTranslateSearchCardAsync(item.Name, StripHtml(item.Description), title, summary);
                     var projectCard = CompactCard(card);
                     projectCard.Tapped += async (_, tap) =>
                     {
@@ -411,23 +426,17 @@ public sealed partial class MainWindow
                 using var request =
                     CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
                 request.CancelAfter(TimeSpan.FromSeconds(30));
-                var t1 = ModTranslation.TranslateAsync(
-                    Core.Http,
-                    originalTitle,
-                    "en_us",
-                    target,
-                    request.Token
-                );
-                var t2 = ModTranslation.TranslateAsync(
+                // 模组名（标题）是专有名词，保留原文，避免如 Sodium 被误译为「钠」。
+                title.Text = StripHtml(originalTitle);
+                title.Tag = originalTitle;
+                var summaryText = await ModTranslation.TranslateAsync(
                     Core.Http,
                     originalDescription,
                     "en_us",
                     target,
                     request.Token
                 );
-                title.Text = await t1;
-                summary.Text = await t2;
-                title.Tag = originalTitle;
+                summary.Text = StripHtml(summaryText);
                 summary.Tag = originalDescription;
             }
             catch
