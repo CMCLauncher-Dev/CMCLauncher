@@ -149,6 +149,7 @@ public sealed class Instance
     public DateTime? LastPlayed { get; set; }
     public bool Favorite { get; set; }
     public bool DebugMode { get; set; }
+    public int OptionsBackupLimit { get; set; } = 10;
 
     public override string ToString() => $"{Name}  ·  {GameVersion} / {Loader}";
 }

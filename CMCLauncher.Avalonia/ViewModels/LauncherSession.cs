@@ -345,6 +345,8 @@ public sealed class LauncherSession : ObservableState, IDisposable
                     break;
                 await Task.Delay(250);
             }
+            try { await Core.CompleteOptionsLaunch(launched); }
+            catch (Exception ex) { Log("ERROR", "Options backup finalization: " + ex); }
             Log("INFO", "Game exited with code " + launched.ExitCode);
             dispatch(() =>
             {

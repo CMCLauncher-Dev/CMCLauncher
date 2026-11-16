@@ -14,6 +14,8 @@ try
             throw new Exception(message);
         Console.WriteLine("PASS " + message);
     }
+    OptionsBackupTests.Run(Path.Combine(root, "options-backups"));
+    Check(true, "options snapshots, verified recovery, retention, rollback, restart, logging boundaries and integrity");
     DataPackGeneratorTests.Run(Path.Combine(root, "data-packs"));
     Check(true, "data pack versions, safe paths, metadata and concurrent creation");
     var child = new System.Diagnostics.ProcessStartInfo("java");

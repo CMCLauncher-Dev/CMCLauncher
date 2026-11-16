@@ -483,6 +483,7 @@ public sealed partial class MainWindow
                 )
             )
         );
+        body.Children.Add(OptionsBackupCard(instance));
         var savedServers = Stack(T("Saved servers", 16, true));
         savedServers.Children.Add(Btn("Show servers", async () =>
         {

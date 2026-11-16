@@ -11,7 +11,9 @@ public sealed partial class MainWindow
         var checks = new List<string>();
         try
         {
+            await VerifyWindowModePersistence(checks);
             session.Store.Config.Settings.LauncherLanguage = "zh_cn";
+            await VerifyOptionsBackupCard(checks);
             foreach (var theme in new[] { "light", "dark" })
             {
                 session.Store.Config.Settings.Theme = theme;
@@ -38,6 +40,49 @@ public sealed partial class MainWindow
             Environment.ExitCode = 1;
         }
         Close();
+    }
+
+    async Task VerifyOptionsBackupCard(List<string> checks)
+    {
+        var instance = new Instance { Name = "Options UI", Directory = Path.Combine(VerificationDirectory!, "options-instance"), OptionsBackupLimit = 4 };
+        Directory.CreateDirectory(instance.Directory);
+        foreach (var theme in new[] { "light", "dark" })
+        {
+            session.Store.Config.Settings.Theme = theme; ApplyTheme();
+            pageContent.Content = OptionsBackupCard(instance);
+            await Task.Delay(80);
+            var controls = pageContent.GetVisualDescendants().OfType<Control>().ToArray();
+            var limit = controls.OfType<NumericUpDown>().Single(n => Equals(n.Tag, "options-backup-limit"));
+            if (limit.Minimum != 2 || limit.Maximum != 100 || !controls.OfType<Button>().Any(b => Equals(b.Tag, "options-backup-restore")))
+                throw new IOException("Options backup controls differ from WinUI.");
+            limit.Value = 3; await Task.Delay(80);
+            if (instance.OptionsBackupLimit != 3) throw new IOException("Options retention control does not update its instance.");
+            using var bitmap = new global::Avalonia.Media.Imaging.RenderTargetBitmap(new global::Avalonia.PixelSize((int)Width, (int)Height));
+            bitmap.Render(this); bitmap.Save(Path.Combine(VerificationDirectory!, "options-backups-" + theme + ".png"));
+        }
+        checks.Add("PASS options backup retention and restore entry in light/dark themes");
+    }
+
+    async Task VerifyWindowModePersistence(List<string> checks)
+    {
+        WindowState = WindowState.Normal; await Task.Delay(60); CapturePlacement();
+        var settings = session.Store.Config.Settings;
+        var width = settings.WindowWidth; var height = settings.WindowHeight;
+        WindowState = WindowState.Maximized; await Task.Delay(100); CapturePlacement(); await session.Save();
+        if (!new Store(session.Store.Root).Config.Settings.StartMaximized || settings.WindowWidth != width || settings.WindowHeight != height)
+            throw new IOException("Maximized mode or normal dimensions were not persisted.");
+        WindowState = WindowState.Minimized; await Task.Delay(60); CapturePlacement(); await session.Save();
+        if (!new Store(session.Store.Root).Config.Settings.StartMaximized)
+            throw new IOException("Minimizing overwrote maximized mode.");
+        WindowState = WindowState.Maximized; await Task.Delay(100);
+        WindowState = WindowState.Normal; await Task.Delay(100); CapturePlacement(); await session.Save();
+        if (new Store(session.Store.Root).Config.Settings.StartMaximized)
+            throw new IOException("Restoring did not persist normal mode.");
+        settings.StartMaximized = true; CapturePlacement(); await session.Save();
+        if (!new Store(session.Store.Root).Config.Settings.StartMaximized)
+            throw new IOException("Capturing an unchanged window overwrote the explicit startup preference.");
+        settings.StartMaximized = false; await session.Save();
+        checks.Add("PASS maximized/normal persistence, minimized preservation and explicit startup preference");
     }
 
     async Task VerifyDataPackParity(List<string> checks)

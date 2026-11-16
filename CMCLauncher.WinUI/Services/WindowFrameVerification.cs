@@ -115,8 +115,26 @@ public sealed partial class MainWindow
             }
             if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
             {
+                var normalWidth = settings.WindowWidth;
+                var normalHeight = settings.WindowHeight;
                 presenter.Maximize();
                 await Task.Delay(120);
+                await store.Save();
+                check(new Store(store.Root).Config.Settings.StartMaximized, "maximizing persists startup mode to disk");
+                check(settings.WindowWidth == normalWidth && settings.WindowHeight == normalHeight, "maximized geometry does not replace the last normal dimensions");
+                presenter.Minimize(); await Task.Delay(80);
+                CaptureWindowPlacement(); await store.Save();
+                check(new Store(store.Root).Config.Settings.StartMaximized, "minimizing preserves the last maximized mode");
+                presenter.Maximize(); await Task.Delay(80);
+                var reopened = new MainWindow(new[] { "--verify-datapack-ui", directory });
+                var reopenedClosed = new TaskCompletionSource();
+                reopened.Closed += (_, _) => reopenedClosed.TrySetResult();
+                reopened.Activate(); await Task.Delay(100);
+                check(reopened.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter { State: Microsoft.UI.Windowing.OverlappedPresenterState.Maximized },
+                    "a fresh window reloads and restores the saved maximized state");
+                check(reopened.store.Config.Settings.WindowWidth == normalWidth && reopened.store.Config.Settings.WindowHeight == normalHeight,
+                    "maximizing does not overwrite normal restore dimensions");
+                reopened.Close(); await reopenedClosed.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 FrameGetClientRect(hwnd, out var maximized);
                 var work = Microsoft
                     .UI.Windowing.DisplayArea.GetFromWindowId(
@@ -142,6 +160,12 @@ public sealed partial class MainWindow
                     )
                 );
                 await Task.Delay(120);
+                await store.Save();
+                check(!new Store(store.Root).Config.Settings.StartMaximized, "restoring to normal persists windowed startup mode");
+                settings.StartMaximized = true;
+                CaptureWindowPlacement(); await store.Save();
+                check(new Store(store.Root).Config.Settings.StartMaximized, "an explicit startup preference survives capture without a window state transition");
+                settings.StartMaximized = false; await store.Save();
                 FrameGetWindowRect(hwnd, out var restored);
                 FrameGetClientRect(hwnd, out var restoredClient);
                 check(

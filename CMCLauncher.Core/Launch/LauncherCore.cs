@@ -51,6 +51,7 @@ public sealed partial class LauncherCore : IDisposable
     public LauncherCore(Store store, HttpMessageHandler? handler = null)
     {
         this.store = store;
+        OptionsBackups = new OptionsBackups(store);
         if (handler == null)
             ConfigureNetwork();
         else
@@ -1537,6 +1538,9 @@ public sealed partial class LauncherCore : IDisposable
             EnableRaisingEvents = true,
         };
         nativeDirectory.Watch(process);
+        OptionsBackup? optionsSnapshot = null;
+        var optionsInstance = new Instance { Id = instance.Id, Directory = game, OptionsBackupLimit = instance.OptionsBackupLimit };
+        var optionsFailureObserved = 0;
         void Output(object _, DataReceivedEventArgs e)
         {
             if (e.Data != null)
@@ -1545,6 +1549,12 @@ public sealed partial class LauncherCore : IDisposable
                 var secret = credentials.S("accessToken");
                 if (secret.Length > 8)
                     text = text.Replace(secret, "[REDACTED]");
+                if (optionsSnapshot != null && CMCLauncher.OptionsBackups.IsResourceReloadFailure(text)
+                    && Interlocked.Exchange(ref optionsFailureObserved, 1) == 0)
+                {
+                    try { OptionsBackups.Observe(optionsInstance, optionsSnapshot.Id, text); }
+                    catch (Exception ex) { Log?.Invoke("Could not record options reload failure: " + ex.Message); }
+                }
                 Log?.Invoke(text);
             }
         }
@@ -1553,12 +1563,26 @@ public sealed partial class LauncherCore : IDisposable
         if (account.Type == "yggdrasil")
             MicrosoftAuth.EnsureAccountAllowed(store.Config.Accounts, account);
         ct.ThrowIfCancellationRequested();
-        progress?.Report((98, "创建游戏进程"));
+        progress?.Report((97, "Back up game options"));
         try
         {
+            optionsSnapshot = await Task.Run(() => OptionsBackups.BeforeLaunch(optionsInstance, ct), ct);
+            ct.ThrowIfCancellationRequested();
+            progress?.Report((98, "创建游戏进程"));
             if (!process.Start())
                 throw new Exception("游戏进程启动失败");
             nativeDirectory.Started();
+            if (optionsSnapshot != null)
+            {
+                OptionsBackups.Attach(optionsInstance, optionsSnapshot.Id, process);
+                optionsLaunches.Add(process, new OptionsLaunch(optionsInstance, optionsSnapshot.Id));
+                process.Exited += async (_, _) =>
+                {
+                    try { await CompleteOptionsLaunch(process); }
+                    catch (Exception ex) { Log?.Invoke("Could not finalize options backup: " + ex.Message); }
+                };
+                if (process.HasExited) await CompleteOptionsLaunch(process);
+            }
             ApplyPlayerPriority(process, store.Config.Settings.PlayerPriority);
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();

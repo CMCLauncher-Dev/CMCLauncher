@@ -106,6 +106,7 @@ public sealed partial class MainWindow
         var managementCard = Card(management);
         managementCard.Tag = "instance-management";
         PageBody.Children.Add(managementCard);
+        PageBody.Children.Add(OptionsBackupCard(instance));
         var servers = new StackPanel { Spacing = 10 };
         servers.Children.Add(Text(Ui("Saved servers"), 15, true));
         servers.Children.Add(Action("Show servers", async (_, _) =>
