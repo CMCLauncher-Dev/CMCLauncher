@@ -353,11 +353,29 @@ public sealed partial class MainWindow
             IsOn = settings.MicaEffect,
             Tag = "mica-effect",
         };
+        // 玻璃风格选择：透明（默认，纯透明透出桌面）或 Aero（模拟 Win7 玻璃高光）。
+        // 仅在液态玻璃总开关开启时可用。
+        var glassStyle = new BelowComboBox
+        {
+            Header = Ui("Glass style"),
+            ItemsSource = new[] { Ui("Transparent glass"), Ui("Aero glass (Win7)") },
+            SelectedIndex = settings.MicaEffect && settings.GlassStyle == "aero" ? 1 : 0,
+            Tag = "glass-style",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        void RefreshGlassStyle() => glassStyle.IsEnabled = micaEffect.IsOn;
         micaEffect.Toggled += async (_, _) =>
         {
             if (syncingAppearanceControls)
                 return;
             settings.MicaEffect = micaEffect.IsOn;
+            RefreshGlassStyle();
+            // 关闭液态玻璃时切回透明风格，避免残留 Aero 设置。
+            if (!micaEffect.IsOn && glassStyle.SelectedIndex == 1)
+            {
+                glassStyle.SelectedIndex = 0;
+                settings.GlassStyle = "transparent";
+            }
             try
             {
                 ApplyBackdrop(micaEffect.IsOn);
@@ -374,6 +392,15 @@ public sealed partial class MainWindow
                 await SaveAppearance();
             }
         };
+        glassStyle.SelectionChanged += async (_, _) =>
+        {
+            if (syncingAppearanceControls)
+                return;
+            settings.GlassStyle = glassStyle.SelectedIndex == 1 ? "aero" : "transparent";
+            ApplyTheme();
+            await SaveAppearance();
+        };
+        RefreshGlassStyle();
         var scale = new NumberBox
         {
             Header = Ui("Control size / %"),
@@ -469,7 +496,7 @@ public sealed partial class MainWindow
                 new StackPanel
                 {
                     Spacing = 12,
-                    Children = { showScrollBars, micaEffect, scale, buttonScale, menuScale, font, fontSize },
+                    Children = { showScrollBars, micaEffect, glassStyle, scale, buttonScale, menuScale, font, fontSize },
                 }
             )
         );
@@ -647,6 +674,9 @@ public sealed partial class MainWindow
             {
                 showScrollBars.IsOn = settings.ShowScrollBars;
                 micaEffect.IsOn = settings.MicaEffect;
+                glassStyle.SelectedIndex =
+                    settings.MicaEffect && settings.GlassStyle == "aero" ? 1 : 0;
+                RefreshGlassStyle();
                 foreach (var control in AppearanceElements(PageBody))
                 {
                     if (control is ComboBox combo && combo.Header?.ToString() == Ui("Appearance"))

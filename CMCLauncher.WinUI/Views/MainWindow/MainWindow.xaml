@@ -502,6 +502,37 @@
         />
       </Grid>
     </SplitView>
+    <!-- Win7 Aero 风格的顶部玻璃高光层：仅在 MicaEffect 开启且 GlassStyle=="aero" 时显示，
+         用于模拟 Aero 玻璃窗框顶部的弧形反光。IsHitTestVisible 关闭以免拦截交互。 -->
+    <Border
+      x:Name="AeroGlassHighlight"
+      Grid.RowSpan="2"
+      Visibility="Collapsed"
+      IsHitTestVisible="False"
+    >
+      <Border.Background>
+        <LinearGradientBrush
+          StartPoint="0,0"
+          EndPoint="0,1"
+        >
+          <GradientStop
+            x:Name="AeroHighlightStart"
+            Offset="0"
+            Color="#99FFFFFF"
+          />
+          <GradientStop
+            x:Name="AeroHighlightMid"
+            Offset="0.16"
+            Color="#1FFFFFFF"
+          />
+          <GradientStop
+            x:Name="AeroHighlightEnd"
+            Offset="0.35"
+            Color="#00FFFFFF"
+          />
+        </LinearGradientBrush>
+      </Border.Background>
+    </Border>
     <InfoBar
       x:Name="TaskToast"
       Grid.RowSpan="2"

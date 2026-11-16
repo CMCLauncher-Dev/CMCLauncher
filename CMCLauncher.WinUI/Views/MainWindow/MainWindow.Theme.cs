@@ -49,6 +49,16 @@ public sealed partial class MainWindow
         // 底部仍由 TransparentBackdrop + WS_EX_LAYERED 保持纯透明，透出桌面内容。
         Color Backdrop(Color c) =>
             micaEnabled ? Color.FromArgb(0x33, c.R, c.G, c.B) : c;
+        // Win7 Aero 风格：在透明玻璃之上叠加顶部弧形高光，模拟 Aero 的窗框反光。
+        // 仅当液态玻璃开启且 GlassStyle=="aero" 时显示；深色主题反光更明显。
+        var aeroGlass = micaEnabled && store.Config.Settings.GlassStyle == "aero";
+        if (AeroGlassHighlight != null)
+        {
+            AeroGlassHighlight.Visibility = aeroGlass
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            AeroGlassHighlight.Opacity = lightTheme ? 0.55 : 0.8;
+        }
         var bg = lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkBg;
         var sidebar = lightTheme ? ThemeTokens.LightSidebar : ThemeTokens.DarkSidebar;
         var text = lightTheme ? ThemeTokens.LightText : ThemeTokens.DarkText;

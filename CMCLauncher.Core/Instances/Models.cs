@@ -64,6 +64,11 @@ public sealed class Settings
     public string ColorPreset { get; set; } = "craft";
     public bool ShowScrollBars { get; set; }
     public bool MicaEffect { get; set; } = true;
+
+    // 液态玻璃的视觉效果风格："transparent"（纯透明，透出桌面）或
+    // "aero"（模拟 Windows 7 Aero 玻璃，叠加顶部高光与毛玻璃质感）。
+    // 仅当 MicaEffect 为 true 时生效。
+    public string GlassStyle { get; set; } = "transparent";
     public double UiScale { get; set; } = 1;
     public double UiButtonScale { get; set; } = 1;
     public double UiMenuScale { get; set; } = 1;
