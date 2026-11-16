@@ -382,7 +382,10 @@ public sealed partial class MainWindow
             await Confirm("Translate", Ui("No lang file found in this mod."));
             return;
         }
-        if (ModTranslation.ServiceLanguage(target) == "en")
+        var isLocalRuleTarget =
+            target.Equals("en_bs", StringComparison.OrdinalIgnoreCase)
+            || target.Equals("lo_ls", StringComparison.OrdinalIgnoreCase);
+        if (!isLocalRuleTarget && ModTranslation.ServiceLanguage(target) == "en")
         {
             await Confirm(
                 "Translate",

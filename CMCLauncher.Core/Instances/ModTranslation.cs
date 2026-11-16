@@ -16,6 +16,7 @@ public static class ModTranslation
         {
             "en_us" => "en",
             "zh_cn" => "zh-CN",
+            "zh_wy" => "zh-CN",
             "zh_tw" => "zh-TW",
             "ja_jp" => "ja",
             "ko_kr" => "ko",
@@ -26,6 +27,81 @@ public static class ModTranslation
             "pt_br" => "pt-BR",
             _ => "en",
         };
+
+    // 本地规则语言（趣味语言包）：不调用翻译服务，直接在本地按规则生成。
+    static bool IsLocalRuleTarget(string code) =>
+        code.ToLowerInvariant() is "en_bs" or "lo_ls";
+
+    // LOLSpeak 常用词替换表（与 lo_ls 语言包规则一致）。
+    static readonly (string From, string To)[] LolSpeakRules =
+    [
+        ("the", "teh"),
+        ("you", "u"),
+        ("your", "ur"),
+        ("please", "plz"),
+        ("are", "ar"),
+        ("is", "iz"),
+        ("and", "an"),
+        ("what", "wat"),
+        ("know", "noe"),
+        ("love", "luv"),
+        ("because", "cuz"),
+        ("going to", "gonna"),
+        ("maybe", "mai"),
+        ("have", "haz"),
+        ("this", "dis"),
+        ("that", "dat"),
+        ("****", "****"),
+    ];
+
+    // 本地规则转换一段文本到趣味语言。
+    static string LocalizeToRule(string text, string target)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+        if (target.Equals("en_bs", StringComparison.OrdinalIgnoreCase))
+        {
+            // 逐词反转字母顺序（Back slang）：仅反转每个词内的字母，保留数字、
+            // 占位符（{0}）首尾标点原样，最后再整体逆序单词顺序。
+            var words = text.Split(' ').Where(w => w.Length > 0);
+            var mapped = words.Select(word =>
+            {
+                if (word.Contains('{') || word.Contains('}'))
+                    return word;
+                var leading = 0;
+                while (leading < word.Length && !char.IsLetterOrDigit(word[leading]))
+                    leading++;
+                var trailing = 0;
+                while (
+                    trailing < word.Length - leading
+                    && !char.IsLetterOrDigit(word[word.Length - 1 - trailing])
+                )
+                    trailing++;
+                var core =
+                    trailing > 0 ? word[leading..(word.Length - trailing)] : word[leading..];
+                var reversedCore = new string(core.ToCharArray().Reverse().ToArray());
+                return word[..leading]
+                    + reversedCore
+                    + (trailing > 0 ? word[^trailing..] : "");
+            }).ToArray();
+            Array.Reverse(mapped);
+            return string.Join(" ", mapped);
+        }
+        if (target.Equals("lo_ls", StringComparison.OrdinalIgnoreCase))
+        {
+            var s = text;
+            foreach (var (from, to) in LolSpeakRules.Where(r => r.From != "****"))
+                s = Regex.Replace(
+                    s,
+                    "\\b" + Regex.Escape(from) + "\\b",
+                    to,
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                    TimeSpan.FromMilliseconds(50)
+                );
+            return s;
+        }
+        return text;
+    }
 
     // 从 JAR 包读取一个 mod 的 lang 文件（JSON 或旧式 .lang）。返回 (翻译键→原文)。
     public static Dictionary<string, string>? ReadLang(string file, string locale)
@@ -107,6 +183,9 @@ public static class ModTranslation
             RegexOptions.CultureInvariant,
             TimeSpan.FromMilliseconds(100)
         );
+        // 趣味语言（Back slang / LOLSpeak）直接在本地按规则生成，不调用翻译服务。
+        if (IsLocalRuleTarget(target))
+            return LocalizeToRule(text, target);
         var from = ServiceLanguage(source);
         var to = ServiceLanguage(target);
         var url =

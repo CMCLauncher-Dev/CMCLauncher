@@ -481,9 +481,12 @@ public sealed partial class MainWindow
                                     );
                                     return;
                                 }
-                                if (
-                                    ModTranslation.ServiceLanguage(target) == "en"
-                                )
+                                // 趣味语言（Back slang/LOLSpeak）应通过本地规则生成，
+                            // 不在此处拦截；其余语言仅当源语言已与目标相同（en→en）时跳过。
+                            var isLocalRuleTarget =
+                                target.Equals("en_bs", StringComparison.OrdinalIgnoreCase)
+                                || target.Equals("lo_ls", StringComparison.OrdinalIgnoreCase);
+                            if (!isLocalRuleTarget && ModTranslation.ServiceLanguage(target) == "en")
                                 {
                                     await ConfirmPop(
                                         anchor,
