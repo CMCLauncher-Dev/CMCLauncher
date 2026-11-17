@@ -69,6 +69,14 @@ public sealed class Settings
     // "aero"（模拟 Windows 7 Aero 玻璃，叠加顶部高光与毛玻璃质感）。
     // 仅当 MicaEffect 为 true 时生效。
     public string GlassStyle { get; set; } = "transparent";
+
+    // 自定义背景图：绝对路径，非空时在内容区底层铺图；为空表示不启用。
+    // 图片由启动器读取，不影响已安装模组或游戏文件。
+    public string CustomBackground { get; set; } = "";
+    public string CustomBackgroundFit { get; set; } = "cover";
+    // 列表卡片是否跟随自定义背景图半透明化：true 时卡片也半透明透出背景图，
+    // false（默认）时卡片保持不透明以保证文字与控件清晰可读。
+    public bool CardFollowBackground { get; set; }
     public double UiScale { get; set; } = 1;
     public double UiButtonScale { get; set; } = 1;
     public double UiMenuScale { get; set; } = 1;

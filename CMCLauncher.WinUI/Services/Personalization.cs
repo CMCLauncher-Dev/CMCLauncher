@@ -401,6 +401,68 @@ public sealed partial class MainWindow
             await SaveAppearance();
         };
         RefreshGlassStyle();
+        // 自定义背景图：选择一张本地图片铺在内容区底层。选择后立即应用并保存，
+        // 移除按钮恢复为默认主题底色。文件名在当前界面语言下线性显示。
+        var backgroundFileName = new TextBlock
+        {
+            Text = BackgroundLabel(settings.CustomBackground),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.8,
+        };
+        var chooseBackground = Action(
+            Ui("Choose background image"),
+            async (_, _) =>
+            {
+                var picker = new DesktopFileOpenPicker();
+                DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
+                foreach (var ext in new[] { ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif" })
+                    picker.FileTypeFilter.Add(ext);
+                var file = await picker.PickSingleFileAsync();
+                if (file == null)
+                    return;
+                try
+                {
+                    settings.CustomBackground = file.Path;
+                    // 强制重载图片源以便切换图片后立刻生效。
+                    BackgroundImage.Source = null;
+                    backgroundFileName.Text = BackgroundLabel(settings.CustomBackground);
+                    ApplyTheme();
+                    await SaveAppearance();
+                }
+                catch (Exception ex)
+                {
+                    await Error(ex);
+                }
+            }
+        );
+        var removeBackground = Action(
+            Ui("Remove background image"),
+            async (_, _) =>
+            {
+                settings.CustomBackground = "";
+                BackgroundImage.Source = null;
+                backgroundFileName.Text = BackgroundLabel("");
+                ApplyTheme();
+                await SaveAppearance();
+            }
+        );
+        // 卡片是否跟随背景图半透明化：开启后列表卡片也半透明透出背景，
+        // 关闭（默认）时卡片保持不透明以保证内容清晰。仅在自定义背景时生效。
+        var cardFollowBackground = new ToggleSwitch
+        {
+            Header = Ui("Cards follow background transparency"),
+            IsOn = settings.CardFollowBackground,
+            Tag = "card-follow-background",
+        };
+        cardFollowBackground.Toggled += async (_, _) =>
+        {
+            if (syncingAppearanceControls)
+                return;
+            settings.CardFollowBackground = cardFollowBackground.IsOn;
+            ApplyTheme();
+            await SaveAppearance();
+        };
         var scale = new NumberBox
         {
             Header = Ui("Control size / %"),
@@ -496,7 +558,7 @@ public sealed partial class MainWindow
                 new StackPanel
                 {
                     Spacing = 12,
-                    Children = { showScrollBars, micaEffect, glassStyle, scale, buttonScale, menuScale, font, fontSize },
+                    Children = { showScrollBars, micaEffect, glassStyle, chooseBackground, backgroundFileName, removeBackground, cardFollowBackground, scale, buttonScale, menuScale, font, fontSize },
                 }
             )
         );
@@ -789,6 +851,12 @@ public sealed partial class MainWindow
         }
         return names.OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase).ToArray();
     }
+
+    // 背景图文件名的显示文本：有选择时显示完整路径，"不启用"提示用于空状态。
+    string BackgroundLabel(string path) =>
+        string.IsNullOrWhiteSpace(path)
+            ? Ui("No background image selected")
+            : Path.GetFileName(path) + " · " + path;
 
     async Task SaveAppearance()
     {

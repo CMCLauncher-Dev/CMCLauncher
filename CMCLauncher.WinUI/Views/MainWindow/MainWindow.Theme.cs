@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -59,16 +60,49 @@ public sealed partial class MainWindow
                 : Visibility.Collapsed;
             AeroGlassHighlight.Opacity = lightTheme ? 0.55 : 0.8;
         }
+        // 自定义背景图：设置中选择了图片路径就显示，并在底色与侧边栏上降低不透明度，
+        // 让图片从内容区下方透出；同时保持文字/卡片前景不透明以保证可读性。
+        var customBackground = store.Config.Settings.CustomBackground;
+        var hasCustomBackground =
+            !string.IsNullOrWhiteSpace(customBackground) && File.Exists(customBackground);
+        if (hasCustomBackground)
+        {
+            try
+            {
+                if (BackgroundImage.Source == null)
+                    BackgroundImage.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(
+                        new Uri(customBackground, UriKind.Absolute)
+                    );
+                BackgroundImage.Visibility = Visibility.Visible;
+            }
+            catch
+            {
+                BackgroundImage.Visibility = Visibility.Collapsed;
+                hasCustomBackground = false;
+            }
+        }
+        else if (BackgroundImage != null)
+        {
+            BackgroundImage.Visibility = Visibility.Collapsed;
+        }
         var bg = lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkBg;
         var sidebar = lightTheme ? ThemeTokens.LightSidebar : ThemeTokens.DarkSidebar;
         var text = lightTheme ? ThemeTokens.LightText : ThemeTokens.DarkText;
         var muted = lightTheme ? ThemeTokens.LightMuted : ThemeTokens.DarkMuted;
         var accent = lightTheme ? ThemeTokens.LightAccent : ThemeTokens.LightAccentText;
+        // 自定义背景启用时把底色压到半透明（0x33，约 20% 不透明），让下方图片清晰透出；
+        // 关闭时沿用原有的液态玻璃 0x33 / 不透明底色逻辑。文字与卡片仍保持不透明保证可读。
+        Color ContentBackdrop(Color c) =>
+            hasCustomBackground
+                ? Color.FromArgb(0x33, c.R, c.G, c.B)
+                : Backdrop(c);
         var bgBrush = Brush(bg);
-        WindowBackground.Color = Backdrop(bgBrush.Color);
+        WindowBackground.Color = hasCustomBackground
+            ? Color.FromArgb(0x00, bgBrush.Color.R, bgBrush.Color.G, bgBrush.Color.B)
+            : Backdrop(bgBrush.Color);
         if (Sidebar.Parent is Panel contentGrid)
-            contentGrid.Background = new SolidColorBrush(Backdrop(bgBrush.Color));
-        Sidebar.Background = new SolidColorBrush(Backdrop(Brush(sidebar).Color));
+            contentGrid.Background = new SolidColorBrush(ContentBackdrop(bgBrush.Color));
+        Sidebar.Background = new SolidColorBrush(ContentBackdrop(Brush(sidebar).Color));
         Sidebar.BorderBrush = new SolidColorBrush(
             RawColor(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorderAlt)
         );
@@ -96,8 +130,10 @@ public sealed partial class MainWindow
         CommunityFilterApplyButton.BorderBrush = ComboAccentBrush;
         TaskCountBadge.Background = Brush(PrimaryColor);
         TaskCountText.Foreground = new SolidColorBrush(Colors.White);
-        CustomTitleBar.Background = new SolidColorBrush(Backdrop(Brush(bg).Color));
-        TitleBrandBackground.Background = new SolidColorBrush(Backdrop(Brush(sidebar).Color));
+        CustomTitleBar.Background = new SolidColorBrush(ContentBackdrop(Brush(bg).Color));
+        TitleBrandBackground.Background = new SolidColorBrush(
+            ContentBackdrop(Brush(sidebar).Color)
+        );
         TitleLabel.Foreground = Brush(text);
         foreach (var card in themeCards.Concat(taskCards))
             ApplyCardTheme(card);
@@ -128,7 +164,18 @@ public sealed partial class MainWindow
     void ApplyCardTheme(Border card)
     {
         var surface = SoftSurfaceColor();
-        if (store.Config.Settings.MicaEffect)
+        var hasCustomBackground =
+            !string.IsNullOrWhiteSpace(store.Config.Settings.CustomBackground)
+            && File.Exists(store.Config.Settings.CustomBackground);
+        // 卡片是否透明的规则：
+        // - 启用自定义背景时，由"卡片跟随背景透明化"开关决定半透明或不透明；
+        // - 未启用背景图、仅开启液态玻璃时，按液态玻璃的 0x33 半透明；
+        // - 其余情况保持不透明，保证文字与控件清晰可读。
+        var followGlass =
+            hasCustomBackground
+                ? store.Config.Settings.CardFollowBackground
+                : store.Config.Settings.MicaEffect;
+        if (followGlass)
             surface = Color.FromArgb(0x33, surface.R, surface.G, surface.B);
         card.Background = new SolidColorBrush(surface);
         card.BorderBrush = Brush(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorder);

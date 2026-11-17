@@ -264,6 +264,15 @@
               <ColumnDefinition Width="204" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
+            <!-- 自定义背景图：默认隐藏，设置中选择图片后由 ApplyTheme 控制显示。
+                 Grid.ColumnSpan 铺满侧边栏与内容区，置于底层，不拦截任何交互。 -->
+            <Image
+              x:Name="BackgroundImage"
+              Grid.ColumnSpan="2"
+              Visibility="Collapsed"
+              IsHitTestVisible="False"
+              Stretch="UniformToFill"
+            />
             <Border
               x:Name="Sidebar"
               Grid.Column="0"
