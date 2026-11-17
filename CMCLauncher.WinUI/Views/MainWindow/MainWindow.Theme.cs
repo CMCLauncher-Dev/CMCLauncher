@@ -17,6 +17,11 @@ public sealed partial class MainWindow
     readonly List<Border> themeCards = new();
     readonly UISettings systemUi = new();
 
+    // 自定义背景图画刷：作为根 Grid 的背景铺满全窗（含标题栏）。用 Background 而非 Grid
+    // 子元素，背景不参与布局测量，避免切换大图时把侧边栏等子元素一步步压缩变小。
+    readonly ImageBrush backgroundBrush = new() { Stretch = Stretch.UniformToFill };
+    static readonly SolidColorBrush CommonBackground = new(Color.FromArgb(0, 0, 0, 0));
+
     // 系统通知不保证在 UI 线程触发，先排回窗口线程再操作控件。
     void SystemThemeChanged(UISettings sender, object args) =>
         DispatcherQueue.TryEnqueue(() =>
@@ -69,21 +74,23 @@ public sealed partial class MainWindow
         {
             try
             {
-                if (BackgroundImage.Source == null)
-                    BackgroundImage.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(
-                        new Uri(customBackground, UriKind.Absolute)
-                    );
-                BackgroundImage.Visibility = Visibility.Visible;
+                // 直接换 ImageSource 即可，ImageBrush 作为 Grid 背景不参与布局测量。
+                backgroundBrush.ImageSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(
+                    new Uri(customBackground, UriKind.Absolute)
+                );
+                ModpackDropRoot.Background = backgroundBrush;
             }
             catch
             {
-                BackgroundImage.Visibility = Visibility.Collapsed;
+                ModpackDropRoot.Background = CommonBackground;
                 hasCustomBackground = false;
             }
         }
-        else if (BackgroundImage != null)
+        else
         {
-            BackgroundImage.Visibility = Visibility.Collapsed;
+            // 无自定义背景时恢复透明，保持 WinUI 原有的透明/液态玻璃表现。
+            backgroundBrush.ImageSource = null;
+            ModpackDropRoot.Background = CommonBackground;
         }
         var bg = lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkBg;
         var sidebar = lightTheme ? ThemeTokens.LightSidebar : ThemeTokens.DarkSidebar;

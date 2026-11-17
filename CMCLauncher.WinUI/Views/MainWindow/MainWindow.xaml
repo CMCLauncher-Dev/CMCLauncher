@@ -63,15 +63,6 @@
         Background="{ThemeResource ControlStrokeColorDefaultBrush}"
       />
     </Grid>
-    <!-- 自定义背景图：全窗背景装饰，Grid.RowSpan 铺满标题栏与内容区。
-         默认隐藏，设置中选择图片后由 ApplyTheme 控制显示。不拦截任何交互。 -->
-    <Image
-      x:Name="BackgroundImage"
-      Grid.RowSpan="2"
-      Visibility="Collapsed"
-      IsHitTestVisible="False"
-      Stretch="UniformToFill"
-    />
     <!-- 自绘标题区留出系统按钮位置，实际预留宽度由 UpdateTitleBarInset 更新。 -->
     <Grid
       x:Name="CustomTitleBar"

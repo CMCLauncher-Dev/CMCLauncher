@@ -82,6 +82,10 @@ public sealed partial class MainWindow
     // 按控件保存原始尺寸，每次都从原值缩放，避免反复应用后越变越大；控件回收时记录随之释放。
     readonly ConditionalWeakTable<DependencyObject, OriginalAppearance> originalAppearances = new();
 
+    // TextBlock 的原始字号用强引用保留，避免弱引用缓存随控件移出可视树被回收后，
+    // 再次应用时误把已缩放的当前值当作原始值，导致字号逐次累积缩小。
+    readonly Dictionary<TextBlock, double> originalTextSizes = new();
+
     // 遍历页面持有的内容，包括抽屉 Pane；无需进入每个原生控件的内部模板。
     static IEnumerable<DependencyObject> AppearanceElements(DependencyObject node)
     {
@@ -165,7 +169,10 @@ public sealed partial class MainWindow
         foreach (var element in elements)
         {
             if (element is TextBlock t)
-                originalAppearances.GetValue(t, _ => new() { FontSize = t.FontSize });
+            {
+                if (!originalTextSizes.TryGetValue(t, out _))
+                    originalTextSizes[t] = t.FontSize;
+            }
             else if (element is Control c)
             {
                 // Lazy content may reach personalization before its theme template is applied.
@@ -192,10 +199,12 @@ public sealed partial class MainWindow
                 && !text.FontFamily.Source.Contains("Icons", StringComparison.OrdinalIgnoreCase)
             )
             {
-                var original = originalAppearances.GetValue(
-                    text,
-                    _ => new() { FontSize = text.FontSize }
-                );
+                var original = originalTextSizes.TryGetValue(text, out var baseSize)
+                    ? new OriginalAppearance { FontSize = baseSize }
+                    : originalAppearances.GetValue(
+                        text,
+                        _ => new() { FontSize = text.FontSize }
+                    );
                 text.FontSize = original.FontSize * fontScale;
                 text.FontFamily = family;
             }
@@ -425,7 +434,6 @@ public sealed partial class MainWindow
                 {
                     settings.CustomBackground = file.Path;
                     // 强制重载图片源以便切换图片后立刻生效。
-                    BackgroundImage.Source = null;
                     backgroundFileName.Text = BackgroundLabel(settings.CustomBackground);
                     ApplyTheme();
                     await SaveAppearance();
@@ -441,7 +449,6 @@ public sealed partial class MainWindow
             async (_, _) =>
             {
                 settings.CustomBackground = "";
-                BackgroundImage.Source = null;
                 backgroundFileName.Text = BackgroundLabel("");
                 ApplyTheme();
                 await SaveAppearance();

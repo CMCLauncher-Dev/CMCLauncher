@@ -40,6 +40,7 @@ public sealed partial class MainWindow
             TextWrapping = TextWrapping.Wrap,
         };
         originalAppearances.Add(block, new() { FontSize = size });
+        originalTextSizes[block] = size;
         block.FontSize =
             size
             * (
