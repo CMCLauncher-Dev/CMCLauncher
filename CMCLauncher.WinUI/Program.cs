@@ -63,6 +63,10 @@ internal static class Program
         if (args.Length >= 2 && args[0] == "--cleanup-mui")
             return 0; // Older launchers may still invoke this command; native resources are now persistent.
         PrepareMuiResources();
+        // 加载可选的外部模组名称翻译映射表（mod_names.json），未提供时仅用内置映射。
+        RemoteModNameTranslator.LoadExternal(
+            Path.Combine(WritableDirectory, "mod_names.json")
+        );
         if (args.Length == 2 && args[0] == "--verify-singlefile-runtime")
         {
             var result = OleInitialize(IntPtr.Zero);

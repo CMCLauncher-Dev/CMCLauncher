@@ -426,8 +426,25 @@ public sealed partial class MainWindow
                 using var request =
                     CancellationTokenSource.CreateLinkedTokenSource(CancellationToken.None);
                 request.CancelAfter(TimeSpan.FromSeconds(30));
-                // 模组名（标题）是专有名词，保留原文，避免如 Sodium 被误译为「钠」。
-                title.Text = StripHtml(originalTitle);
+                // 模组名是专有名词：优先查本地映射表（HMCL 思路，避免把 Sodium 误译成「钠」），
+                // 未命中时再交给翻译服务机译。原文写入 Tag 供恢复。
+                var cleanTitle = StripHtml(originalTitle);
+                var knownTitle = ModTranslation.ServiceLanguage(target) != "zh-CN"
+                    ? cleanTitle
+                    : RemoteModNameTranslator.Translate(cleanTitle);
+                if (knownTitle != null)
+                    title.Text = knownTitle;
+                else
+                {
+                    var translatedTitle = await ModTranslation.TranslateAsync(
+                        Core.Http,
+                        cleanTitle,
+                        "en_us",
+                        target,
+                        request.Token
+                    );
+                    title.Text = StripHtml(translatedTitle);
+                }
                 title.Tag = originalTitle;
                 var summaryText = await ModTranslation.TranslateAsync(
                     Core.Http,

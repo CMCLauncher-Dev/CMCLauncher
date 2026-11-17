@@ -89,6 +89,8 @@ public sealed class LauncherSession : ObservableState, IDisposable
         Store = new Store(root);
         Locales = new LocalizationCatalog(Path.Combine(UserDirectory, "locales"));
         Themes = new ThemeCatalog(Path.Combine(UserDirectory, "themes"));
+        // 加载可选的外部模组名称翻译映射表（mod_names.json），未提供时仅用内置映射。
+        RemoteModNameTranslator.LoadExternal(Path.Combine(UserDirectory, "mod_names.json"));
         selected =
             Store.Config.Instances.FirstOrDefault(i => i.Id == Store.Config.SelectedInstanceId)
             ?? Store.Config.Instances.FirstOrDefault();

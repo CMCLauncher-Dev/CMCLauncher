@@ -509,13 +509,24 @@ public sealed partial class MainWindow
                         navigationRequest?.Token ?? default
                     );
                 request.CancelAfter(TimeSpan.FromSeconds(30));
-                var titleTask = ModTranslation.TranslateAsync(
-                    session.Core.Http,
-                    originalTitle,
-                    "en_us",
-                    target,
-                    request.Token
-                );
+                // 模组名是专有名词：优先查本地映射表（HMCL 思路），
+                // 未命中时再交给翻译服务机译。原文写入 Tag 供恢复。
+                var knownTitle = ModTranslation.ServiceLanguage(target) != "zh-CN"
+                    ? originalTitle
+                    : RemoteModNameTranslator.Translate(originalTitle);
+                if (knownTitle != null)
+                    title.Text = knownTitle;
+                else
+                {
+                    var translatedTitle = await ModTranslation.TranslateAsync(
+                        session.Core.Http,
+                        originalTitle,
+                        "en_us",
+                        target,
+                        request.Token
+                    );
+                    title.Text = translatedTitle;
+                }
                 var descTask = ModTranslation.TranslateAsync(
                     session.Core.Http,
                     originalDescription,
@@ -523,7 +534,6 @@ public sealed partial class MainWindow
                     target,
                     request.Token
                 );
-                title.Text = await titleTask;
                 description.Text = await descTask;
                 title.Tag = originalTitle;
                 description.Tag = originalDescription;
