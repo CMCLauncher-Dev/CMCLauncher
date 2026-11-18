@@ -420,12 +420,14 @@ public sealed partial class MainWindow
             Opacity = 0.8,
         };
         var chooseBackground = Action(
-            Ui("Choose background image"),
+            Ui("Choose background"),
             async (_, _) =>
             {
                 var picker = new DesktopFileOpenPicker();
                 DesktopPicker.Initialize(picker, WindowNative.GetWindowHandle(this));
                 foreach (var ext in new[] { ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".gif" })
+                    picker.FileTypeFilter.Add(ext);
+                foreach (var ext in WallpaperVideoExtensions)
                     picker.FileTypeFilter.Add(ext);
                 var file = await picker.PickSingleFileAsync();
                 if (file == null)
@@ -445,7 +447,7 @@ public sealed partial class MainWindow
             }
         );
         var removeBackground = Action(
-            Ui("Remove background image"),
+            Ui("Remove background"),
             async (_, _) =>
             {
                 settings.CustomBackground = "";
@@ -859,10 +861,10 @@ public sealed partial class MainWindow
         return names.OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase).ToArray();
     }
 
-    // 背景图文件名的显示文本：有选择时显示完整路径，"不启用"提示用于空状态。
+    // 背景文件名的显示文本：有选择时显示完整路径，"不启用"提示用于空状态。
     string BackgroundLabel(string path) =>
         string.IsNullOrWhiteSpace(path)
-            ? Ui("No background image selected")
+            ? Ui("No background selected")
             : Path.GetFileName(path) + " · " + path;
 
     async Task SaveAppearance()

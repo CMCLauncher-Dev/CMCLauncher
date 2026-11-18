@@ -12,6 +12,18 @@
     Background="Transparent"
     AllowDrop="True"
   >
+    <!-- 动态壁纸视频背景：铺满整个窗口（含标题栏），位于所有内容之下。
+         不显示传输控件、静音并循环播放；由 ApplyTheme 根据 CustomBackground
+         扩展名在图片与视频之间切换。 -->
+    <MediaPlayerElement
+      x:Name="VideoWallpaper"
+      Grid.Row="0"
+      Grid.RowSpan="2"
+      AreTransportControlsEnabled="False"
+      IsHitTestVisible="False"
+      Stretch="UniformToFill"
+      Opacity="0"
+    />
     <!-- 隐藏控件绑定系统主题画刷，ThemeCustomization.cs 从这些对象读取当前主题颜色。 -->
     <Grid Visibility="Collapsed">
       <Border
