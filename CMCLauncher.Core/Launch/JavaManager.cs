@@ -42,6 +42,47 @@ public static class JavaManager
             _ => false,
         };
 
+    // CVE-2026-114938 (Java4Shell)：OpenJDK Base64 解码器远程代码执行漏洞。
+    // 仅影响 x86-64 上启用 AVX-512 VBMI 加速的 17/21/25/27 版本线（Java 8/11 不受影响）。
+    // 官方建议的临时缓解参数，跨架构通用：禁用硬件加速的 Base64 编解码 intrinsic。
+    public const string Java4ShellMitigationArgument = "-XX:-UseBASE64Intrinsics";
+
+    // 是否受 Java4Shell 影响：仅 x86-64 且版本线在 17/21/25/27 且落后于官方修复版本。
+    public static bool AffectedByJava4Shell(JavaInstallation java)
+    {
+        if (java.Architecture is not ("amd64" or "x86_64"))
+            return false;
+        if (!TryJavaVersion(java.Version, out var current))
+            return false;
+        // Java 17 的受影响代码路径自 17.0.6 起引入；21/25/27 从首个发布即受影响。
+        var affectedFrom = current.Major switch
+        {
+            17 => new Version(17, 0, 6),
+            21 => new Version(21, 0, 0),
+            25 => new Version(25, 0, 0),
+            27 => new Version(27, 0, 0),
+            _ => null,
+        };
+        var fixedVersion = current.Major switch
+        {
+            17 => new Version(17, 0, 21, 1),
+            21 => new Version(21, 0, 13, 1),
+            25 => new Version(25, 0, 5, 1),
+            27 => new Version(27, 0, 1, 1),
+            _ => null,
+        };
+        return affectedFrom != null && fixedVersion != null && current >= affectedFrom && current < fixedVersion;
+    }
+
+    // 从属性字符串中解析版本；丢弃 '+build'、'-ea' 与旧版 '_' 后缀。
+    static bool TryJavaVersion(string text, out Version version)
+    {
+        var end = text.IndexOfAny(new[] { '+', '-', '_' });
+        if (end >= 0)
+            text = text[..end];
+        return Version.TryParse(text, out version!);
+    }
+
     // 根据游戏版本推断所需 Java 大版本号
     public static int RequiredMajor(string gameVersion, int declared = 0)
     {

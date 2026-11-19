@@ -166,6 +166,16 @@ public sealed class JavaSettingsPage : CMCPage
             var panel = new StackPanel { Spacing = 5 };
             panel.Children.Add(Text($"Java {java.Version} · {java.Vendor}", 14, true));
             panel.Children.Add(Text(java.Architecture + " · " + java.Path, 12));
+            if (JavaManager.AffectedByJava4Shell(java))
+            {
+                var warning = Text(
+                    "This Java version is affected by the Java4Shell vulnerability (CVE-2026-114938). Update to a fixed release or the launcher will disable its fast Base64 path automatically.",
+                    12
+                );
+                warning.Foreground = Brush(LightTheme ? "#C42B1C" : "#FF99A4");
+                warning.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold;
+                panel.Children.Add(warning);
+            }
             if (!File.Exists(java.Path))
                 panel.Children.Add(Text(Ui("File does not exist. Re-import or remove the entry."), 12));
             panel.Children.Add(

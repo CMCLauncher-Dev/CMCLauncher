@@ -1355,6 +1355,17 @@ public sealed partial class LauncherCore : IDisposable
         );
         var java = await JavaManager.Match(store, requiredJava, ct);
         Status?.Invoke($"自动匹配 Java {requiredJava}：{java}");
+        // CVE-2026-114938 (Java4Shell)：识别受影响运行时，稍后自动注入官方缓解参数。
+        // 识别失败（进程无法运行等）不应阻断游戏启动。
+        JavaInstallation? javaInfo = null;
+        try
+        {
+            javaInfo = await JavaManager.Inspect(java, ct);
+        }
+        catch (Exception ex)
+        {
+            Log?.Invoke("未能识别 Java 环境：" + ex.Message);
+        }
         var game = store.GameDirectory(instance);
         var storage = store.StorageDirectory(instance);
         Directory.CreateDirectory(game);
@@ -1471,6 +1482,17 @@ public sealed partial class LauncherCore : IDisposable
             clientJar: jar,
             authenticationArguments: authenticationArguments
         );
+        // CVE-2026-114938 (Java4Shell)：为受影响的 Java 运行时自动追加官方建议缓解参数。
+        // 影响 17.0.6+ / 21 / 25 / 27 x86-64 且落后于官方修复版本的 OpenJDK。
+        if (javaInfo != null && JavaManager.AffectedByJava4Shell(javaInfo))
+        {
+            if (!args.Contains(JavaManager.Java4ShellMitigationArgument, StringComparer.Ordinal))
+                args.Insert(0, JavaManager.Java4ShellMitigationArgument);
+            Log?.Invoke(
+                $"Java {javaInfo.Version} 受 Java4Shell (CVE-2026-114938) 影响，"
+                    + $"已自动添加官方建议缓解参数 {JavaManager.Java4ShellMitigationArgument}"
+            );
+        }
         // Like HMCL, prefer the GUI Java executable for the game, while keeping
         // java.exe for runtime inspection and loader installers.
         if (

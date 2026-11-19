@@ -610,6 +610,7 @@
     "Scan Java": "Scan Java",
     "No Java added yet. Import or scan local installations.": "No Java added yet. Import or scan local installations.",
     "File does not exist. Re-import or remove the entry.": "File does not exist. Re-import or remove the entry.",
+    "This Java version is affected by the Java4Shell vulnerability (CVE-2026-114938). Update to a fixed release or the launcher will disable its fast Base64 path automatically.": "This Java version is affected by the Java4Shell vulnerability (CVE-2026-114938). Update to a fixed release or the launcher will disable its fast Base64 path automatically.",
     "Download Java {0}": "Download Java {0}",
     "Java not found in PATH.": "Java not found in PATH.",
     "Import Java from PATH": "Import Java from PATH",

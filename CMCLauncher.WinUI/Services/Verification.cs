@@ -2381,6 +2381,40 @@ public sealed partial class MainWindow
             "    java.version = 21.0.8\n    java.vendor = Eclipse Adoptium\n    os.arch = amd64\n"
         );
         JavaManager.Register(store.Config.Settings, javaFixture);
+        Check(
+            JavaManager.AffectedByJava4Shell(javaFixture)
+                && JavaManager.AffectedByJava4Shell(
+                    JavaManager.Parse(
+                        "x",
+                        "    java.version = 17.0.10\n    java.vendor = Eclipse Adoptium\n    os.arch = amd64\n"
+                    )
+                )
+                && !JavaManager.AffectedByJava4Shell(
+                    JavaManager.Parse(
+                        "x",
+                        "    java.version = 21.0.13.1\n    java.vendor = Eclipse Adoptium\n    os.arch = amd64\n"
+                    )
+                )
+                && !JavaManager.AffectedByJava4Shell(
+                    JavaManager.Parse(
+                        "x",
+                        "    java.version = 17.0.5\n    java.vendor = Eclipse Adoptium\n    os.arch = amd64\n"
+                    )
+                )
+                && !JavaManager.AffectedByJava4Shell(
+                    JavaManager.Parse(
+                        "x",
+                        "    java.version = 21.0.8\n    java.vendor = Eclipse Adoptium\n    os.arch = aarch64\n"
+                    )
+                )
+                && !JavaManager.AffectedByJava4Shell(
+                    JavaManager.Parse(
+                        "x",
+                        "    java.version = 1.8.0_452\n    java.vendor = Eclipse Adoptium\n    os.arch = amd64\n"
+                    )
+                ),
+            "Java4Shell (CVE-2026-114938) affected release detection is correct"
+        );
         page = "java";
         expandedNavigation = "settings";
         await RenderAsync();
@@ -2390,6 +2424,12 @@ public sealed partial class MainWindow
                     .OfType<TextBlock>()
                     .Any(t => t.Text.Contains("21.0.8") && t.Text.Contains("Eclipse Adoptium")),
             "Java management shows version and vendor"
+        );
+        Check(
+            Descendants(PageBody)
+                .OfType<TextBlock>()
+                .Any(t => t.Text.Contains("Java4Shell") && t.Text.Contains("CVE-2026-114938")),
+            "Java management flags Java4Shell affected releases"
         );
         Check(
             new[] { "导入 Java", "扫描 Java", "扫描文件夹", "下载 Java", "从列表移除" }.All(label =>
