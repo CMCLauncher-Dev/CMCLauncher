@@ -119,6 +119,9 @@ public sealed partial class MainWindow
         style.Setters.Add(new Setter(Control.BackgroundProperty, ComboSurfaceBrush));
         style.Setters.Add(new Setter(Control.ForegroundProperty, ComboTextBrush));
         style.Setters.Add(new Setter(Control.BorderBrushProperty, ComboBorderBrush));
+        // 自定义 Style 未设置 BasedOn 会整体替换默认样式，CornerRadius 会回退为 0（直角）。
+        // 默认样式通过主题资源 OverlayCornerRadius 提供 8px 圆角，这里显式补回保持一致。
+        style.Setters.Add(new Setter(Control.CornerRadiusProperty, new CornerRadius(8)));
         style.Setters.Add(
             new Setter(
                 FrameworkElement.MaxWidthProperty,

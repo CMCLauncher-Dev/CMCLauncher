@@ -113,6 +113,7 @@ public sealed partial class MainWindow
             await Task.Delay(250);
             activePopconfirm!.Hide();
             check(!await confirmation, "dismissing popconfirm does not authorize deletion");
+            await Task.Delay(500);
             var longPath = Path.Combine(
                 directory,
                 new string('p', 120),
@@ -122,6 +123,13 @@ public sealed partial class MainWindow
             );
             confirmation = ConfirmPop(anchor, Ui("Remove Java entry?"), longPath, Ui("Remove"));
             await Task.Delay(250);
+            if (activePopconfirm == null)
+                throw new InvalidOperationException(
+                    "long-path popconfirm never became active; confirmation already "
+                        + confirmation.IsCompleted
+                        + " result="
+                        + (confirmation.IsCompleted ? confirmation.Result.ToString() : "pending")
+                );
             panel = (StackPanel)activePopconfirm!.Content;
             var popconfirmText = Descendants(panel)
                 .OfType<TextBlock>()
@@ -131,6 +139,13 @@ public sealed partial class MainWindow
                 popconfirmText.MaxWidth > 0
                     && popconfirmText.ActualWidth <= popconfirmText.MaxWidth + 1,
                 "long popconfirm messages wrap instead of overflowing the flyout"
+            );
+            var cornerSetter = activePopconfirm
+                .FlyoutPresenterStyle.Setters.OfType<Setter>()
+                .SingleOrDefault(s => s.Property == Control.CornerRadiusProperty);
+            check(
+                cornerSetter != null && (CornerRadius)cornerSetter.Value == new CornerRadius(8),
+                "popconfirm flyout keeps its rounded corners"
             );
             activePopconfirm!.Hide();
             await confirmation;
