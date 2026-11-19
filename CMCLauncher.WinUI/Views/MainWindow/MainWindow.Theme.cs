@@ -4,6 +4,9 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Windows.Media.Core;
+using Windows.Media.Playback;
+using Windows.Storage;
 using Windows.UI;
 using Windows.UI.ViewManagement;
 
@@ -21,6 +24,27 @@ public sealed partial class MainWindow
     // 子元素，背景不参与布局测量，避免切换大图时把侧边栏等子元素一步步压缩变小。
     readonly ImageBrush backgroundBrush = new() { Stretch = Stretch.UniformToFill };
     static readonly SolidColorBrush CommonBackground = new(Color.FromArgb(0, 0, 0, 0));
+
+    // 动态壁纸视频：仅当选中的自定义背景是视频文件时创建并循环播放。
+    // 视频层是 Grid 子元素但被锁定为根 Grid 的真实尺寸，且 MediaPlayerElement 不把
+    // 媒体原始尺寸上报为 DesiredSize，因此不会像大图那样压缩侧边栏等 Star 列。
+    MediaPlayer? wallpaperPlayer;
+
+    // 支持的动态壁纸视频扩展名（含点）。与静态图一样，仅本地文件路径生效。
+    static readonly HashSet<string> WallpaperVideoExtensions = new(
+        StringComparer.OrdinalIgnoreCase
+    )
+    {
+        ".mp4",
+        ".mkv",
+        ".webm",
+        ".mov",
+        ".m4v",
+        ".avi",
+        ".wmv",
+        ".mpg",
+        ".mpeg",
+    };
 
     // 系统通知不保证在 UI 线程触发，先排回窗口线程再操作控件。
     void SystemThemeChanged(UISettings sender, object args) =>
@@ -70,8 +94,19 @@ public sealed partial class MainWindow
         var customBackground = store.Config.Settings.CustomBackground;
         var hasCustomBackground =
             !string.IsNullOrWhiteSpace(customBackground) && File.Exists(customBackground);
-        if (hasCustomBackground)
+        var videoWallpaper =
+            hasCustomBackground
+            && WallpaperVideoExtensions.Contains(Path.GetExtension(customBackground));
+        if (hasCustomBackground && videoWallpaper)
         {
+            // 视频墙纸：交给 MediaPlayer 循环播放；旧画刷清空以免两层叠加。
+            backgroundBrush.ImageSource = null;
+            ModpackDropRoot.Background = CommonBackground;
+            PlayWallpaperVideo(customBackground);
+        }
+        else if (hasCustomBackground)
+        {
+            StopWallpaperVideo();
             try
             {
                 // 直接换 ImageSource 即可，ImageBrush 作为 Grid 背景不参与布局测量。
@@ -89,6 +124,7 @@ public sealed partial class MainWindow
         else
         {
             // 无自定义背景时恢复透明，保持 WinUI 原有的透明/液态玻璃表现。
+            StopWallpaperVideo();
             backgroundBrush.ImageSource = null;
             ModpackDropRoot.Background = CommonBackground;
         }
@@ -174,6 +210,66 @@ public sealed partial class MainWindow
             bar.ButtonInactiveBackgroundColor = Colors.Transparent;
             bar.ButtonInactiveForegroundColor = Brush(muted).Color;
         }
+    }
+
+    // 启动/切换到动态壁纸视频：循环播放、静音、隐藏全部控件。
+    // MediaPlayerElement.MediaPlayer 在 WinUI 3 中是只读的，因此通过 Source 装载媒体，
+    // 再读取其内部播放器设置循环与静音。
+    void PlayWallpaperVideo(string path)
+    {
+        // 本地路径转成 file:/// 形式的绝对 Uri，保证 Media Foundation 能正确打开带空格/中文路径。
+        var uri = new Uri("file:///" + Path.GetFullPath(path).Replace('\\', '/'));
+        if (wallpaperPlayer == null)
+        {
+            VideoWallpaper.Source = MediaSource.CreateFromUri(uri);
+            wallpaperPlayer = VideoWallpaper.MediaPlayer;
+            if (wallpaperPlayer != null)
+                wallpaperPlayer.MediaFailed += WallpaperMediaFailed;
+            // 把视频层明确锁到根 Grid 的真实尺寸：媒体自然尺寸不再作为 DesiredSize
+            // 参与根 Grid 的量测，避免像大图那样把侧边栏等 Star 列一步步压缩。
+            SyncWallpaperSize();
+            ModpackDropRoot.SizeChanged += (_, _) => SyncWallpaperSize();
+        }
+        else
+        {
+            wallpaperPlayer.Source = MediaSource.CreateFromUri(uri);
+        }
+        if (wallpaperPlayer == null)
+            return;
+        wallpaperPlayer.IsMuted = true;
+        wallpaperPlayer.IsLoopingEnabled = true;
+        VideoWallpaper.Opacity = 1;
+        VideoWallpaper.Visibility = Visibility.Visible;
+        wallpaperPlayer.Play();
+    }
+
+    // 视频层尺寸与根 Grid 保持一致；显式尺寸使布局系统直接接受而不做额外列/行分配。
+    void SyncWallpaperSize()
+    {
+        VideoWallpaper.Width = ModpackDropRoot.ActualWidth;
+        VideoWallpaper.Height = ModpackDropRoot.ActualHeight;
+    }
+
+    // 视频解码/加载失败时（如缺失编解码器）隐藏视频层，让窗口回到默认底色。
+    void WallpaperMediaFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args) =>
+        VideoWallpaper.DispatcherQueue.TryEnqueue(() =>
+        {
+            StopWallpaperVideo();
+            backgroundBrush.ImageSource = null;
+            ModpackDropRoot.Background = CommonBackground;
+        });
+
+    // 停止动态壁纸视频并释放文件引用，让外部进程可删除/替换该文件。
+    void StopWallpaperVideo()
+    {
+        if (wallpaperPlayer != null)
+        {
+            wallpaperPlayer.MediaFailed -= WallpaperMediaFailed;
+            wallpaperPlayer.Pause();
+            wallpaperPlayer.Source = null;
+        }
+        VideoWallpaper.Opacity = 0;
+        VideoWallpaper.Visibility = Visibility.Collapsed;
     }
 
     // 新建与已显示的卡片采用同一取色规则，避免首次进入页面时仍使用旧的表面色。

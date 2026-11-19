@@ -55,6 +55,15 @@ static class LocalizationCatalogTests
             "Bundled Japanese is discoverable and includes account and client terminology"
         );
         Check(
+            catalog.Languages.Any(l => l.Code == "zh_wy" && l.DisplayName == "文言文")
+                && catalog.Translate("zh_wy", "Save") == "存之"
+                && catalog.Translate("zh_wy", "Cancel") == "罢之"
+                && catalog.Translate("zh_wy", "Authentication server") == "认证之服"
+                && catalog.Translate("zh_wy", "Launch game") == "启其游戏"
+                && catalog.Translate("zh_wy", "Logs") == "运行之日志",
+            "Bundled Classical Chinese covers everyday and account terminology"
+        );
+        Check(
             catalog.Format("ja_jp", "Page {0} of {1}", 2, 9) == "9 ページ中 2 ページ目"
                 && catalog.Format("ja_jp", "{0:N0} versions loaded", 12)
                     == "12 件のバージョンを読み込みました",
