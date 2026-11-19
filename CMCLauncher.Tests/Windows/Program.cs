@@ -493,6 +493,28 @@ internal static class Program
             "real Java metadata inspection"
         );
         Pass("local Java scan and real vendor inspection");
+        JavaManager.Register(javaStore.Config.Settings, inspectedJava);
+        var matchedExact = await JavaManager.Match(
+            javaStore,
+            inspectedJava.Major,
+            CancellationToken.None
+        );
+        Check(
+            matchedExact == inspectedJava.Path,
+            "exact required Java major is preferred over newer runtimes"
+        );
+        var lowerRequired = Math.Max(1, inspectedJava.Major - 1);
+        var matchedFallback = await JavaManager.Match(javaStore, lowerRequired, CancellationToken.None);
+        var fallbackInfo = await JavaManager.Inspect(matchedFallback, CancellationToken.None);
+        Check(
+            fallbackInfo.Major >= lowerRequired,
+            "a higher Java major satisfies a lower requirement"
+        );
+        await Reject(
+            () => JavaManager.Match(javaStore, 99, CancellationToken.None),
+            "impossible Java requirement still rejects with only lower runtimes"
+        );
+        Pass("Java matching prefers exact then accepts newer majors for compatibility");
         using (
             var javaCore = new LauncherCore(
                 javaStore,

@@ -68,7 +68,10 @@ public static class JavaManager
             )
                 yield return discovered;
         }
+        // 优先精确匹配所需大版本；没有时接受更高的兼容大版本（Java 向后兼容）。
         var seen = new HashSet<string>(PathComparer);
+        string? newer = null;
+        var newerMajor = int.MaxValue;
         await foreach (var path in LaunchCandidates())
         {
             ct.ThrowIfCancellationRequested();
@@ -79,8 +82,15 @@ public static class JavaManager
             try
             {
                 var java = await Inspect(path, ct);
-                if (java.Major == required && CompatibleArchitecture(java.Architecture))
+                if (!CompatibleArchitecture(java.Architecture))
+                    continue;
+                if (java.Major == required)
                     return java.Path;
+                if (java.Major > required && java.Major < newerMajor)
+                {
+                    newerMajor = java.Major;
+                    newer = java.Path;
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -88,8 +98,10 @@ public static class JavaManager
             }
             catch { }
         }
+        if (newer != null)
+            return newer;
         throw new Exception(
-            $"此游戏需要 Java {required}，未找到匹配环境。请到设置 → Java 管理导入、扫描或下载 Java {required}。"
+            $"此游戏需要 Java {required} 或更高版本，未找到匹配环境。请到设置 → Java 管理导入、扫描或下载 Java {required}。"
         );
     }
 
