@@ -19,8 +19,8 @@ static class ThemeCatalogTests
             "Only Fresh green is embedded when external files are absent"
         );
         Check(
-            catalog.Resolve("craft", "LightBg", true, "#000000") == "#F6F8F4"
-                && catalog.Resolve("craft", "DarkBg", false, "#000000") == "#121E16",
+            catalog.Resolve("craft", "LightBg", true, "#000000") == "#F6F8F7"
+                && catalog.Resolve("craft", "DarkBg", false, "#000000") == "#1B1C1B",
             "Embedded JSON preserves the existing light and dark palettes"
         );
         Directory.CreateDirectory(root);
@@ -40,7 +40,7 @@ static class ThemeCatalogTests
             "External palettes and mode overrides are applied"
         );
         Check(
-            catalog.Resolve("ocean", "LightText", true, "#000000") == "#303145",
+            catalog.Resolve("ocean", "LightText", true, "#000000") == "#242825",
             "Partial external themes inherit missing colors from Fresh green"
         );
         await File.WriteAllTextAsync(external, "{invalid");
@@ -57,7 +57,7 @@ static class ThemeCatalogTests
         catalog.Reload();
         Check(
             catalog.Resolve("craft", "LightBg", true, "#000000") == "#ABCDEF"
-                && catalog.Resolve("craft", "DarkBg", false, "#000000") == "#121E16",
+                && catalog.Resolve("craft", "DarkBg", false, "#000000") == "#1B1C1B",
             "External edits override the built-in palette while preserving missing colors"
         );
         await File.WriteAllTextAsync(
@@ -66,7 +66,7 @@ static class ThemeCatalogTests
         );
         catalog.Reload();
         Check(
-            catalog.Resolve("craft", "LightBg", true, "#000000") == "#F6F8F4",
+            catalog.Resolve("craft", "LightBg", true, "#000000") == "#F6F8F7",
             "Invalid color rejects an entire override atomically"
         );
         foreach (var id in new[] { "native", "custom" })
@@ -93,7 +93,7 @@ static class ThemeCatalogTests
         File.Delete(craft);
         catalog.Reload();
         Check(
-            catalog.Resolve("removed-theme", "DarkBg", false, "#000000") == "#121E16",
+            catalog.Resolve("removed-theme", "DarkBg", false, "#000000") == "#1B1C1B",
             "Removed themes fall back to the built-in palette"
         );
         await File.WriteAllTextAsync(external, new string(' ', 256_001));

@@ -56,7 +56,9 @@ public sealed partial class MainWindow
                         new Border
                         {
                             Height = 1,
-                            Background = Brush(lightTheme ? "#E2E3E8" : "#454653"),
+                            Background = Brush(
+                                lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorder
+                            ),
                             Margin = new Thickness(0, 4, 0, 4),
                         }
                     );
@@ -66,7 +68,9 @@ public sealed partial class MainWindow
                     root.Children.Add(
                         new Border
                         {
-                            BorderBrush = Brush(lightTheme ? "#BFC2CD" : "#555766"),
+                            BorderBrush = Brush(
+                                lightTheme ? ThemeTokens.LightSelection : ThemeTokens.DarkSelection
+                            ),
                             BorderThickness = new Thickness(3, 0, 0, 0),
                             Padding = new Thickness(12, 4, 4, 4),
                             Child = quoteContent,

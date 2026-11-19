@@ -2099,7 +2099,7 @@ public sealed partial class MainWindow
                 && store.Config.Settings.UiButtonScale == 1
                 && store.Config.Settings.UiMenuScale == 1
                 && store.Config.Settings.UiFontFamily == DefaultFontFamily
-                && WindowBackground.Color == RawColor("#F6F8F4"),
+                && WindowBackground.Color == RawColor("#F6F8F7"),
             "fresh green preset restores default appearance and ignores custom colors"
         );
         presetPicker.SelectedIndex = ColorPresetIndex("custom");

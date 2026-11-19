@@ -187,12 +187,13 @@ public sealed partial class MainWindow
         // 原生预设直接使用系统表面色，不把强调色混入卡片和下拉框底色。
         if (store.Config.Settings.ColorPreset == "native")
             return PaletteColor(ThemeTokens.White);
-        var background = PaletteColor(lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkBg);
+        // 深色模式以中性的表面色为底：直接把强调色混进深色背景会让卡片整体染色、发闷。
+        var background = PaletteColor(lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkSurface);
 
         var accent = PaletteColor(lightTheme ? ThemeTokens.LightAccent : ThemeTokens.DarkAccent);
 
-        // 浅色模式混入 8% 强调色，深色模式混入 12%
-        double amount = lightTheme ? 0.08 : 0.12;
+        // 浅色模式混入 8% 强调色，深色模式只留 4% 的色调倾向
+        double amount = lightTheme ? 0.08 : 0.04;
 
         return ColorHelper.FromArgb(
             255,

@@ -110,9 +110,18 @@ public sealed partial class MainWindow
         if (Sidebar.Parent is Panel contentGrid)
             contentGrid.Background = new SolidColorBrush(ContentBackdrop(bgBrush.Color));
         Sidebar.Background = new SolidColorBrush(ContentBackdrop(Brush(sidebar).Color));
-        Sidebar.BorderBrush = new SolidColorBrush(
-            RawColor(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorderAlt)
-        );
+        // 液态玻璃下各层底色都是半透明，不透明的分隔线会显成一条黑线，直接隐藏。
+        Sidebar.BorderBrush = micaEnabled
+            ? new SolidColorBrush(Colors.Transparent)
+            : new SolidColorBrush(
+                ContentBackdrop(
+                    store.Config.Settings.ColorPreset == "native"
+                        ? RawColor(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorderAlt)
+                        : PaletteColor(
+                            lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorderAlt
+                        )
+                )
+            );
         SidebarNote.Foreground = Brush(muted);
         Eyebrow.Foreground = Brush(accent);
         PageTitle.Foreground = Brush(text);

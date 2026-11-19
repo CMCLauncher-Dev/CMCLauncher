@@ -574,7 +574,9 @@ public sealed partial class MainWindow
                     if (contentType == "mod")
                     {
                         contentCard.Padding = new Thickness(6, 3, 6, 3);
-                        contentCard.BorderBrush = Brush(lightTheme ? "#E6E3EF" : "#373341");
+                        contentCard.BorderBrush = Brush(
+                            lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorder
+                        );
                     }
                     contentRows.Children.Add(contentCard);
                     // 每添加一项让出一次 UI 线程，避免连续构造卡片阻塞交互。

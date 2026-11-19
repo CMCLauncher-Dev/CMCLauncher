@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
@@ -32,9 +32,9 @@ public sealed partial class MainWindow
             foreach (
                 var (id, light, dark) in new[]
                 {
-                    ("craft", "#F6F8F4", "#121E16"),
-                    ("lakecyan", "#EDF4F6", "#172427"),
-                    ("sakura", "#FFF7FA", "#211A22"),
+                    ("craft", "#F6F8F7", "#1B1C1B"),
+                    ("lakecyan", "#F1FAFC", "#171D1F"),
+                    ("sakura", "#FFF5F8", "#1F1A1D"),
                 }
             )
             foreach (var mode in new[] { "light", "dark" })
@@ -85,7 +85,7 @@ public sealed partial class MainWindow
                         check(
                             themeCards.All(card =>
                                 card.Background is SolidColorBrush brush
-                                && brush.Color == RawColor("#E4EFF1")
+                                && brush.Color == RawColor("#E0F0F3")
                             ),
                             "Lake Cyan light cards immediately use the blended theme color rather than white"
                         );
@@ -185,7 +185,7 @@ public sealed partial class MainWindow
             store.Config.Settings.Theme = "dark";
             ApplyTheme();
             check(
-                WindowBackground.Color == RawColor("#121E16"),
+                WindowBackground.Color == RawColor("#1B1C1B"),
                 "malformed external Fresh green JSON falls back to the embedded palette in the window"
             );
         }

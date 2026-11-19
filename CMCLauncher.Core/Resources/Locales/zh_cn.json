@@ -448,7 +448,7 @@
     "The source returned a web page instead of a blueprint.": "下载源返回的是网页，请在原站检查该蓝图。",
     "Blueprint exceeds 100 MB.": "蓝图文件超过 100 MB 限制。",
     "The blueprint file is empty.": "蓝图文件为空。",
-    "Blueprints": "蓝图",
+    "Blueprints": "投影/蓝图",
     "Search blueprints": "搜索蓝图",
     "Loading blueprints…": "正在加载蓝图…",
     "No blueprints found.": "没有找到蓝图。",

@@ -449,7 +449,7 @@
     "The source returned a web page instead of a blueprint.": "The source returned a web page instead of a blueprint.",
     "Blueprint exceeds 100 MB.": "Blueprint exceeds 100 MB.",
     "The blueprint file is empty.": "The blueprint file is empty.",
-    "Blueprints": "Blueprints",
+    "Blueprints": "Schematics",
     "Search blueprints": "Search blueprints",
     "Loading blueprints…": "Loading blueprints…",
     "No blueprints found.": "No blueprints found.",
