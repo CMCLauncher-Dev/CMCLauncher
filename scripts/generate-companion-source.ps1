@@ -49,9 +49,10 @@ if (Test-Path $TargetDir)
             }
         }
     }
+    # 只打包 Default/ 中的自带文件；外层目录可能残留旧版构建的副本。
     foreach ($folder in @("locales", "themes"))
     {
-        $jsonDir = Join-Path $TargetDir $folder
+        $jsonDir = Join-Path (Join-Path $TargetDir $folder) "Default"
         if (Test-Path $jsonDir)
         {
             foreach ($f in Get-ChildItem -LiteralPath $jsonDir -File -Filter '*.json')

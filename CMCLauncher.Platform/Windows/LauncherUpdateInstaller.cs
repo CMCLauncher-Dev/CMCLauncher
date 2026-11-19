@@ -21,11 +21,16 @@ public static class LauncherUpdateInstaller
         );
 
     // Keep mutable launcher data and user-edited language/theme packs in place.
+    // Bundled packs under locales/Default and themes/Default always follow the update.
     public static bool Preserve(string relative) =>
-        relative.Split('/')[0].ToLowerInvariant()
-            is "locales"
-                or "themes"
-                or "frpc"
+        relative.Split('/') is [var top, var folder, _, ..]
+        && top.ToLowerInvariant() is "locales" or "themes"
+        && folder.Equals("Default", StringComparison.OrdinalIgnoreCase)
+            ? false
+            : relative.Split('/')[0].ToLowerInvariant()
+                is "locales"
+                    or "themes"
+                    or "frpc"
                 or "state"
                 or "logs"
                 or "instances"

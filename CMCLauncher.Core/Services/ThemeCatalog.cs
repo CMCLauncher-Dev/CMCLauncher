@@ -22,6 +22,7 @@ public sealed class ThemeCatalog
     readonly string directory;
     readonly Action<string>? diagnostic;
     Dictionary<string, Definition> definitions = new(StringComparer.Ordinal);
+    HashSet<string> embeddedIds = new(StringComparer.Ordinal);
     HashSet<string> builtIns = new(StringComparer.Ordinal);
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
@@ -29,12 +30,18 @@ public sealed class ThemeCatalog
     {
         this.directory = directory;
         this.diagnostic = diagnostic;
+        BundledResources.RemoveStaleCopies(directory, diagnostic);
         Reload();
     }
 
+    // 程序集内置的主题在前，其次是 Default/ 中的自带主题，最后是用户新增的主题。
     public IReadOnlyList<ThemePreset> Presets =>
         definitions
-            .Values.OrderBy(p => builtIns.Contains(p.Id) ? 0 : 1)
+            .Values.OrderBy(p =>
+                embeddedIds.Contains(p.Id) ? 0
+                : builtIns.Contains(p.Id) ? 1
+                : 2
+            )
             .ThenBy(p => p.Id, StringComparer.Ordinal)
             .Select(p => new ThemePreset(p.Id, p.DisplayName, builtIns.Contains(p.Id)))
             .ToArray();
@@ -60,51 +67,53 @@ public sealed class ThemeCatalog
             next.Add(definition.Id, definition);
             embedded.Add(definition.Id);
         }
+        var shipped = new HashSet<string>(embedded, StringComparer.Ordinal);
         try
         {
-            if (Directory.Exists(directory))
-                foreach (
-                    var path in Directory
-                        .EnumerateFiles(directory, "*.json")
-                        .OrderBy(p => p, StringComparer.Ordinal)
-                )
+            foreach (var (path, isDefault) in BundledResources.JsonFiles(directory))
+            {
+                try
                 {
-                    try
+                    if (new FileInfo(path).Length > 256_000)
+                        throw new IOException("Theme file exceeds 256 KB.");
+                    var definition = Parse(File.ReadAllText(path));
+                    if (definition.Id != Path.GetFileNameWithoutExtension(path))
+                        throw new JsonException("Theme ID does not match its filename.");
+                    if (next.TryGetValue(definition.Id, out var bundled))
                     {
-                        if (new FileInfo(path).Length > 256_000)
-                            throw new IOException("Theme file exceeds 256 KB.");
-                        var definition = Parse(File.ReadAllText(path));
-                        if (definition.Id != Path.GetFileNameWithoutExtension(path))
-                            throw new JsonException("Theme ID does not match its filename.");
-                        if (next.TryGetValue(definition.Id, out var bundled))
-                        {
-                            // An external file may override part of the embedded palette without duplicating it.
-                            foreach (var pair in definition.Colors)
-                                bundled.Colors[pair.Key] = pair.Value;
-                            foreach (var pair in definition.Light)
-                                bundled.Light[pair.Key] = pair.Value;
-                            foreach (var pair in definition.Dark)
-                                bundled.Dark[pair.Key] = pair.Value;
-                            bundled.DisplayName = definition.DisplayName;
-                        }
-                        else
-                            next.Add(definition.Id, definition);
+                        // A later file may override part of an earlier palette without duplicating it.
+                        foreach (var pair in definition.Colors)
+                            bundled.Colors[pair.Key] = pair.Value;
+                        foreach (var pair in definition.Light)
+                            bundled.Light[pair.Key] = pair.Value;
+                        foreach (var pair in definition.Dark)
+                            bundled.Dark[pair.Key] = pair.Value;
+                        bundled.DisplayName = definition.DisplayName;
                     }
-                    catch (Exception ex)
-                        when (ex is IOException or UnauthorizedAccessException or JsonException)
-                    {
-                        diagnostic?.Invoke(
-                            "Theme file ignored: " + Path.GetFileName(path) + " · " + ex.Message
-                        );
-                    }
+                    else
+                        next.Add(definition.Id, definition);
+                    if (isDefault)
+                        shipped.Add(definition.Id);
                 }
+                catch (Exception ex)
+                    when (ex is IOException or UnauthorizedAccessException or JsonException)
+                {
+                    diagnostic?.Invoke(
+                        "Theme file ignored: "
+                            + Path.GetRelativePath(directory, path)
+                            + " · "
+                            + ex.Message
+                    );
+                }
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             diagnostic?.Invoke("Theme directory unavailable: " + ex.Message);
         }
         definitions = next;
-        builtIns = embedded;
+        embeddedIds = embedded;
+        builtIns = shipped;
     }
 
     static Definition Parse(string json)

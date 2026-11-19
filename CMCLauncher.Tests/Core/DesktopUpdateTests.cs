@@ -59,6 +59,7 @@ static class DesktopUpdateTests
                     DesktopUpdateInstaller.ExecutableName,
                     "CMCLauncher.Avalonia.dll",
                     "themes/custom.json",
+                    "themes/Default/craft.json",
                     "settings.json",
                 }
             )
@@ -82,6 +83,11 @@ static class DesktopUpdateTests
                 != "fixture"
         )
             throw new Exception("Desktop update modified user data.");
+        if (
+            await File.ReadAllTextAsync(Path.Combine(target, "themes", "Default", "craft.json"))
+            != "fixture"
+        )
+            throw new Exception("Desktop update did not refresh bundled Default themes.");
         var brokenStage = Path.Combine(root, "desktop-rollback-stage");
         Directory.CreateDirectory(brokenStage);
         await File.WriteAllTextAsync(
@@ -111,6 +117,9 @@ static class DesktopUpdateTests
             throw new Exception("Desktop update rollback modified existing user data.");
         if (
             !DesktopUpdateInstaller.Preserve("themes/custom.json")
+            || !DesktopUpdateInstaller.Preserve("locales/en_us.json")
+            || DesktopUpdateInstaller.Preserve("themes/Default/craft.json")
+            || DesktopUpdateInstaller.Preserve("locales/default/en_us.json")
             || !DesktopUpdateInstaller.Preserve("settings.json")
             || DesktopUpdateInstaller.Preserve("CMCLauncher.Avalonia.dll")
         )

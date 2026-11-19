@@ -2,11 +2,13 @@
 
 The launcher reads UTF-8 JSON files from `locales/` beside `CMCLauncher.exe`. The source files are in `CMCLauncher.Core/Resources/Locales/`. These interface translations are separate from Minecraft's game language and the Windows MUI files under `languages/`.
 
+Bundled packs are installed in `locales/Default/` (and bundled themes in `themes/Default/`). Every update replaces that folder, so do not edit files there. Put your own packs and edits directly in `locales/` (or `themes/`): a file there with the same name is applied on top of the bundled copy and is never overwritten. When the launcher starts, it removes files in `locales/` and `themes/` that are unmodified copies of a bundled release, so older installations pick up new translations and palettes automatically.
+
 New installations default to English. Explicitly saved language preferences are preserved. The `strings` keys are English; Chinese text lives in the Chinese pack values. The English pack's `aliases` map supports legacy source messages.
 
 ## Editing translations
 
-Edit `locales/en_us.json`, `locales/zh_cn.json`, or `locales/ja_jp.json`. Restart the launcher, or switch interface languages, to reload the files. No compilation is required for external translation edits.
+Create `locales/en_us.json`, `locales/zh_cn.json`, or `locales/ja_jp.json` and add only the entries you want to change; you can start from a copy of the file in `locales/Default/`. Restart the launcher, or switch interface languages, to reload the files. No compilation is required for external translation edits.
 
 ```json
 {
@@ -21,7 +23,7 @@ Edit `locales/en_us.json`, `locales/zh_cn.json`, or `locales/ja_jp.json`. Restar
 
 Keep keys unchanged when translating values. Keys use English text; `context.*` keys distinguish uses that require different translations. Parameterized messages use .NET composite formatting: retain `{0}`, `{1}`, and format specifiers such as `{0:N0}`. Parameters may be reordered, but their indexes must remain valid. Literal braces in formatted messages use `{{` and `}}`.
 
-External entries override the built-in JSON copy. Missing entries in the bundled Chinese or English packs retain their bundled values. Missing entries in additional languages fall back to English, then to the original text if no key exists. Malformed files are ignored and recorded in the runtime log. Invalid formatting falls back to the built-in English template. The built-in copies also let the launcher start if the external files are missing.
+Entries in `locales/` override `locales/Default/`, which overrides the copy built into the launcher. Missing entries in the bundled Chinese or English packs retain their bundled values. Missing entries in additional languages fall back to English, then to the original text if no key exists. Malformed files are ignored and recorded in the runtime log. Invalid formatting falls back to the built-in English template. The built-in copies also let the launcher start if the external files are missing.
 
 ## Adding a language
 

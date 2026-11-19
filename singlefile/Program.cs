@@ -114,18 +114,28 @@ internal static class Program
                     "cmcl"
                 )
             );
+            // 自带语言包和主题写入 Default/ 并随版本同步；外层目录是用户文件，保持不动。
             foreach (var folder in new[] { "locales", "themes" })
             {
-                var source = Path.Combine(runtime, folder);
+                var source = Path.Combine(runtime, folder, "Default");
                 if (!Directory.Exists(source))
                     continue;
-                var destination = Path.Combine(userDirectory, folder);
+                var destination = Path.Combine(userDirectory, folder, "Default");
                 Directory.CreateDirectory(destination);
+                var shipped = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var file in Directory.GetFiles(source, "*.json"))
                 {
-                    var target = Path.Combine(destination, Path.GetFileName(file));
-                    SeedFile(file, target);
+                    var name = Path.GetFileName(file);
+                    shipped.Add(name);
+                    SyncFile(file, Path.Combine(destination, name));
                 }
+                foreach (var stale in Directory.GetFiles(destination, "*.json"))
+                    if (!shipped.Contains(Path.GetFileName(stale)))
+                        try
+                        {
+                            File.Delete(stale);
+                        }
+                        catch (IOException) { }
             }
             foreach (var name in new[] { "README.md", "LICENSE" })
             {
@@ -181,6 +191,29 @@ internal static class Program
             catch (IOException) when (File.Exists(target))
             { /* Another startup seeded it first. */
             }
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+                File.Delete(temporary);
+        }
+    }
+
+    static void SyncFile(string source, string target)
+    {
+        if (
+            File.Exists(target)
+            && File.ReadAllBytes(target).AsSpan().SequenceEqual(File.ReadAllBytes(source))
+        )
+            return;
+        var temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.Copy(source, temporary);
+            File.Move(temporary, target, true);
+        }
+        catch (IOException) when (File.Exists(target))
+        { /* Another startup is syncing the same file. */
         }
         finally
         {

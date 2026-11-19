@@ -10,13 +10,24 @@ public sealed partial class MainWindow
         var savedPage = page;
         var savedLanguage = store.Config.Settings.LauncherLanguage;
         var directory = Path.Combine(Program.UserDirectory, "locales");
+        // 自带语言包在 Default/；验证时把修改写到外层同名文件，模拟用户修改。
         var english = Path.Combine(directory, "en_us.json");
         var french = Path.Combine(directory, "fr_fr.json");
-        var original = await File.ReadAllBytesAsync(english);
+        var bundled = await File.ReadAllBytesAsync(
+            Path.Combine(BundledResources.DefaultDirectory(directory), "en_us.json")
+        );
+        var original = File.Exists(english) ? await File.ReadAllBytesAsync(english) : null;
         var originalFrench = File.Exists(french) ? await File.ReadAllBytesAsync(french) : null;
+        async Task RestoreEnglish()
+        {
+            if (original == null)
+                File.Delete(english);
+            else
+                await File.WriteAllBytesAsync(english, original);
+        }
         try
         {
-            var json = JsonNode.Parse(original)!;
+            var json = JsonNode.Parse(bundled)!;
             json["strings"]!["Logs"] = "Runtime logs from JSON";
             await File.WriteAllTextAsync(english, json.ToJsonString());
             page = "logs";
@@ -33,7 +44,7 @@ public sealed partial class MainWindow
                 PageTitle.Text == "Logs",
                 "invalid external JSON falls back to bundled translations in the actual window"
             );
-            await File.WriteAllBytesAsync(english, original);
+            await RestoreEnglish();
             await File.WriteAllTextAsync(
                 french,
                 """{"code":"fr_fr","displayName":"Français","strings":{"Launcher settings":"Paramètres JSON","Launcher language":"Langue"}}"""
@@ -56,7 +67,7 @@ public sealed partial class MainWindow
         }
         finally
         {
-            await File.WriteAllBytesAsync(english, original);
+            await RestoreEnglish();
             if (originalFrench == null)
                 File.Delete(french);
             else

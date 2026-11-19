@@ -122,5 +122,47 @@ static class LocalizationCatalogTests
         );
         var languages = catalog.Languages.Select(l => l.Code).ToArray();
         Check(languages[0] == "en_us" && languages[1] == "zh_cn", "English is listed first");
+
+        var bundledDirectory = BundledResources.DefaultDirectory(root);
+        Directory.CreateDirectory(bundledDirectory);
+        var germanJson =
+            """{"code":"de_de","displayName":"Deutsch","strings":{"Save":"Speichern","Cancel":"Abbrechen"}}""";
+        await File.WriteAllTextAsync(Path.Combine(bundledDirectory, "de_de.json"), germanJson);
+        var userGerman = Path.Combine(root, "de_de.json");
+        await File.WriteAllTextAsync(
+            userGerman,
+            """{"code":"de_de","displayName":"Deutsch","strings":{"Save":"Sichern"}}"""
+        );
+        catalog.Reload();
+        Check(
+            catalog.Translate("de_de", "Save") == "Sichern"
+                && catalog.Translate("de_de", "Cancel") == "Abbrechen",
+            "User language packs override individual Default/ strings"
+        );
+        File.Delete(userGerman);
+        catalog.Reload();
+        Check(
+            catalog.Translate("de_de", "Save") == "Speichern",
+            "Removing the user pack falls back to the bundled Default/ pack"
+        );
+
+        // 外层与 Default/ 或历史自带版本一致的副本视为未修改，启动时清理；用户改过的保留。
+        await File.WriteAllTextAsync(userGerman, "\uFEFF" + germanJson + "\r\n");
+        await using (
+            var embedded = typeof(LocalizationCatalog).Assembly.GetManifestResourceStream(
+                "CMCLauncher.Locales.zh_cn.json"
+            )!
+        )
+        await using (var copy = File.Create(Path.Combine(root, "zh_cn.json")))
+            await embedded.CopyToAsync(copy);
+        var italian = Path.Combine(root, "it_it.json");
+        var cleaned = new LocalizationCatalog(root, warnings.Add);
+        Check(
+            !File.Exists(userGerman)
+                && !File.Exists(Path.Combine(root, "zh_cn.json"))
+                && File.Exists(italian)
+                && cleaned.Translate("zh_cn", "Save") == "保存",
+            "Unmodified bundled language copies are removed while user packs stay"
+        );
     }
 }

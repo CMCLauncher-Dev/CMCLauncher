@@ -112,7 +112,7 @@ Linux 和 macOS 构建供测试使用。macOS 构建 **尚未签名或公证**�
 | 外观与语言 | 浅色、深色与跟随系统主题；颜色、字体、缩放与外观预设；启动器与游戏的语言设置 |
 | 账号与诊断 | Microsoft 设备代码登录、外部 authlib-injector 登录、Windows DPAPI 凭据加密、运行时日志，以及游戏错误报告导出 |
 
-界面翻译从可执行文件旁的 `locales/` 下可编辑的 JSON 文件加载。额外的有效语言包会出现在语言选择器中。schema、重载行为与翻译指南详见 [界面语言包](docs/LOCALIZATION.md)。
+界面翻译从可执行文件旁的 JSON 文件加载：自带语言包位于 `locales/Default/`（每次更新都会替换），自己的修改放在 `locales/`。额外的有效语言包会出现在语言选择器中。schema、重载行为与翻译指南详见 [界面语言包](docs/LOCALIZATION.md)。
 
 ## 支持范围与限制
 

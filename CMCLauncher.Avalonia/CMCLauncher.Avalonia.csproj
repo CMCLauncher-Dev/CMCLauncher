@@ -33,12 +33,12 @@
     />
     <Content
       Include="../CMCLauncher.Core/Resources/Locales/*.json"
-      Link="locales/%(Filename)%(Extension)"
+      Link="locales/Default/%(Filename)%(Extension)"
       CopyToOutputDirectory="PreserveNewest"
     />
     <Content
       Include="../CMCLauncher.Core/Resources/Themes/*.json"
-      Link="themes/%(Filename)%(Extension)"
+      Link="themes/Default/%(Filename)%(Extension)"
       CopyToOutputDirectory="PreserveNewest"
     />
   </ItemGroup>

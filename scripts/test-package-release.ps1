@@ -3,7 +3,8 @@ $fixture = Join-Path ([IO.Path]::GetTempPath()) ('cmcl-package-check-' + [guid]:
 $publish = Join-Path $fixture 'publish'
 New-Item -ItemType Directory -Path $publish -Force | Out-Null
 $files = @(
-    'CMCLauncher.exe', 'README.md', 'LICENSE', 'locales/en_us.json', 'themes/custom.json',
+    'CMCLauncher.exe', 'README.md', 'LICENSE', 'locales/Default/en_us.json', 'themes/Default/craft.json',
+    'locales/en_us.json', 'themes/custom.json',
     'assets/logo.png', 'logs/session.log', 'frpc/configs/private.toml', 'cmcl/frpc/secret.ini',
     '.minecraft/saves/world/level.dat', 'state/accounts.json', 'instances/world.json',
     'tools/frpc.exe', 'crash-reports/crash.txt', 'cache/session.json', 'settings.json',
@@ -25,7 +26,8 @@ $zip = [IO.Compression.ZipFile]::OpenRead($archive)
 try
 {
     $names = @($zip.Entries | ForEach-Object FullName)
-    $expected = @('CMCLauncher.exe', 'README.md', 'LICENSE', 'locales/en_us.json', 'themes/custom.json', 'assets/logo.png')
+    # 外层 locales/、themes/ 是测试运行留下的用户文件，不能进入发行包。
+    $expected = @('CMCLauncher.exe', 'README.md', 'LICENSE', 'locales/Default/en_us.json', 'themes/Default/craft.json', 'assets/logo.png')
     if ($names.Count -ne $expected.Count -or @($names | Where-Object { $_ -notin $expected }).Count -gt 0)
     {
         throw "Unexpected packaged files: $($names -join ', ')"
@@ -36,4 +38,4 @@ try
     }
 }
 finally { $zip.Dispose() }
-Write-Output 'PASS Release packaging excludes runtime data and includes documentation exactly once.'
+Write-Output 'PASS Release packaging excludes runtime data and user packs and includes documentation exactly once.'

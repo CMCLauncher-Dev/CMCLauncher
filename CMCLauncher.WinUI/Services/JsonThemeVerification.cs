@@ -13,10 +13,13 @@ public sealed partial class MainWindow
         var savedPreset = store.Config.Settings.ColorPreset;
         var savedFont = store.Config.Settings.UiFontSize;
         var directory = Path.Combine(Program.UserDirectory, "themes");
+        // 自带主题在 Default/；验证时把覆盖写到外层同名文件，模拟用户修改。
         var craft = Path.Combine(directory, "craft.json");
+        var bundledCraft = Path.Combine(BundledResources.DefaultDirectory(directory), "craft.json");
         var external = Path.Combine(directory, "verification-theme.json");
         var native = Path.Combine(directory, "native.json");
-        var original = await File.ReadAllBytesAsync(craft);
+        var original = await File.ReadAllBytesAsync(bundledCraft);
+        var originalCraft = File.Exists(craft) ? await File.ReadAllBytesAsync(craft) : null;
         var originalExternal = File.Exists(external)
             ? await File.ReadAllBytesAsync(external)
             : null;
@@ -24,10 +27,10 @@ public sealed partial class MainWindow
         try
         {
             check(
-                themeCatalog.Presets.Single(p => p.IsBuiltIn).Id == "craft"
-                    && themeCatalog.Presets.Any(p => p.Id == "lakecyan" && !p.IsBuiltIn)
-                    && themeCatalog.Presets.Any(p => p.Id == "sakura" && !p.IsBuiltIn),
-                "only Fresh green is embedded; Lake Cyan and Sakura are external JSON themes"
+                themeCatalog.Presets[0].Id == "craft"
+                    && themeCatalog.Presets.Where(p => p.Id is "craft" or "lakecyan" or "sakura")
+                        .All(p => p.IsBuiltIn),
+                "Fresh green is listed first; Default/ themes such as Lake Cyan and Sakura are built in"
             );
             foreach (
                 var (id, light, dark) in new[]
@@ -191,7 +194,10 @@ public sealed partial class MainWindow
         }
         finally
         {
-            await File.WriteAllBytesAsync(craft, original);
+            if (originalCraft == null)
+                File.Delete(craft);
+            else
+                await File.WriteAllBytesAsync(craft, originalCraft);
             if (originalExternal == null)
                 File.Delete(external);
             else

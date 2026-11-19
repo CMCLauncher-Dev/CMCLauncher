@@ -19,10 +19,14 @@ try
     if ((Get-Content -LiteralPath $report) -notcontains 'activation=success') { throw 'WinUI activation was not verified.' }
     # 可编辑资源与运行时文件现集中到可执行文件同级的 cmcl 文件夹内。
     $cmcl = Join-Path $checkRoot 'cmcl'
-    if (!(Test-Path -LiteralPath (Join-Path $cmcl 'locales/en_us.json')) -or !(Test-Path -LiteralPath (Join-Path $cmcl 'themes'))) { throw 'Editable launcher files were not seeded in the cmcl folder.' }
+    # 自带文件同步到 Default/，外层 locales/、themes/ 留给用户文件。
+    $bundledLanguage = Join-Path $cmcl 'locales/Default/en_us.json'
+    if (!(Test-Path -LiteralPath $bundledLanguage) -or !(Test-Path -LiteralPath (Join-Path $cmcl 'themes/Default/craft.json'))) { throw 'Bundled launcher files were not synced into the cmcl Default folders.' }
     Write-Output 'Single-file cold-start WinUI activation passed.'
+    $bundledHash = (Get-FileHash -LiteralPath $bundledLanguage).Hash
+    [IO.File]::AppendAllText($bundledLanguage, "`n")
     $language = Join-Path $cmcl 'locales/en_us.json'
-    [IO.File]::AppendAllText($language, "`n")
+    [IO.File]::WriteAllText($language, '{"code":"en_us","displayName":"English","strings":{"Save":"Save (user edit)"}}')
     $languageHash = (Get-FileHash -LiteralPath $language).Hash
     $configuration = Join-Path $cmcl 'frpc/configs/preserve.toml'
     New-Item -ItemType Directory -Path (Split-Path -Parent $configuration) -Force | Out-Null
@@ -32,8 +36,9 @@ try
     {
         if (!$warm.WaitForExit(60000)) { $warm.Kill($true); throw 'Single-file warm startup timed out.' }
         if ($warm.ExitCode -ne 0 -or (Get-FileHash -LiteralPath $language).Hash -ne $languageHash -or [IO.File]::ReadAllText($configuration) -ne 'serverAddr = "127.0.0.1"') { throw 'Single-file warm startup did not preserve editable files.' }
+        if ((Get-FileHash -LiteralPath $bundledLanguage).Hash -ne $bundledHash) { throw 'Single-file warm startup did not restore the bundled Default language pack.' }
     }
     finally { $warm.Dispose() }
-    Write-Output 'Single-file warm startup preserves language edits and frpc configurations.'
+    Write-Output 'Single-file warm startup restores Default packs and preserves user language edits and frpc configurations.'
 }
 finally { $process.Dispose() }

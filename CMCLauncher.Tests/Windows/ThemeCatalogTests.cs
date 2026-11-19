@@ -99,5 +99,57 @@ static class ThemeCatalogTests
         await File.WriteAllTextAsync(external, new string(' ', 256_001));
         catalog.Reload();
         Check(catalog.Presets.Count == 1, "Oversized files are ignored");
+
+        var bundledDirectory = BundledResources.DefaultDirectory(root);
+        Directory.CreateDirectory(bundledDirectory);
+        var bundledMint = Path.Combine(bundledDirectory, "mint.json");
+        var mintJson =
+            """{"version":1,"id":"mint","displayName":"Mint","colors":{"LightBg":"#0A0B0C"}}""";
+        await File.WriteAllTextAsync(bundledMint, mintJson);
+        var userMint = Path.Combine(root, "mint.json");
+        await File.WriteAllTextAsync(
+            userMint,
+            """{"version":1,"id":"mint","displayName":"Mint","colors":{"LightBg":"#0D0E0F"}}"""
+        );
+        await File.WriteAllTextAsync(
+            Path.Combine(root, "zest.json"),
+            """{"version":1,"id":"zest","displayName":"Zest","colors":{"LightBg":"#101112"}}"""
+        );
+        catalog.Reload();
+        Check(
+            catalog.Presets.Select(p => p.Id).SequenceEqual(new[] { "craft", "mint", "zest" })
+                && catalog.Presets.Single(p => p.Id == "mint").IsBuiltIn
+                && !catalog.Presets.Single(p => p.Id == "zest").IsBuiltIn,
+            "Default/ themes are built in and listed before user themes"
+        );
+        Check(
+            catalog.Resolve("mint", "LightBg", true, "#000000") == "#0D0E0F",
+            "A user theme overrides the bundled Default/ theme with the same ID"
+        );
+        File.Delete(userMint);
+        catalog.Reload();
+        Check(
+            catalog.Resolve("mint", "LightBg", true, "#000000") == "#0A0B0C",
+            "Removing the user copy falls back to the bundled Default/ theme"
+        );
+
+        // 与 Default/ 完全一致（仅换行不同）或与历史自带版本一致的外层副本视为未修改，启动时清理。
+        await File.WriteAllTextAsync(userMint, "\uFEFF" + mintJson + "\r\n");
+        await using (
+            var embedded = typeof(ThemeCatalog).Assembly.GetManifestResourceStream(
+                "CMCLauncher.Themes.craft.json"
+            )!
+        )
+        await using (var copy = File.Create(Path.Combine(root, "craft.json")))
+            await embedded.CopyToAsync(copy);
+        var edited = Path.Combine(root, "zest.json");
+        _ = new ThemeCatalog(root, warnings.Add);
+        Check(
+            !File.Exists(userMint)
+                && !File.Exists(Path.Combine(root, "craft.json"))
+                && File.Exists(edited)
+                && File.Exists(bundledMint),
+            "Unmodified bundled copies are removed while user themes and Default/ stay"
+        );
     }
 }

@@ -73,16 +73,17 @@
     <TrimmerRootAssembly Include="WinRT.Runtime" />
     <TrimmerRootAssembly Include="Microsoft.InteractiveExperiences.Projection" />
   </ItemGroup>
+  <!-- 自带文件放在 Default/，外层 themes/、locales/ 留给用户自己的文件。 -->
   <ItemGroup>
     <Content
       Include="../CMCLauncher.Core/Resources/Themes/*.json"
-      Link="themes/%(Filename)%(Extension)"
+      Link="themes/Default/%(Filename)%(Extension)"
       CopyToOutputDirectory="PreserveNewest"
       CopyToPublishDirectory="PreserveNewest"
     />
     <Content
       Include="../CMCLauncher.Core/Resources/Locales/*.json"
-      Link="locales/%(Filename)%(Extension)"
+      Link="locales/Default/%(Filename)%(Extension)"
       CopyToOutputDirectory="PreserveNewest"
       CopyToPublishDirectory="PreserveNewest"
     />

@@ -25,6 +25,10 @@
       LogicalName="CMCLauncher.Locales.%(Filename).json"
     />
     <EmbeddedResource
+      Include="Resources/BundledHistory.txt"
+      LogicalName="CMCLauncher.BundledHistory"
+    />
+    <EmbeddedResource
       Include="../.config/clientid.local.json"
       LogicalName="CMCLauncher.MicrosoftClient"
       Condition="Exists('../.config/clientid.local.json')"

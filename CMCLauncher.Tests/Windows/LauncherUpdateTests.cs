@@ -350,6 +350,7 @@ static class LauncherUpdateTests
             "CMCLauncher.exe",
             "CMCLauncher.dll",
             "locales/ja_jp.json",
+            "locales/Default/ja_jp.json",
             "settings.json",
             "frpc/configs/local.toml"
         );
@@ -360,8 +361,10 @@ static class LauncherUpdateTests
             "Renamed.exe"
         );
         Check(
-            staged.Count == 2 && staged.Contains("Renamed.exe"),
-            "Portable staging retains user data and supports renamed launchers"
+            staged.Count == 3
+                && staged.Contains("Renamed.exe")
+                && staged.Contains("locales/Default/ja_jp.json"),
+            "Portable staging retains user data, refreshes Default packs and supports renamed launchers"
         );
         Zip("../escaped.exe");
         await Reject(() =>

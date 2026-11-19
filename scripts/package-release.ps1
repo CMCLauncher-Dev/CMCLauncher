@@ -15,7 +15,9 @@ $publishRootUri = [System.Uri]::new($publishRoot.TrimEnd('\') + '\')
 # A publish folder may have been run for testing. Never distribute its runtime user data.
 function Test-PublishFile([string]$Relative)
 {
+    # locales/、themes/ 外层是用户文件，发行包只带 Default/ 中的自带文件。
     return $Relative -notmatch '^(logs|frpc|cmcl|state|instances|tools|\.minecraft|crash-reports|cache)(/|$)' -and
+        $Relative -notmatch '^(locales|themes)/[^/]+\.json$' -and
         $Relative -notmatch '(^|/)(clientid\.local\.json|curseforge\.local\.json|settings\.json|credentials?\.json|secrets?\.json)$' -and
         $Relative -notmatch '\.(pfx|p12|key|log)$' -and
         $Relative -notmatch '(^|/)\.cmcl-[^/]*$'

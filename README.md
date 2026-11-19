@@ -94,7 +94,7 @@ Release archives include .NET and the Windows App SDK runtime, so you do not nee
 | Appearance and languages | Light, dark and system themes; colors, fonts, scaling and appearance presets; launcher and game language settings |
 | Accounts and diagnostics | Microsoft device-code sign-in, external authlib-injector sign-in, Windows DPAPI credential encryption, runtime logs and game error-report export |
 
-Interface translations load from editable JSON files in `locales/` beside the executable. Additional valid language packs appear in the language selector. See [language packs](docs/LOCALIZATION.md) for the schema, reload behavior and translation guide.
+Interface translations load from JSON files beside the executable: bundled packs in `locales/Default/` (replaced on every update) and your own edits in `locales/`. Additional valid language packs appear in the language selector. See [language packs](docs/LOCALIZATION.md) for the schema, reload behavior and translation guide.
 
 ## Support and limitations
 

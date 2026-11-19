@@ -50,6 +50,7 @@ public sealed class LocalizationCatalog
     {
         this.directory = directory;
         this.diagnostic = diagnostic;
+        BundledResources.RemoveStaleCopies(directory, diagnostic);
         Reload();
     }
 
@@ -86,8 +87,8 @@ public sealed class LocalizationCatalog
         defaultStrings = new(next["en_us"].Strings, StringComparer.Ordinal);
         try
         {
-            if (Directory.Exists(directory))
-                foreach (var path in Directory.EnumerateFiles(directory, "*.json"))
+            // Default/ 中的自带语言包先合并，外层的用户语言包再覆盖其中的词条。
+            foreach (var (path, _) in BundledResources.JsonFiles(directory))
                 {
                     try
                     {
@@ -119,7 +120,10 @@ public sealed class LocalizationCatalog
                         )
                     {
                         diagnostic?.Invoke(
-                            "Language pack ignored: " + Path.GetFileName(path) + " · " + ex.Message
+                            "Language pack ignored: "
+                                + Path.GetRelativePath(directory, path)
+                                + " · "
+                                + ex.Message
                         );
                     }
                 }
