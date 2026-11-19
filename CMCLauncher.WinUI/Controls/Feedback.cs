@@ -170,6 +170,13 @@ public sealed partial class MainWindow
     {
         var text = Text(message, 13);
         text.Foreground = ComboTextBrush;
+        // 垂直 StackPanel 的子元素测量时宽度无界，超长消息（如 Java 路径）
+        // 会按单行撑开再被弹出层最大宽度裁切。用相同的上限约束文本，
+        // 让它在测量阶段就换行，保证内容完整可见。
+        text.MaxWidth = Math.Max(
+            120,
+            Math.Min(400, ((FrameworkElement)Content).ActualWidth - 64)
+        );
         return ConfirmPop(anchor, title, text, confirmText);
     }
 

@@ -113,6 +113,27 @@ public sealed partial class MainWindow
             await Task.Delay(250);
             activePopconfirm!.Hide();
             check(!await confirmation, "dismissing popconfirm does not authorize deletion");
+            var longPath = Path.Combine(
+                directory,
+                new string('p', 120),
+                "more",
+                new string('j', 120),
+                "java.exe"
+            );
+            confirmation = ConfirmPop(anchor, Ui("Remove Java entry?"), longPath, Ui("Remove"));
+            await Task.Delay(250);
+            panel = (StackPanel)activePopconfirm!.Content;
+            var popconfirmText = Descendants(panel)
+                .OfType<TextBlock>()
+                .Single(t => t.Text == longPath);
+            panel.UpdateLayout();
+            check(
+                popconfirmText.MaxWidth > 0
+                    && popconfirmText.ActualWidth <= popconfirmText.MaxWidth + 1,
+                "long popconfirm messages wrap instead of overflowing the flyout"
+            );
+            activePopconfirm!.Hide();
+            await confirmation;
 
             var gameRoot = Path.Combine(directory, "schematic-ui-game");
             Directory.CreateDirectory(Path.Combine(gameRoot, "mods"));

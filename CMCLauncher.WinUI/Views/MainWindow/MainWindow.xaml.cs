@@ -208,6 +208,7 @@ public sealed partial class MainWindow : Window
         ModpackDropRoot.SizeChanged += (_, _) => SyncClip();
         rootVisual.Clip = rectClip;
         InitializeCommunityFilterDrawer();
+        InitializeFeedback();
         RuntimeLog.DebugEnabled = store.Config.Settings.DebugLogging;
         runtimeLogTimer.Interval = TimeSpan.FromMilliseconds(150);
         runtimeLogTimer.Tick += (_, _) => FlushRuntimeLogs();
