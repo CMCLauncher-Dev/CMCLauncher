@@ -105,7 +105,7 @@ public static partial class JavaManager
         {
             foreach (var registered in store.Config.Settings.JavaInstallations)
                 yield return registered.Path;
-            // Avoid rescanning the filesystem when a registered runtime already matches.
+            // 已注册的运行时若已匹配则避免重复扫描文件系统。
             foreach (
                 var discovered in await Task.Run(() => Candidates(store, null, ct).ToList(), ct)
             )
@@ -351,8 +351,8 @@ public static partial class JavaManager
         return found;
     }
 
-    // Java 8 JDK archives contain both bin/java and jre/bin/java. Prefer the outer JDK,
-    // which also supplies the compiler and tools required by loader installers.
+    // Java 8 JDK 归档同时包含 bin/java 与 jre/bin/java，优先选择外层 JDK，
+    // 它还提供加载器安装所需的编译器与工具。
     internal static string? DownloadedJavaExecutable(string root) =>
         Directory
             .EnumerateFiles(root, JavaExecutable, SearchOption.AllDirectories)

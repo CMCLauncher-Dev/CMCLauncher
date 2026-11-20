@@ -209,7 +209,7 @@ public sealed class MinecraftDirectoryManager(Store store)
                     )
             )
                 throw new IOException("Choose a new, separate destination directory.");
-            // Nested managed roots and imported instance directories are not owned by this operation.
+            // 嵌套的受管根目录与导入的实例目录不归本次操作所有。
             if (List().Any(r => !Same(r.Path, source) && Inside(r.Path, source)))
                 throw new IOException(
                     "The source contains another registered Minecraft directory."
@@ -277,7 +277,7 @@ public sealed class MinecraftDirectoryManager(Store store)
                     throw new IOException("A file failed migration verification.");
                 copiedHashes[file] = hash;
             }
-            // Refuse to remove a source changed by another launcher during the copy.
+            // 拒绝删除在复制期间被其它启动器修改过的源目录。
             foreach (var file in entries)
             {
                 NoLinks(file);
@@ -333,7 +333,7 @@ public sealed class MinecraftDirectoryManager(Store store)
             foreach (var item in paths)
             {
                 var i = item.Instance;
-                // Legacy instances used Library implicitly. Pin their root before changing it.
+                // 旧版实例隐式使用 Library。在修改其根目录前先固定下来。
                 if (i.StorageRoot == null && i.ImportRoot == null && Same(source, store.Library))
                     i.StorageRoot = destination;
                 else
@@ -361,7 +361,7 @@ public sealed class MinecraftDirectoryManager(Store store)
                 }
                 throw;
             }
-            // A failed cleanup leaves a valid migrated copy and the old source intact.
+            // 清理失败时仍保留一份有效的迁移副本，旧源目录保持原样。
             try
             {
                 await Task.Run(() => Directory.Delete(source, true));

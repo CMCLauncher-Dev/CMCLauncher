@@ -11,8 +11,8 @@ public sealed record ExternalProfile(string Id, string Name)
     public override string ToString() => Name;
 }
 
-// Yggdrasil credentials never share a transport or token with Microsoft sign-in.
-// Only tokens are persisted, using the same Windows vault as Microsoft accounts.
+// Yggdrasil 凭据从不与 Microsoft 登录共享传输通道或令牌。
+// 仅持久化令牌，使用与 Microsoft 账号相同的 Windows 凭据库。
 public sealed class ExternalAuth : IDisposable
 {
     readonly HttpClient http;
@@ -81,7 +81,7 @@ public sealed class ExternalAuth : IDisposable
     // 读取响应体，限制声明长度与流式大小均不超过 1MB。
     async Task<string> ReadBody(HttpResponseMessage response, CancellationToken ct)
     {
-        // Bound both declared and streamed response sizes; metadata is passed to Java later.
+        // 同时限制声明长度与流式读取大小；元数据稍后传递给 Java。
         if (response.Content.Headers.ContentLength > 1024 * 1024)
             throw new InvalidDataException("The authentication response is too large.");
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -97,8 +97,8 @@ public sealed class ExternalAuth : IDisposable
         return Encoding.UTF8.GetString(output.ToArray());
     }
 
-    // Resolve redirects and API Location Indication using GET only. Password/token POSTs
-    // never follow redirects, so a server cannot forward credentials to another host.
+    // 仅使用 GET 解析重定向与 API 位置指示。密码/令牌 POST 请求
+    // 从不跟随重定向，因此服务器无法将凭据转发到其他主机。
     async Task<(Uri Server, string Metadata)> Discover(string input, CancellationToken ct)
     {
         var uri = ServerUri(input);
@@ -144,7 +144,7 @@ public sealed class ExternalAuth : IDisposable
     static void EnsureSuccess(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
-            // Do not include the response body: some providers echo credentials in errors.
+            // 不携带响应体：某些提供商会在错误中回显凭据。
             throw new InvalidOperationException(
                 $"External authentication failed (HTTP {(int)response.StatusCode}). Check your server, credentials, or sign in again."
             );
@@ -313,7 +313,7 @@ public sealed class ExternalAuth : IDisposable
         );
         if (validation.IsSuccessStatusCode)
             return account;
-        // Transport errors and redirects must not silently rotate an otherwise valid token.
+        // 传输错误与重定向不得静默轮换一个本有效的令牌。
         if (validation.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized))
             EnsureSuccess(validation);
         body["requestUser"] = true;
@@ -336,7 +336,7 @@ public sealed class ExternalAuth : IDisposable
     )
     {
         var metadata = await Discover(account.AuthServer, ct);
-        // A saved account stays tied to its original server even if discovery changes later.
+        // 已保存的账号始终绑定其原始服务器，即使后续发现结果发生变化。
         if (metadata.Server != ServerUri(account.AuthServer))
             throw new InvalidOperationException(
                 "The authentication server address changed. Sign in again."

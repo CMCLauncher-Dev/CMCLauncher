@@ -51,7 +51,7 @@ public sealed class Settings
     public int MemoryMb { get; set; } = 4096;
     public int DownloadThreads { get; set; } = 16;
 
-    // JSON values override this regional default, including an explicit opt-out.
+    // JSON 中的值会覆盖此地区默认值，包括显式关闭的情况。
     public bool UseBmclApi { get; set; } = MicrosoftAuth.IsMainlandMachine;
     public string GameDownloadSource { get; set; } = "";
 
@@ -194,8 +194,8 @@ public sealed class Account
     public string AuthServer { get; set; } = "";
     public string LoginName { get; set; } = "";
 
-    // External servers may issue the same UUID as another provider. Keep the game UUID
-    // separate from the key used to select and remove launcher accounts.
+    // 外部服务器可能签发与其他提供商相同的 UUID。将游戏 UUID
+    // 与用于选择和删除启动器账号的键分开保存。
     [System.Text.Json.Serialization.JsonIgnore]
     public string Key =>
         Type == "yggdrasil"
@@ -245,7 +245,7 @@ public sealed class Store
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
         WriteIndented = true,
-        // JsonNode values created through Add<T> need a resolver even before the first settings save.
+        // 通过 Add<T> 创建的 JsonNode 值，在首次保存设置之前也需要类型解析器。
         TypeInfoResolver =
             new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver(),
     };
@@ -297,7 +297,7 @@ public sealed class Store
             legacy,
             "settings-rename-" + Guid.NewGuid().ToString("N") + ".tmp"
         );
-        // Rewrite only paths rooted in the old data directory; external games stay in place.
+        // 仅重写以旧数据目录为根的路径；外部游戏目录保持原位。
         void Rewrite(JsonNode? node)
         {
             if (node is JsonObject obj)
@@ -427,7 +427,7 @@ public sealed class Store
             );
     }
 
-    // Protect shared profile files while allowing individual imported version folders to be recycled.
+    // 保护共享的版本档案文件，同时允许单独回收各个导入的版本文件夹。
     public string? DeletableInstanceDirectory(Instance instance) =>
         InspectVersionDeletion(instance).DeletableDirectory;
 
@@ -435,7 +435,7 @@ public sealed class Store
     {
         var storage = Path.GetFullPath(StorageDirectory(instance))
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        // Imported versions can share a runtime root while owning distinct versions/<id> folders.
+        // 导入的版本可以共享运行时根目录，同时各自拥有独立的 versions/<id> 文件夹。
         string VersionDirectory(Instance candidate)
         {
             if (
@@ -502,7 +502,7 @@ public sealed class Store
         if (shared.Length > 0)
             return new(target, VersionDeletionBlockReason.SharedDirectory, shared);
 
-        // The base game version alone is not evidence of a dependency: inspect actual profile references.
+        // 仅凭基础游戏版本不能证明存在依赖关系：需检查实际的版本档案引用。
         if (
             string.Equals(
                 parent,
@@ -655,7 +655,7 @@ public sealed class Store
             )
         )
             throw new Exception("路径越过实例目录");
-        // Refuse junctions and symlinks along write/read paths.
+        // 拒绝读写路径中的目录联接和符号链接。
         for (
             var cursor = full;
             cursor != null && cursor.Length >= Path.GetFullPath(root).Length;

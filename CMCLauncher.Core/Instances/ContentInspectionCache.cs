@@ -64,7 +64,7 @@ public static class ContentInspectionCache
 
     static async Task<Result> GetCore(string file, string kind, bool enabled, string cacheRoot)
     {
-        // Unpacked packs can change individual files without changing directory timestamps.
+        // 已解包的整合包可能在不改变目录时间戳的情况下修改其中的单个文件。
         if (Directory.Exists(file))
             return new Result(
                 await Task.Run(() => ContentManager.Inspect(file, kind, enabled)),

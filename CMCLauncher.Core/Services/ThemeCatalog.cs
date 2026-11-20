@@ -170,7 +170,7 @@ public sealed class ThemeCatalog
             if (definition.Colors.TryGetValue(token, out value))
                 return value;
         }
-        // External palettes may omit colors; missing files and unknown IDs use Fresh green.
+        // 外部调色板可能省略颜色；缺失的文件与未知 ID 回退到 Fresh 绿色。
         if (definitions.TryGetValue("craft", out var fallback))
         {
             var modes = light ? fallback.Light : fallback.Dark;

@@ -13,7 +13,7 @@ public sealed partial class LauncherCore
     // NeoForged 官方 Maven 重定向到 ForgeCDN 镜像，其余走 BMCL 镜像。
     internal static Uri GameMirrorUrl(Uri uri)
     {
-        // NeoForged publishes the same release artifacts on its official ForgeCDN mirror.
+        // NeoForged 在其官方 ForgeCDN 镜像上发布相同的发布产物。
         if (
             uri.Scheme == "https"
             && uri.IsDefaultPort
@@ -84,7 +84,7 @@ public sealed partial class LauncherCore
             throw new InvalidOperationException(
                 "Java installer networking requires an unauthenticated HTTP or SOCKS5 proxy. Use a local proxy for installation."
             );
-        _ = NetworkProxy.Create(settings); // Reuse hostname-pattern validation before constructing JVM options.
+        _ = NetworkProxy.Create(settings); // 在构造 JVM 参数前复用主机名模式校验。
         var bypass = string.Join(
             "|",
             settings.ProxyBypassHosts.Split(
@@ -147,8 +147,8 @@ public sealed partial class LauncherCore
             ct
         );
 
-    // The Java installer has a separate HTTP stack. Populate its verified Maven cache through
-    // the launcher's proxy/mirror pipeline before starting Java, without weakening Java TLS.
+    // Java 安装器使用独立的 HTTP 栈。在启动 Java 之前，通过启动器的代理/镜像
+    // 流水线填充其已校验的 Maven 缓存，同时不削弱 Java 的 TLS 校验。
     internal async Task PrefetchInstallerLibraries(
         string installer,
         string storage,
@@ -195,8 +195,8 @@ public sealed partial class LauncherCore
         {
             ct.ThrowIfCancellationRequested();
             var artifact = library["downloads"]?["artifact"];
-            // Missing/empty URLs identify legacy, embedded or processor-generated artifacts.
-            // Those remain under the official installer's control instead of guessing download URLs.
+            // 缺失/为空的 URL 标识的是遗留、内嵌或由处理器生成的产物。
+            // 这些产物仍由官方安装器自行处理，而不是猜测下载 URL。
             if (artifact == null || string.IsNullOrWhiteSpace(artifact.S("url")))
                 continue;
             var path = Store.SafePath(storage, "libraries/" + artifact.S("path"));

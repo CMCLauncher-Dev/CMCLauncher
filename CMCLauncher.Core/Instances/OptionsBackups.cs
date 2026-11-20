@@ -217,7 +217,7 @@ public sealed class OptionsBackups(Store store)
         var keep = new HashSet<string>();
         if (retain != null)
             keep.Add(retain);
-        // Preserve the latest confirmed-good config even after repeated failed launches.
+        // 即使多次启动失败，也保留最近一次确认良好的配置。
         if (
             backups.FirstOrDefault(b =>
                 (b.State == OptionsBackupState.Healthy || b.VerifiedAtStart)

@@ -9,8 +9,8 @@ public sealed class MicrosoftAuth(LauncherCore core)
 {
     const string LoginBase = "https://login.microsoftonline.com/consumers/oauth2/v2.0/";
 
-    // Build-time input stays out of source control; the public OAuth identifier
-    // is embedded in the assembly and is not a client secret.
+    // 构建期输入不纳入源码管理；公开的 OAuth 标识符
+    // 内嵌于程序集中，并非客户端密钥。
     public static string ConfiguredClientId
     {
         get
@@ -152,16 +152,16 @@ public sealed class MicrosoftAuth(LauncherCore core)
             if (credentials.S("source") == "pcl")
                 return false;
 
-            // A successful /minecraft/profile response is the ownership check. Xbox refresh
-            // tokens and XUID claims are useful account data, but neither is guaranteed to
-            // be present in every otherwise valid response.
+            // 成功获取 /minecraft/profile 响应即为所有权校验。Xbox 刷新
+            // 令牌与 XUID 声明是有用的账号数据，但二者并不保证出现在
+            // 每个本有效的响应中。
             if (
                 credentials is JsonObject obj
                 && obj.TryGetPropertyValue("minecraftProfileVerified", out var verified)
             )
                 return verified?.GetValue<bool>() == true;
 
-            // Older CMC credentials predate the explicit profile-verification marker.
+            // 旧版 CMC 凭据早于显式的档案验证标记。
             return credentials.S("refreshToken").Length > 0 && credentials.S("xuid").Length > 0;
         }
         catch
@@ -173,7 +173,7 @@ public sealed class MicrosoftAuth(LauncherCore core)
     public const string OfflineLockedMessage =
         "请先通过 Microsoft 登录并验证 Minecraft Java Edition 正版档案，才能使用离线身份。";
 
-    // Use system region information, not the launcher's selected UI language.
+    // 使用系统区域信息，而非启动器所选的界面语言。
     public static bool IsMainlandEnvironment(string zone, string region, int geoId) =>
         zone is "Asia/Shanghai" or "Asia/Urumqi"
         || zone == "China Standard Time" && (region == "CN" || geoId == 45)

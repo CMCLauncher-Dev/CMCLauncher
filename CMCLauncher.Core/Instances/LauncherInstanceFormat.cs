@@ -40,7 +40,7 @@ public static class LauncherInstanceFormat
         var minecraft = Path.Combine(path, ".minecraft");
         if (Directory.Exists(Path.Combine(minecraft, "versions")))
             return new(minecraft, null);
-        // An empty folder may still be selected as the destination for future installations.
+        // 空目录仍可作为未来安装的目标位置被选中。
         return new(path, null);
     }
 
