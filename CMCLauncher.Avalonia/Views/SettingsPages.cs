@@ -325,8 +325,6 @@ public sealed partial class MainWindow
                 var mode = proxyMode.SelectedItem?.ToString() ?? "system";
                 if (applyNetwork && mode == "custom")
                     _ = NetworkProxy.Address(address.Text ?? "");
-                settings.LauncherLanguage =
-                    (language.SelectedItem as InterfaceLanguage)?.Code ?? "en_us";
                 settings.MemoryMb = (int)Math.Round(memory.Value);
                 settings.AutoMemory = autoMemory.IsChecked == true;
                 settings.DownloadThreads = (int)(threads.Value ?? 16);
@@ -402,6 +400,7 @@ public sealed partial class MainWindow
                 return;
             try
             {
+                settings.LauncherLanguage = selected.Code;
                 await SaveSettings(rebuild: true);
             }
             catch (Exception ex)

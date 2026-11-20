@@ -878,17 +878,16 @@ public sealed partial class MainWindow
             .OfType<ComboBox>()
             .Single(c => c.SelectedItem is InterfaceLanguage);
         language.SelectedItem = session.Locales.Languages.Single(l => l.Code == "zh_cn");
-        for (var i = 0; i < 40 && pageTitle.Text != Ui("Settings"); i++)
+        bool ChineseUiReady() =>
+            session.Store.Config.Settings.LauncherLanguage == "zh_cn"
+            && navigationVisuals["root:downloads"].Label.Text == "下载"
+            && navigationVisuals["root:home"].Label.Text == "主页"
+            && pageTitle.Text == Ui("Settings")
+            && pageContent.GetVisualDescendants().OfType<TextBlock>()
+                .Any(t => t.Text == Ui("Launcher language"));
+        for (var i = 0; i < 120 && !ChineseUiReady(); i++)
             await Task.Delay(25);
-        if (
-            session.Store.Config.Settings.LauncherLanguage != "zh_cn"
-            || navigationVisuals["root:downloads"].Label.Text != "下载"
-            || navigationVisuals["root:home"].Label.Text != "主页"
-            || !pageContent
-                .GetVisualDescendants()
-                .OfType<TextBlock>()
-                .Any(t => t.Text == Ui("Launcher language"))
-        )
+        if (!ChineseUiReady())
             throw new IOException("Changing language did not rebuild the menus and settings.");
         checks.Add("PASS live Chinese localization of navigation and settings");
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
