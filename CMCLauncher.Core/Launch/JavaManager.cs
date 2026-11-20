@@ -363,6 +363,27 @@ public static partial class JavaManager
             .ThenBy(path => path, PathComparer)
             .FirstOrDefault();
 
+    // Strip archive-only wrappers while preserving the JDK layout and macOS bundles.
+    static string DownloadedJavaRoot(string root, string executable)
+    {
+        while (true)
+        {
+            var entries = Directory.EnumerateFileSystemEntries(root).Take(2).ToArray();
+            if (entries.Length != 1)
+                return root;
+
+            var child = entries[0];
+            if (!executable.StartsWith(child + Path.DirectorySeparatorChar, PathComparison)
+                || Path.GetFileName(child).Equals("bin", StringComparison.OrdinalIgnoreCase)
+                || Path.GetExtension(child).Equals(".jdk", StringComparison.OrdinalIgnoreCase)
+                || Path.GetFileName(child).Equals("Contents", StringComparison.OrdinalIgnoreCase)
+                || File.GetAttributes(child).HasFlag(FileAttributes.ReparsePoint))
+                return root;
+
+            root = child;
+        }
+    }
+
     // 从 Adoptium API 下载指定大版本的 Temurin JDK 并安装到 runtimes 目录
     public static Task<JavaInstallation> Download(
         LauncherCore core,
@@ -427,7 +448,8 @@ public static partial class JavaManager
             ?? throw new InvalidOperationException("This Java installation is not managed by CMCLauncher.");
         if (current != null && (PathComparer.Equals(current.ManagedHash, hash)
             || (current.ManagedHash.Length == 0
-                && PathComparer.Equals(Path.GetFileName(original), $"{brand}-{major}-{hash[..12]}"))))
+                && PathComparer.Equals(Path.GetFileName(original), $"{brand}-{major}-{hash[..12]}")))
+            && PathComparer.Equals(DownloadedJavaRoot(original!, current.Path), original))
             return current;
         var root = original == null
             ? Path.GetFullPath(installParent ?? Path.Combine(store.Root, "runtimes"))
@@ -478,16 +500,18 @@ public static partial class JavaManager
                 if (previous == null || next == null || next < previous)
                     return current;
             }
+            var extractedRoot = DownloadedJavaRoot(staging, executable);
+            var relativeExecutable = Path.GetRelativePath(extractedRoot, executable);
             ct.ThrowIfCancellationRequested();
             if (original == null)
-                Directory.Move(staging, destination);
+                Directory.Move(extractedRoot, destination);
             else
             {
                 var backup = Path.Combine(root, ".java-backup-" + Guid.NewGuid());
                 Directory.Move(destination, backup);
                 try
                 {
-                    Directory.Move(staging, destination);
+                    Directory.Move(extractedRoot, destination);
                 }
                 catch
                 {
@@ -503,7 +527,7 @@ public static partial class JavaManager
                     stage("旧 Java 文件未能清理：" + backup);
                 }
             }
-            inspected.Path = Path.Combine(destination, Path.GetRelativePath(staging, executable));
+            inspected.Path = Path.Combine(destination, relativeExecutable);
             inspected.ManagedRoot = destination;
             inspected.ManagedHash = hash;
             return inspected;
