@@ -68,7 +68,7 @@ public static partial class DataPackGenerator
                     : new { pack_format = major, description = options.Description },
             }
         );
-        // 1.21 renamed registry directories; 1.21.2 simplified ingredient objects to IDs.
+        // 1.21 起注册表目录改为单数命名；1.21.2 起配方材料对象简化为物品 ID
         string Folder(string singular, string plural) => major >= 48 ? singular : plural;
         var root = "data/" + options.Namespace + "/";
         if (options.Templates.HasFlag(DataPackTemplates.Recipe))
@@ -214,7 +214,7 @@ public static partial class DataPackGenerator
     // 校验物品 ID 的资源位置语法（namespace:path）；不校验该物品是否真实存在于所选游戏/Mod 中。
     static void ValidateItem(string value)
     {
-        // Validate resource-location syntax, not the selected game's/mods' item registry.
+        // 只校验资源位置（namespace:path）语法，不校验该物品是否真实存在于所选游戏/Mod 中
         if (string.IsNullOrWhiteSpace(value) || value.Length > 255)
             throw new ArgumentException("Enter a valid item ID, such as minecraft:stone.");
         var parts = value.Split(':');

@@ -9,9 +9,11 @@ namespace CMCLauncher;
 
 public sealed partial class LauncherCore
 {
+    // 将下载 URL 映射到镜像地址：
+    // NeoForged 官方 Maven 重定向到 ForgeCDN 镜像，其余走 BMCL 镜像。
     internal static Uri GameMirrorUrl(Uri uri)
     {
-        // NeoForged publishes the same release artifacts on its official ForgeCDN mirror.
+        // NeoForged 在其官方 ForgeCDN 镜像上发布相同的发布产物。
         if (
             uri.Scheme == "https"
             && uri.IsDefaultPort
@@ -23,6 +25,8 @@ public sealed partial class LauncherCore
         return BmclUrl(uri);
     }
 
+    // 带重试的下载请求包装：
+    // 传输层失败（超时/5xx/连接中断）时最多重试 2 次，间隔递增。
     async Task<T> InstallerRequest<T>(
         Func<Task<T>> request,
         string description,
@@ -44,6 +48,7 @@ public sealed partial class LauncherCore
         }
     }
 
+    // 判断异常是否为可重试的传输层失败（非业务错误）。
     static bool IsInstallerTransportFailure(Exception ex) =>
         ex is HttpIOException
         || ex is IOException { InnerException: System.Net.Sockets.SocketException }
@@ -57,6 +62,9 @@ public sealed partial class LauncherCore
                         or HttpStatusCode.GatewayTimeout
             );
 
+    // 为 Java 安装器生成 JVM 代理参数：
+    // 支持系统代理与自定义 HTTP/SOCKS5 代理（不支持认证代理），
+    // 并设置连接/读取超时与绕过列表。
     internal static IReadOnlyList<string> InstallerProxyArguments(Settings settings)
     {
         var mode = NetworkProxy.Mode(settings);
@@ -76,7 +84,7 @@ public sealed partial class LauncherCore
             throw new InvalidOperationException(
                 "Java installer networking requires an unauthenticated HTTP or SOCKS5 proxy. Use a local proxy for installation."
             );
-        _ = NetworkProxy.Create(settings); // Reuse hostname-pattern validation before constructing JVM options.
+        _ = NetworkProxy.Create(settings); // 在构造 JVM 参数前复用主机名模式校验。
         var bypass = string.Join(
             "|",
             settings.ProxyBypassHosts.Split(
@@ -103,6 +111,7 @@ public sealed partial class LauncherCore
         return options;
     }
 
+    // 下载 .sha1 校验文件并提取 SHA-1 哈希值，响应体限制 512 字节。
     internal async Task<string> InstallerChecksum(string url, CancellationToken ct) =>
         await InstallerRequest(
             async () =>
@@ -138,8 +147,8 @@ public sealed partial class LauncherCore
             ct
         );
 
-    // The Java installer has a separate HTTP stack. Populate its verified Maven cache through
-    // the launcher's proxy/mirror pipeline before starting Java, without weakening Java TLS.
+    // Java 安装器使用独立的 HTTP 栈。在启动 Java 之前，通过启动器的代理/镜像
+    // 流水线填充其已校验的 Maven 缓存，同时不削弱 Java 的 TLS 校验。
     internal async Task PrefetchInstallerLibraries(
         string installer,
         string storage,
@@ -186,8 +195,8 @@ public sealed partial class LauncherCore
         {
             ct.ThrowIfCancellationRequested();
             var artifact = library["downloads"]?["artifact"];
-            // Missing/empty URLs identify legacy, embedded or processor-generated artifacts.
-            // Those remain under the official installer's control instead of guessing download URLs.
+            // 缺失/为空的 URL 标识的是遗留、内嵌或由处理器生成的产物。
+            // 这些产物仍由官方安装器自行处理，而不是猜测下载 URL。
             if (artifact == null || string.IsNullOrWhiteSpace(artifact.S("url")))
                 continue;
             var path = Store.SafePath(storage, "libraries/" + artifact.S("path"));

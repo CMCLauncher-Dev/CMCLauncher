@@ -9,8 +9,8 @@ public sealed class MicrosoftAuth(LauncherCore core)
 {
     const string LoginBase = "https://login.microsoftonline.com/consumers/oauth2/v2.0/";
 
-    // Build-time input stays out of source control; the public OAuth identifier
-    // is embedded in the assembly and is not a client secret.
+    // 构建期输入不纳入源码管理；公开的 OAuth 标识符
+    // 内嵌于程序集中，并非客户端密钥。
     public static string ConfiguredClientId
     {
         get
@@ -66,6 +66,9 @@ public sealed class MicrosoftAuth(LauncherCore core)
         return result;
     }
 
+    // 设备代码登录流程：
+    // 请求设备代码 → 展示给用户 → 轮询 token 端点等待浏览器授权 → 换取三层令牌。
+    // 轮询间隔遵循服务端 interval，slow_down 时递增，过期后抛出异常。
     public async Task<Account> Login(
         string clientId,
         Action<string, string> showCode,
@@ -125,6 +128,7 @@ public sealed class MicrosoftAuth(LauncherCore core)
         return basic;
     }
 
+    // 校验登录地址是否为受信任的 Microsoft 域名（HTTPS、默认端口、无凭据）。
     public static bool IsVerificationUrl(string value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && uri.Scheme == "https"
@@ -136,6 +140,8 @@ public sealed class MicrosoftAuth(LauncherCore core)
                 or "login.microsoftonline.com"
                 or "login.live.com";
 
+    // 判断账号是否已通过 Minecraft Java Edition 正版验证：
+    // 优先检查显式验证标记，旧版凭据回退到 refreshToken + xuid 存在性检查。
     public static bool IsVerifiedMinecraftPlayer(Account account)
     {
         if (account.Type != "microsoft")
@@ -146,16 +152,16 @@ public sealed class MicrosoftAuth(LauncherCore core)
             if (credentials.S("source") == "pcl")
                 return false;
 
-            // A successful /minecraft/profile response is the ownership check. Xbox refresh
-            // tokens and XUID claims are useful account data, but neither is guaranteed to
-            // be present in every otherwise valid response.
+            // 成功获取 /minecraft/profile 响应即为所有权校验。Xbox 刷新
+            // 令牌与 XUID 声明是有用的账号数据，但二者并不保证出现在
+            // 每个本有效的响应中。
             if (
                 credentials is JsonObject obj
                 && obj.TryGetPropertyValue("minecraftProfileVerified", out var verified)
             )
                 return verified?.GetValue<bool>() == true;
 
-            // Older CMC credentials predate the explicit profile-verification marker.
+            // 旧版 CMC 凭据早于显式的档案验证标记。
             return credentials.S("refreshToken").Length > 0 && credentials.S("xuid").Length > 0;
         }
         catch
@@ -167,12 +173,13 @@ public sealed class MicrosoftAuth(LauncherCore core)
     public const string OfflineLockedMessage =
         "请先通过 Microsoft 登录并验证 Minecraft Java Edition 正版档案，才能使用离线身份。";
 
-    // Use system region information, not the launcher's selected UI language.
+    // 使用系统区域信息，而非启动器所选的界面语言。
     public static bool IsMainlandEnvironment(string zone, string region, int geoId) =>
         zone is "Asia/Shanghai" or "Asia/Urumqi"
         || zone == "China Standard Time" && (region == "CN" || geoId == 45)
         || string.IsNullOrEmpty(zone) && (region == "CN" || geoId == 45);
 
+    // 根据系统时区、区域代码与 GeoID 判断是否为中国大陆环境。
     public static bool IsMainlandMachine
     {
         get
@@ -192,26 +199,32 @@ public sealed class MicrosoftAuth(LauncherCore core)
         }
     }
 
+    // 离线身份可用性：中国大陆环境或已有正版验证账号。
     public static bool CanUseOffline(IEnumerable<Account> accounts) =>
         IsMainlandMachine || accounts.Any(IsVerifiedMinecraftPlayer);
 
+    // 外部（Yggdrasil）账号可用性：与离线身份相同的门槛。
     public static bool CanUseExternal(IEnumerable<Account> accounts) =>
         IsMainlandMachine || accounts.Any(IsVerifiedMinecraftPlayer);
 
     public const string ExternalLockedMessage =
         "Sign in with Microsoft and verify ownership of Minecraft Java Edition before using external accounts.";
 
+    // 外部账号使用前置检查，不满足时抛出锁定提示。
     public static void EnsureExternalAllowed(IEnumerable<Account> accounts)
     {
         if (!CanUseExternal(accounts))
             throw new InvalidOperationException(ExternalLockedMessage);
     }
 
+    // 判断指定账号是否可用：
+    // 正版验证账号始终可用；离线/外部账号需满足对应环境条件。
     public static bool CanUseAccount(IEnumerable<Account> accounts, Account account) =>
         IsVerifiedMinecraftPlayer(account)
         || account.Type == "offline" && CanUseOffline(accounts)
         || account.Type == "yggdrasil" && CanUseExternal(accounts);
 
+    // 账号使用前置检查，按类型抛出对应的锁定提示。
     public static void EnsureAccountAllowed(IEnumerable<Account> accounts, Account account)
     {
         if (!CanUseAccount(accounts, account))
@@ -356,6 +369,7 @@ public sealed class MicrosoftAuth(LauncherCore core)
         };
     }
 
+    // OAuth 流程专用异常，携带服务端错误代码（如 authorization_pending、slow_down）。
     sealed class AuthException(string code, string message) : Exception(message)
     {
         public string Code { get; } = code;

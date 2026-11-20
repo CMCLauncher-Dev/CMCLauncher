@@ -29,6 +29,7 @@ public static class ContentManager
         try
         {
             using var zip = ZipFile.OpenRead(file);
+            // 从 JAR 中读取指定路径的文本条目，超过 2MB 视为异常直接跳过
             string? Read(string path)
             {
                 var entry = zip.GetEntry(path);
@@ -37,6 +38,7 @@ public static class ContentManager
                 using var reader = new StreamReader(entry.Open());
                 return reader.ReadToEnd();
             }
+            // 按加载器优先级依次尝试：Fabric/Quilt JSON → Forge/NeoForge TOML → 旧版 mcmod.info
             foreach (var path in new[] { "fabric.mod.json", "quilt.mod.json" })
                 if (Read(path) is string json)
                 {
@@ -168,6 +170,7 @@ public static class ContentManager
                 using var reader = new StreamReader(entry.Open());
                 return reader.ReadToEnd();
             }
+            // 图标解析优先级：Fabric icon 字段（多尺寸时选最接近 64px 的）→ Quilt metadata.icon → Forge/NeoForge logoFile → 旧版 mcmod.info logoFile
             string? icon = null;
             if (Metadata("fabric.mod.json") is string fabric)
             {
@@ -360,6 +363,7 @@ public static class ContentManager
             }
             if (kind == "mod")
             {
+                // 依次尝试各加载器的元数据文件，命中即停止
                 var fabric = Read("fabric.mod.json");
                 var quilt = Read("quilt.mod.json");
                 var neo = Read("META-INF/neoforge.mods.toml");
@@ -378,7 +382,7 @@ public static class ContentManager
                 else if (neo != null || forge != null)
                 {
                     var text = neo ?? forge!;
-                    // Read display metadata only; this is not a general TOML parser or dependency resolver.
+                    // 仅用正则提取展示字段（displayName/version/description），不做完整 TOML 解析
                     string Field(string key)
                     {
                         var match = Regex.Match(
@@ -418,6 +422,7 @@ public static class ContentManager
                         recognized = true;
                     }
                 }
+                // 所有标准元数据均未命中时，回退到 JAR 清单的 Implementation-Title 作为名称
                 if (!recognized && Read("META-INF/MANIFEST.MF") is string manifest)
                 {
                     string ManifestField(string key) =>
@@ -484,7 +489,7 @@ public static class ContentManager
     // 检测实例是否具备着色器支持：已启用的 Iris/Oculus/OptiFine Mod，或版本档案中的 OptiFine 库。
     public static bool HasShaderSupport(Instance instance, string game)
     {
-        // Inspect enabled Mod identities, not filenames (a renamed JAR may still contain Iris).
+        // 第一阶段：扫描 mods 目录中已启用 JAR 的内部元数据，按 Mod ID 识别（而非文件名，因为 JAR 可能被重命名）
         var mods = Path.Combine(game, "mods");
         if (Directory.Exists(mods))
             foreach (
@@ -546,6 +551,7 @@ public static class ContentManager
                                 or System.Text.Json.JsonException
                     ) { }
             }
+        // 第二阶段：检查版本档案 JSON 中是否声明了 OptiFine 库依赖
         var profile =
             instance.ImportRoot != null && instance.VersionId != null
                 ? Store.SafePath(

@@ -73,6 +73,7 @@ public static class DataPackEntryEditor
         );
     }
 
+    // 返回条目类型的显示名称。
     public static string Label(DataPackEntryKind kind) =>
         kind switch
         {
@@ -87,6 +88,7 @@ public static class DataPackEntryEditor
             _ => throw new ArgumentException("Unknown data pack entry type."),
         };
 
+    // 返回指定条目类型的引导字段定义列表（键、标签、默认值、帮助文本等）。
     public static IReadOnlyList<DataPackField> Fields(DataPackEntryKind kind)
     {
         var result = new List<DataPackField>();
@@ -289,6 +291,7 @@ public static class DataPackEntryEditor
         return result.AsReadOnly();
     }
 
+    // 创建一条新条目，字段值初始化为各字段的默认值。
     public static DataPackEntry Create(DataPackEntryKind kind, string id = "example") =>
         new(
             kind,
@@ -296,6 +299,9 @@ public static class DataPackEntryEditor
             Fields(kind).ToDictionary(f => f.Key, f => f.DefaultValue, StringComparer.Ordinal)
         );
 
+    // 将条目构建为 (相对路径, 文件内容) 对：
+    // 根据游戏版本的数据包格式（major）生成版本感知的 JSON 或函数文本。
+    // SourceOverride 非空时直接以原始文本为准。
     public static KeyValuePair<string, string> Build(
         DataPackEntry entry,
         string gameVersion,
@@ -563,6 +569,8 @@ public static class DataPackEntryEditor
         );
     }
 
+    // 将标签注册表名称映射到目录名：
+    // 旧版本（major < 48）使用复数目录名，新版本使用单数。
     internal static string TagDirectory(string name, int major)
     {
         SafePath(name);
@@ -579,6 +587,8 @@ public static class DataPackEntryEditor
         return major < 48 && pairs.TryGetValue(singular, out var plural) ? plural : singular;
     }
 
+    // 校验资源路径：仅允许小写字母、数字、下划线、连字符、点与斜杠，
+    // 拒绝空段、点段、超长段及 Windows 保留设备名。
     internal static void SafePath(string path)
     {
         if (
@@ -628,6 +638,7 @@ public static class DataPackEntryEditor
         }
     }
 
+    // 校验命名空间资源 ID（如 minecraft:stone），可选允许 #tag 前缀。
     static void Resource(string value, bool allowTag = false)
     {
         if (allowTag && value.StartsWith('#'))
@@ -643,11 +654,13 @@ public static class DataPackEntryEditor
             throw new ArgumentException("Invalid resource namespace.");
     }
 
+    // 解析布尔字段，非 true/false 时抛出异常。
     internal static bool Boolean(string value) =>
         bool.TryParse(value, out var result)
             ? result
             : throw new ArgumentException("Choose true or false.");
 
+    // 解析整数字段并校验范围，越界时抛出异常。
     static int Integer(string value, int min, int max) =>
         int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n)
         && n >= min
@@ -655,11 +668,13 @@ public static class DataPackEntryEditor
             ? n
             : throw new ArgumentException("A numeric field is outside its allowed range.");
 
+    // 按行拆分多行文本，去除空行与首尾空白。
     static string[] Lines(string value) =>
         value
             .Replace("\r", "")
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+    // 解析 JSON 文本，限制大小 2MB 与深度 64，失败时抛出 DataPackJsonException。
     static JsonNode ParseJson(string source)
     {
         if (source.Length > 2 * 1024 * 1024)
@@ -677,9 +692,11 @@ public static class DataPackEntryEditor
         }
     }
 
+    // 将 JSON 文本格式化（缩进）后返回，末尾补换行。
     static string JsonText(string source) =>
         ParseJson(source).ToJsonString(new JsonSerializerOptions(JsonSerializerOptions.Default) { WriteIndented = true }) + "\n";
 
+    // 规范化函数文本：统一换行符、去除尾部多余换行并补一个换行。
     static string FunctionText(string source)
     {
         if (source.Length > 2 * 1024 * 1024 || source.Contains('\0'))
@@ -688,6 +705,7 @@ public static class DataPackEntryEditor
     }
 }
 
+// JSON 解析异常，携带出错行号与列号（从 1 开始）。
 public sealed class DataPackJsonException : ArgumentException
 {
     public long Line { get; }

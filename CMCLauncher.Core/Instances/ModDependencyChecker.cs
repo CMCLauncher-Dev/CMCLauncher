@@ -26,6 +26,7 @@ public static class ModDependencyChecker
         StringComparer.OrdinalIgnoreCase
     );
 
+    // 单条依赖声明：Mod ID 与版本区间（无区间则为 null）。
     sealed record Dependency(string Id, string? Version);
 
     public static List<ModDependencyIssue> Check(string game)
@@ -174,6 +175,7 @@ public static class ModDependencyChecker
         return deps;
     }
 
+    // 将 TOML 文本拆分为 [header] 块（支持单/双中括号），返回块头与块体。
     static IEnumerable<(string Header, string Body)> TomlBlocks(string toml)
     {
         foreach (
@@ -185,6 +187,7 @@ public static class ModDependencyChecker
             yield return (m.Groups[1].Value.Trim(), m.Groups[2].Value);
     }
 
+    // 去除版本区间字符串两端的引号与空白。
     static string Clean(string range) => range.Trim('"', '\'', ' ', '\t');
 
     // ---------- 轻量语义版本与 Maven 范围判定 ----------
@@ -242,6 +245,8 @@ public static class ModDependencyChecker
         return false;
     }
 
+    // Maven 区间判定：[1.0,2.0) / (1.0,2.0] / [1.0,) 等形式，
+    // 分别校验下界与上界（空界表示无限制）。
     static bool MavenSatisfies(string version, string range)
     {
         var lowerIncl = range[0] == '[';
@@ -260,6 +265,7 @@ public static class ModDependencyChecker
         }
     }
 
+    // 去除版本字符串前导的比较运算符（= > < ~ ^）与末尾的 + 号。
     static string TrimOps(string s)
     {
         var t = s.Trim();
@@ -268,6 +274,7 @@ public static class ModDependencyChecker
         return t.Replace("+", "");
     }
 
+    // 去除 Maven 界值两端的空白。
     static string trimBound(string s) => s.Trim();
 
     // 只比较主/次/修订三段的数字大小，忽略预发布与构建后缀，足够覆盖常见依赖区间。
@@ -285,6 +292,7 @@ public static class ModDependencyChecker
         return 0;
     }
 
+    // 提取版本字符串中全部数字段（如 "1.20.1-beta+3" → [1, 20, 1, 3]）。
     static List<int> Numbers(string v)
     {
         var result = new List<int>();

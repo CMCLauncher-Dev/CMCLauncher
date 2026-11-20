@@ -3,11 +3,13 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
+// 主题预设：ID、显示名称、是否内置。
 public sealed record ThemePreset(string Id, string DisplayName, bool IsBuiltIn);
 
-// Load external palettes independently: a broken file cannot replace the working built-in theme.
+// 主题目录：独立加载外部调色板，损坏的文件不会影响可用的内置主题。
 public sealed class ThemeCatalog
 {
+    // 单个主题定义：版本、ID、显示名称，以及基础/浅色/深色三组颜色令牌。
     sealed class Definition
     {
         public int Version { get; set; } = 1;
@@ -22,12 +24,20 @@ public sealed class ThemeCatalog
     readonly string directory;
     readonly string? packagedDirectory;
     readonly Action<string>? diagnostic;
+    // 全部主题定义（内置 + 外部），按 ID 索引。
     Dictionary<string, Definition> definitions = new(StringComparer.Ordinal);
+    // 程序集内嵌的主题 ID 集合。
     HashSet<string> embeddedIds = new(StringComparer.Ordinal);
+    // 自带（Default/）主题 ID 集合。
     HashSet<string> builtIns = new(StringComparer.Ordinal);
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
-    public ThemeCatalog(string directory, Action<string>? diagnostic = null, string? packagedDirectory = null)
+    // 初始化主题目录：清理过期副本并加载全部主题。
+    public ThemeCatalog(
+        string directory,
+        Action<string>? diagnostic = null,
+        string? packagedDirectory = null
+    )
     {
         this.directory = directory;
         this.diagnostic = diagnostic;
@@ -51,6 +61,7 @@ public sealed class ThemeCatalog
 
     public bool IsBuiltIn(string id) => builtIns.Contains(id);
 
+    // 重新加载全部主题：先读程序集内嵌主题，再叠加 Default/ 与用户主题文件。
     public void Reload()
     {
         var next = new Dictionary<string, Definition>(StringComparer.Ordinal);
@@ -73,10 +84,19 @@ public sealed class ThemeCatalog
         var shipped = new HashSet<string>(embedded, StringComparer.Ordinal);
         try
         {
+            // 叠加外部主题文件：校验大小、ID 与文件名一致，同 ID 时合并覆盖颜色。
             var files = BundledResources.JsonFiles(directory);
-            if (packagedDirectory != null && !string.Equals(
-                Path.GetFullPath(packagedDirectory), Path.GetFullPath(directory), StringComparison.OrdinalIgnoreCase))
-                files = BundledResources.JsonFiles(packagedDirectory).Where(file => file.Bundled).Concat(files);
+            if (
+                packagedDirectory != null
+                && !string.Equals(
+                    Path.GetFullPath(packagedDirectory),
+                    Path.GetFullPath(directory),
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+                files = BundledResources.JsonFiles(packagedDirectory)
+                    .Where(file => file.Bundled)
+                    .Concat(files);
             foreach (var (path, isDefault) in files)
             {
                 try
@@ -88,7 +108,7 @@ public sealed class ThemeCatalog
                         throw new JsonException("Theme ID does not match its filename.");
                     if (next.TryGetValue(definition.Id, out var bundled))
                     {
-                        // A later file may override part of an earlier palette without duplicating it.
+                        // 后加载的文件可覆盖先前调色板的部分颜色，而无需重复整份定义。
                         foreach (var pair in definition.Colors)
                             bundled.Colors[pair.Key] = pair.Value;
                         foreach (var pair in definition.Light)
@@ -123,6 +143,7 @@ public sealed class ThemeCatalog
         builtIns = shipped;
     }
 
+    // 解析并校验主题 JSON：版本、ID 格式、显示名称、颜色令牌与取值均须合法。
     static Definition Parse(string json)
     {
         var definition =
@@ -154,6 +175,8 @@ public sealed class ThemeCatalog
         return definition;
     }
 
+    // 解析颜色令牌：优先主题自身（浅色/深色 → 基础），缺失时回退到 craft 主题，
+    // 仍缺失则返回原始值。native/custom 主题直接返回原始值。
     public string Resolve(string id, string token, bool light, string original)
     {
         if (id is "native" or "custom")
@@ -166,7 +189,7 @@ public sealed class ThemeCatalog
             if (definition.Colors.TryGetValue(token, out value))
                 return value;
         }
-        // External palettes may omit colors; missing files and unknown IDs use Fresh green.
+        // 外部调色板可能省略颜色；缺失的文件与未知 ID 回退到 Fresh 绿色。
         if (definitions.TryGetValue("craft", out var fallback))
         {
             var modes = light ? fallback.Light : fallback.Dark;

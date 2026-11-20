@@ -93,6 +93,7 @@ public sealed partial class LauncherCore : IDisposable
 
     public HttpClient Http => http;
 
+    // 将 Mojang 官方游戏资源 URL 映射到 BMCLAPI 国内镜像地址。
     public static Uri BmclUrl(Uri uri)
     {
         if (uri.Scheme != "https" || !uri.IsDefaultPort || uri.UserInfo.Length != 0)
@@ -113,6 +114,7 @@ public sealed partial class LauncherCore : IDisposable
             : new Uri("https://bmclapi2.bangbang93.com" + prefix + uri.PathAndQuery);
     }
 
+    // BMCLAPI 镜像回退 Handler — 根据下载源策略在官方与镜像之间自动切换。
     sealed class BmclHandler(LauncherCore owner, HttpMessageHandler inner)
         : DelegatingHandler(inner)
     {
@@ -167,6 +169,7 @@ public sealed partial class LauncherCore : IDisposable
         }
     }
 
+    // 诊断日志 Handler — 记录每个 HTTP 请求的耗时、状态码和异常（仅调试模式启用）。
     sealed class DiagnosticHandler(LauncherCore owner, HttpMessageHandler inner)
         : DelegatingHandler(new BmclHandler(owner, inner))
     {
@@ -782,6 +785,7 @@ public sealed partial class LauncherCore : IDisposable
         return Merge(version, profile);
     }
 
+    // 查询指定游戏版本的可用加载器构建列表（Fabric / Forge / NeoForge）。
     public async Task<List<string>> LoaderBuilds(
         string gameVersion,
         string loader,
@@ -826,6 +830,7 @@ public sealed partial class LauncherCore : IDisposable
             .ToList();
     }
 
+    // 根据加载器类型生成构建版本前缀，用于过滤 Maven 仓库中的版本列表。
     public static string LoaderBuildPrefix(string gameVersion, string loader)
     {
         if (loader == "forge")
@@ -836,6 +841,7 @@ public sealed partial class LauncherCore : IDisposable
         return gameVersion + ".";
     }
 
+    // 下载并运行 Forge/NeoForge 安装器，安装完成后更新实例的 VersionId 和 LoaderVersion。
     public async Task<Instance> InstallLoader(Instance instance, string build, CancellationToken ct)
     {
         instance.StorageRoot ??= store.MinecraftRoot;
@@ -999,6 +1005,7 @@ public sealed partial class LauncherCore : IDisposable
         );
     }
 
+    // 在本地 versions 目录中查找匹配指定加载器和构建的版本档案 ID。
     public static async Task<string?> FindLoaderProfile(
         string storage,
         string loader,
@@ -1075,6 +1082,7 @@ public sealed partial class LauncherCore : IDisposable
         return null;
     }
 
+    // 全新安装游戏：创建隔离实例 → 安装加载器（如需要）→ 下载游戏文件，失败时回滚清理。
     // Only fresh installations own their destination; repairs and imported instances must never roll it back.
     public async Task InstallNewGame(Instance instance, string build, CancellationToken ct)
     {
@@ -1153,6 +1161,7 @@ public sealed partial class LauncherCore : IDisposable
         }
     }
 
+    // 下载游戏客户端 JAR、依赖库和资源文件到实例存储目录。
     public async Task DownloadGame(Instance instance, CancellationToken ct)
     {
         var version = await VersionFor(instance, ct);
@@ -1227,6 +1236,7 @@ public sealed partial class LauncherCore : IDisposable
         await WriteIsolatedProfile(instance, version);
     }
 
+    // 将合并后的完整版本档案写入实例目录，供后续启动时直接读取（无需再次解析继承链）。
     public async Task WriteIsolatedProfile(Instance instance, JsonNode version)
     {
         if (instance.ImportRoot != null)

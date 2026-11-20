@@ -21,7 +21,7 @@ public sealed class CurseForgeService(LauncherCore core)
 
         var dependencies = new JsonObject { ["minecraft"] = source["minecraft"]!.S("version") };
 
-        // modLoaders: [{id: "fabric-0.14.22", primary: true}, ...]
+        // modLoaders 字段结构：[{id: "fabric-0.14.22", primary: true}, ...]
         // 取 primary=true 的加载器，没有则取第一个
         var modLoaders = source["minecraft"]!["modLoaders"]!.Items().ToList();
         var primary =
@@ -51,7 +51,7 @@ public sealed class CurseForgeService(LauncherCore core)
             }
         }
 
-        // files: [{projectID: 123, fileID: 456, required: true}, ...]
+        // files 字段结构：[{projectID: 123, fileID: 456, required: true}, ...]
         // 保留 CurseForge 特有字段，InstallPack 中统一解析下载链接
         var files = new JsonArray();
         foreach (var f in source["files"]!.Items())
@@ -104,7 +104,7 @@ public sealed class CurseForgeService(LauncherCore core)
             () => CurseForgeCredentials.ConfiguredApiKey,
             applicationAccessApproved: true
         );
-        // Resolve metadata without forwarding credentials through the shared HTTP transport.
+        // 解析元数据时不通过共享 HTTP 传输通道转发凭据。
         foreach (var f in pending)
         {
             ct.ThrowIfCancellationRequested();
@@ -133,7 +133,7 @@ public sealed class CurseForgeService(LauncherCore core)
             )
                 throw new InvalidDataException("The CurseForge file is unavailable.");
 
-            // A missing URL is a distribution restriction, not a reason to invent a CDN path.
+            // 缺少 URL 属于分发限制，而非凭空构造 CDN 路径的理由。
             var url = fileInfo.S("downloadUrl");
 
             if (url.Length == 0)

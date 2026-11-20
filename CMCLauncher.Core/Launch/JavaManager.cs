@@ -21,6 +21,7 @@ public static partial class JavaManager
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
 
+    // 判断是否为 macOS 系统自带的 Java 占位符（stub），它只是安装器入口而非真实 JDK。
     internal static bool IsMacSystemStub(string path) =>
         MinecraftPlatform.OsName == "osx"
         && (
@@ -31,6 +32,7 @@ public static partial class JavaManager
             )
         );
 
+    // 判断候选 Java 的 CPU 架构是否与当前进程架构兼容。
     internal static bool CompatibleArchitecture(string architecture) =>
         System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture switch
         {
@@ -103,7 +105,7 @@ public static partial class JavaManager
         {
             foreach (var registered in store.Config.Settings.JavaInstallations)
                 yield return registered.Path;
-            // Avoid rescanning the filesystem when a registered runtime already matches.
+            // 已注册的运行时若已匹配则避免重复扫描文件系统。
             foreach (
                 var discovered in await Task.Run(() => Candidates(store, null, ct).ToList(), ct)
             )
@@ -349,8 +351,8 @@ public static partial class JavaManager
         return found;
     }
 
-    // Java 8 JDK archives contain both bin/java and jre/bin/java. Prefer the outer JDK,
-    // which also supplies the compiler and tools required by loader installers.
+    // Java 8 JDK 归档同时包含 bin/java 与 jre/bin/java，优先选择外层 JDK，
+    // 它还提供加载器安装所需的编译器与工具。
     internal static string? DownloadedJavaExecutable(string root) =>
         Directory
             .EnumerateFiles(root, JavaExecutable, SearchOption.AllDirectories)
@@ -515,9 +517,12 @@ public static partial class JavaManager
         }
     }
 
+    // 返回由 CMCLauncher 管理的 Java 的品牌（temurin/corretto 等），非托管安装返回 null。
     public static string? ManagedBrand(Store store, JavaInstallation java) =>
         ManagedLocation(store, java)?.Brand;
 
+    // 解析托管安装目录：路径必须位于 runtimes 下、目录名符合 brand-major-hash12 格式、
+    // 且品牌受支持，否则视为非托管安装。
     static (string Brand, string Directory)? ManagedLocation(Store store, JavaInstallation java)
     {
         if (!Path.IsPathFullyQualified(java.Path))
@@ -538,9 +543,11 @@ public static partial class JavaManager
             ? (match.Groups[1].Value, destination) : null;
     }
 
+    // 将发行版版本字符串（如 17.0.12_8）解析为可比较的 Version。
     static Version? ReleaseVersion(string value) =>
         TryJavaVersion(value.Replace('_', '.'), out var parsed) ? parsed : null;
 
+    // 根据供应商名称推断可自动更新的下载品牌；不支持的品牌返回 null。
     public static string? UpdateBrand(Store store, JavaInstallation java)
     {
         if (ManagedBrand(store, java) is { } managed)
@@ -560,6 +567,8 @@ public static partial class JavaManager
         return DownloadBrands(java.Major).Any(option => option.Id == brand) ? brand : null;
     }
 
+    // 将现有 Java 安装更新到同大版本的最新发行版：
+    // 下载并校验新版本，仅当版本确实更新时才替换安装并更新设置。
     public static async Task<bool> UpdateJava(
         LauncherCore core, Store store, JavaInstallation current, CancellationToken ct,
         Action<string> stage

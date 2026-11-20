@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
+// Modrinth 搜索结果条目，用于社区搜索和榜单展示。
 public sealed record SearchResult(
     string Id,
     string Name,
@@ -18,6 +19,7 @@ public sealed record SearchResult(
     public override string ToString() => Name;
 }
 
+// 社区项目详情，包含名称、描述、正文、图标、下载量、关注者和分类。
 public sealed record CommunityProject(
     string Name,
     string Description,
@@ -30,6 +32,7 @@ public sealed record CommunityProject(
     string Authors = ""
 );
 
+// 社区版本分页容器，HasNext 判断是否还有下一页。
 public sealed record CommunityVersionPage(
     IReadOnlyList<CommunityVersion> Versions,
     int Offset,
@@ -40,6 +43,7 @@ public sealed record CommunityVersionPage(
     public bool HasNext => NextOffset > Offset && NextOffset < TotalHits;
 }
 
+// 单个社区版本信息，包含游戏版本和加载器兼容性列表。
 public sealed record CommunityVersion(
     string Id,
     string Name,
@@ -50,6 +54,7 @@ public sealed record CommunityVersion(
     List<string> Loaders
 );
 
+// 社区搜索分页结果，HasNext 基于 total_hits 判断而非本页是否填满。
 public sealed record CommunitySearchPage(
     IReadOnlyList<SearchResult> Hits,
     int Offset,
@@ -61,6 +66,7 @@ public sealed record CommunitySearchPage(
     public bool HasNext => Hits.Count > 0 && (long)Offset + Hits.Count < TotalHits;
 }
 
+// 社区搜索筛选条件，所有字段为空字符串时表示不筛选。
 public sealed record CommunitySearchFilters(
     string GameVersion = "",
     string Loader = "",
@@ -82,6 +88,7 @@ public sealed record CommunitySearchFilters(
     string Source = "modrinth"
 );
 
+// 社区分类标签，按项目类型分组。
 public sealed record CommunityCategory(
     string Name,
     string ProjectType,
@@ -89,10 +96,13 @@ public sealed record CommunityCategory(
     string? DisplayName = null
 );
 
+// 社区加载器标签，列出支持的项目类型。
 public sealed record CommunityLoader(string Name, IReadOnlyList<string> ProjectTypes);
 
+// 社区许可证标签。
 public sealed record CommunityLicense(string Id, string Name);
 
+// 社区筛选目录，聚合游戏版本、分类、加载器和许可证供筛选面板使用。
 public sealed record CommunityFilterCatalog(
     IReadOnlyList<GameRelease> GameVersions,
     IReadOnlyList<CommunityCategory> Categories,
@@ -151,6 +161,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         }
     }
 
+    // 将筛选条件转换为 Modrinth API 的 facets 表达式列表。
     static void AddSearchFilters(List<string[]> facets, string type, CommunitySearchFilters filters)
     {
         // 值单独引用，避免输入中的空格、冒号或运算符变成额外的筛选表达式。
@@ -214,6 +225,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         After("modified_timestamp", filters.UpdatedAfter);
     }
 
+    // 获取项目详情（名称、描述、正文、图标、下载量、关注者、分类）。
     public async Task<CommunityProject> ProjectDetails(string project, CancellationToken ct)
     {
         var data = await core.Json(
@@ -231,6 +243,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         );
     }
 
+    // 获取项目的所有版本列表。
     public async Task<List<CommunityVersion>> ProjectVersions(string project, CancellationToken ct)
     {
         var data = await core.Json(
@@ -250,6 +263,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
             .ToList();
     }
 
+    // 获取指定版本的依赖列表（仅查看声明，不下载文件）。
     public async Task<List<CommunityDependency>> Dependencies(
         string project,
         string versionId,
@@ -258,7 +272,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
     {
         var version = await ExactVersion(project, versionId, ct);
         var result = new List<CommunityDependency>();
-        // Only inspect this version's declarations; viewing dependencies never downloads files.
+        // 仅查看该版本声明的依赖列表（最多 100 条），不会下载任何文件
         foreach (var dep in version["dependencies"].Items().Take(100))
         {
             var id = dep.S("project_id");
@@ -300,6 +314,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
     public static string? ModInstallUnsupportedReason(Instance? instance) =>
         ContentManager.ModInstallUnsupportedReason(instance);
 
+    // 搜索 Modrinth 项目；支持按实例版本/加载器过滤，多版本时自动分批并发查询。
     public async Task<List<SearchResult>> Search(
         string query,
         string type,
@@ -313,7 +328,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
             return [];
         if (gameVersions is { Count: > 40 })
         {
-            // Keep URLs below proxy/server request limits when filtering hundreds of snapshots.
+            // 版本数超过 40 时按批并发查询，避免 URL 过长超出代理/服务器限制
             using var concurrency = new SemaphoreSlim(3);
             var batches = await Task.WhenAll(
                 gameVersions
@@ -386,6 +401,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         return FetchSearchPage(query, type, facets, offset, limit, ct, filters?.Sort);
     }
 
+    // 调用 Modrinth 搜索 API 并解析分页结果。
     async Task<CommunitySearchPage> FetchSearchPage(
         string query,
         string type,
@@ -432,6 +448,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         );
     }
 
+    // 通过文件 SHA512 哈希查询 Modrinth，判断当前 Mod 是否有更新版本。
     public async Task<(string Project, string Version, string Name)?> FindModUpdate(
         Instance instance,
         string file,
@@ -464,6 +481,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         return (project, latest.S("id"), latest.S("version_number"));
     }
 
+    // 更新实例中的 Mod：备份旧文件 → 暂存目录安装新版本 → 原子替换，失败时回滚。
     public async Task UpdateMod(
         Instance instance,
         string file,
@@ -579,6 +597,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         }
     }
 
+    // 查询项目兼容指定游戏版本和加载器的最新版本，优先选择 release 类型。
     async Task<JsonNode> ProjectVersion(
         string project,
         string? gameVersion,
@@ -607,6 +626,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
             ?? throw new Exception("没有兼容当前版本与加载器的文件");
     }
 
+    // 下载单个文件并校验哈希（优先 SHA512，回退 SHA1）。
     async Task DownloadFile(JsonNode file, string target, CancellationToken ct)
     {
         var hashes = file["hashes"];
@@ -624,6 +644,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         );
     }
 
+    // 安装资源包/数据包/光影到实例，先校验兼容性和前置条件再下载导入。
     public async Task InstallContent(
         Instance instance,
         string project,
@@ -862,6 +883,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         }
     }
 
+    // 下载项目指定版本的主文件到暂存目录，返回本地路径。
     public async Task<string> DownloadProjectFile(string project, string version, string stage, CancellationToken ct)
     {
         var metadata = await ExactVersion(project, version, ct);
@@ -872,6 +894,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         return target;
     }
 
+    // 从 Modrinth 下载 .mrpack 整合包并安装为新实例。
     public async Task<Instance> InstallProjectPack(
         string project,
         CancellationToken ct,
@@ -1064,7 +1087,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
             }
             catch
             {
-                // Move succeeded, so this directory belongs to this fresh installation.
+                // 目录移动已成功，说明该目录属于本次全新安装，可安全清理
                 try
                 {
                     var owned = Store.SafePath(
@@ -1089,7 +1112,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         }
     }
 
-    // ZIP is a container, not a pack format. Only import game content described by a known manifest.
+    // ZIP 只是容器而非整合包格式，仅导入由已知清单（modrinth.index.json / mmc-pack.json / manifest.json）描述的游戏内容
     internal static (JsonNode Manifest, string[] ContentPrefixes) ReadPack(string path, string fallbackName)
     {
         using var zip = ZipFile.OpenRead(path);
@@ -1117,7 +1140,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         }
         var index = indexes[0];
         var prefix = index.FullName[..^index.Name.Length];
-        // Validate the wrapper path even when the archive contains no overrides.
+        // 即使压缩包中没有 overrides 目录，也要校验前缀路径的合法性
         Store.SafePath(Path.GetTempPath(), prefix + "manifest.json");
         if (index.Length > 8 * 1024 * 1024)
             throw new Exception("整合包清单过大");

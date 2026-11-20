@@ -7,7 +7,7 @@ namespace CMCLauncher;
 // 启动器自己的 TLS 策略，不会修改 Windows 的证书存储。
 public static class CertificatePolicy
 {
-    // Snapshot 2026-10-23. Match SPKI, including cross-signs and reissued certificates.
+    // 快照日期 2026-10-23。按 SPKI 匹配，涵盖交叉签名与重新签发的证书。
     // https://emudhra.we-have-a-problem.com/impacted-intermediates.json
     static readonly Dictionary<string, string> DeniedKeys = new(StringComparer.Ordinal)
     {

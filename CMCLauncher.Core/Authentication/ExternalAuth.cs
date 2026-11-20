@@ -5,13 +5,14 @@ using System.Text.Json.Nodes;
 
 namespace CMCLauncher;
 
+// 外部（Yggdrasil）认证的玩家档案：UUID 与显示名称。
 public sealed record ExternalProfile(string Id, string Name)
 {
     public override string ToString() => Name;
 }
 
-// Yggdrasil credentials never share a transport or token with Microsoft sign-in.
-// Only tokens are persisted, using the same Windows vault as Microsoft accounts.
+// Yggdrasil 凭据从不与 Microsoft 登录共享传输通道或令牌。
+// 仅持久化令牌，使用与 Microsoft 账号相同的 Windows 凭据库。
 public sealed class ExternalAuth : IDisposable
 {
     readonly HttpClient http;
@@ -29,6 +30,7 @@ public sealed class ExternalAuth : IDisposable
         );
     }
 
+    // 创建 HTTP 处理器：禁用自动重定向与 Cookie，支持用户配置的代理。
     static HttpClientHandler Transport(Settings settings)
     {
         var proxy = NetworkProxy.Create(settings);
@@ -41,6 +43,9 @@ public sealed class ExternalAuth : IDisposable
         };
     }
 
+    // 解析并校验认证服务器地址：
+    // 支持 authlib-injector:yggdrasil-server: 前缀、自动补全 https://，
+    // 仅允许 HTTPS 且不含凭据/查询/片段。
     public static Uri ServerUri(string input)
     {
         input = input.Trim();
@@ -63,6 +68,7 @@ public sealed class ExternalAuth : IDisposable
         return new Uri(uri.AbsoluteUri.TrimEnd('/') + "/");
     }
 
+    // 从 JSON 节点解析玩家档案，校验 UUID 格式与名称长度。
     static ExternalProfile Profile(JsonNode? node)
     {
         if (!Guid.TryParse(node.S("id"), out var id) || node.S("name").Length is < 1 or > 64)
@@ -72,9 +78,10 @@ public sealed class ExternalAuth : IDisposable
         return new(id.ToString("N"), node.S("name"));
     }
 
+    // 读取响应体，限制声明长度与流式大小均不超过 1MB。
     async Task<string> ReadBody(HttpResponseMessage response, CancellationToken ct)
     {
-        // Bound both declared and streamed response sizes; metadata is passed to Java later.
+        // 同时限制声明长度与流式读取大小；元数据稍后传递给 Java。
         if (response.Content.Headers.ContentLength > 1024 * 1024)
             throw new InvalidDataException("The authentication response is too large.");
         await using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -90,8 +97,8 @@ public sealed class ExternalAuth : IDisposable
         return Encoding.UTF8.GetString(output.ToArray());
     }
 
-    // Resolve redirects and API Location Indication using GET only. Password/token POSTs
-    // never follow redirects, so a server cannot forward credentials to another host.
+    // 仅使用 GET 解析重定向与 API 位置指示。密码/令牌 POST 请求
+    // 从不跟随重定向，因此服务器无法将凭据转发到其他主机。
     async Task<(Uri Server, string Metadata)> Discover(string input, CancellationToken ct)
     {
         var uri = ServerUri(input);
@@ -133,15 +140,17 @@ public sealed class ExternalAuth : IDisposable
         throw new InvalidOperationException("Too many authentication server redirects.");
     }
 
+    // 校验 HTTP 状态码，非 2xx 时抛出异常（不携带响应体以防凭据泄露）。
     static void EnsureSuccess(HttpResponseMessage response)
     {
         if (!response.IsSuccessStatusCode)
-            // Do not include the response body: some providers echo credentials in errors.
+            // 不携带响应体：某些提供商会在错误中回显凭据。
             throw new InvalidOperationException(
                 $"External authentication failed (HTTP {(int)response.StatusCode}). Check your server, credentials, or sign in again."
             );
     }
 
+    // 向认证服务器的 authserver/{action} 端点发送 POST 请求并解析 JSON 响应。
     async Task<JsonNode> Post(Uri server, string action, JsonObject body, CancellationToken ct)
     {
         using var content = new StringContent(
@@ -166,6 +175,8 @@ public sealed class ExternalAuth : IDisposable
             ?? throw new InvalidDataException("The authentication response is empty.");
     }
 
+    // 从认证响应构建 Account 对象：
+    // 校验 accessToken、clientToken 与预期档案一致，凭据经 CredentialVault 加密存储。
     static Account AccountFrom(
         Uri server,
         string login,
@@ -200,6 +211,8 @@ public sealed class ExternalAuth : IDisposable
         };
     }
 
+    // 外部账号登录流程：
+    // 发现服务器 → authenticate → 多档案时由用户选择 → refresh 获取最终令牌。
     public async Task<Account> Login(
         IEnumerable<Account> accounts,
         string server,
@@ -265,6 +278,8 @@ public sealed class ExternalAuth : IDisposable
         return AccountFrom(discovered.Server, login.Trim(), response, client, selected);
     }
 
+    // 刷新外部账号令牌：
+    // 先 validate 验证当前令牌，失败（401/403）时通过 refresh 获取新令牌。
     public async Task<Account> Refresh(
         IEnumerable<Account> accounts,
         Account account,
@@ -298,7 +313,7 @@ public sealed class ExternalAuth : IDisposable
         );
         if (validation.IsSuccessStatusCode)
             return account;
-        // Transport errors and redirects must not silently rotate an otherwise valid token.
+        // 传输错误与重定向不得静默轮换一个本有效的令牌。
         if (validation.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized))
             EnsureSuccess(validation);
         body["requestUser"] = true;
@@ -312,6 +327,8 @@ public sealed class ExternalAuth : IDisposable
         );
     }
 
+    // 生成启动时注入 authlib-injector 的 JVM 参数：
+    // -javaagent 指向本地 jar，prefetched 携带服务器元数据的 Base64。
     public async Task<IReadOnlyList<string>> LaunchArguments(
         Account account,
         string cacheRoot,
@@ -319,7 +336,7 @@ public sealed class ExternalAuth : IDisposable
     )
     {
         var metadata = await Discover(account.AuthServer, ct);
-        // A saved account stays tied to its original server even if discovery changes later.
+        // 已保存的账号始终绑定其原始服务器，即使后续发现结果发生变化。
         if (metadata.Server != ServerUri(account.AuthServer))
             throw new InvalidOperationException(
                 "The authentication server address changed. Sign in again."
@@ -333,6 +350,9 @@ public sealed class ExternalAuth : IDisposable
         ];
     }
 
+    // 下载并缓存 authlib-injector jar：
+    // 从官方 API 获取清单，校验 SHA256 与下载域名，
+    // 本地缓存命中时跳过下载，下载过程使用临时文件 + 原子移动。
     async Task<string> Injector(string root, CancellationToken ct)
     {
         using var manifestResponse = await http.GetAsync(InjectorApi, ct);

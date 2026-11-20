@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace CMCLauncher;
 
-// Typed queries remain available independently of the community browsing entry point.
+// CurseForge 类型化查询接口，独立于社区浏览入口可用。心心念念curesforge嗯对密钥不给你但是能用（」——fuzhu
 public interface ICurseForgeClient
 {
     bool IsEnabled { get; }
@@ -30,10 +30,13 @@ public interface ICurseForgeClient
     );
 }
 
+// CurseForge 作者信息。
 public sealed record CurseForgeAuthor(int Id, string Name, string Url);
 
+// CurseForge 项目链接。
 public sealed record CurseForgeLinks(string? WebsiteUrl);
 
+// CurseForge 项目（Mod）元数据。
 public sealed record CurseForgeProject(
     int Id,
     int GameId,
@@ -45,8 +48,10 @@ public sealed record CurseForgeProject(
     List<CurseForgeAuthor>? Authors
 );
 
+// CurseForge 文件哈希（值 + 算法编号）。
 public sealed record CurseForgeHash(string Value, int Algo);
 
+// CurseForge 文件元数据。
 public sealed record CurseForgeFile(
     int Id,
     int GameId,
@@ -61,12 +66,16 @@ public sealed record CurseForgeFile(
     List<CurseForgeHash>? Hashes
 );
 
+// 分页信息。
 public sealed record CurseForgePagination(int Index, int PageSize, int ResultCount, int TotalCount);
 
+// 分页结果页。
 public sealed record CurseForgePage<T>(List<T> Data, CurseForgePagination Pagination);
 
+// 文件下载访问判定：是否允许、原因、下载 URI。
 public sealed record CurseForgeFileAccess(bool IsAllowed, string? Reason, Uri? DownloadUri);
 
+// CurseForge API 异常，携带 HTTP 状态码与可选的重试时间。
 public sealed class CurseForgeApiException(HttpStatusCode statusCode, TimeSpan? retryAfter)
     : Exception($"CurseForge API returned HTTP {(int)statusCode}.")
 {
@@ -77,10 +86,12 @@ public sealed class CurseForgeApiException(HttpStatusCode statusCode, TimeSpan? 
 // 不复用 LauncherCore.Http：此服务需要直连，且不能随重定向泄露 x-api-key。
 public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
 {
+    // Minecraft 在 CurseForge 中的固定游戏 ID。
     public const int MinecraftGameId = 432;
     static readonly Uri ApiRoot = new("https://api.curseforge.com/v1/");
     static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     readonly HttpClient http;
+    // API 密钥提供器，每次请求时调用以获取最新密钥。
     readonly Func<string?> apiKeyProvider;
     public bool IsEnabled { get; }
 
@@ -108,6 +119,8 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         };
     }
 
+    // 创建专用 HTTP 传输：禁用代理、自动重定向与 Cookie，
+    // 防止 x-api-key 随重定向泄露到第三方主机。
     internal static SocketsHttpHandler CreateTransport()
     {
         var handler = new SocketsHttpHandler
@@ -123,6 +136,7 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         return handler;
     }
 
+    // 按关键词搜索 Mod 项目。
     public Task<CurseForgePage<CurseForgeProject>> SearchAsync(
         string query,
         int index = 0,
@@ -138,6 +152,7 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         );
     }
 
+    // 获取单个 Mod 项目元数据，校验返回的 ID 与游戏 ID 一致。
     public async Task<CurseForgeProject> GetProjectAsync(
         int projectId,
         CancellationToken ct = default
@@ -152,6 +167,7 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         return project;
     }
 
+    // 分页获取 Mod 项目的文件列表。
     public Task<CurseForgePage<CurseForgeFile>> GetFilesAsync(
         int projectId,
         int index = 0,
@@ -167,6 +183,7 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         );
     }
 
+    // 获取单个文件元数据，校验返回的 ID、ModId 与游戏 ID 一致。
     public async Task<CurseForgeFile> GetFileAsync(
         int projectId,
         int fileId,
@@ -188,6 +205,8 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         return file;
     }
 
+    // 判定文件是否允许第三方分发下载：
+    // 依次检查项目可用性、分发许可、文件可用性与下载 URL 合法性。
     public async Task<CurseForgeFileAccess> GetFileAccessAsync(
         int projectId,
         int fileId,
@@ -225,9 +244,12 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         return new(true, null, uri);
     }
 
+    // 内部查询接口，返回原始 JSON 节点。
     internal Task<System.Text.Json.Nodes.JsonNode> Query(string relative, CancellationToken ct) =>
         GetAsync<System.Text.Json.Nodes.JsonNode>(relative, ct);
 
+    // 使用 API 密钥下载文件：校验 URL、大小与 SHA-1 哈希，
+    // 先写临时文件再原子替换，失败时清理临时文件。
     internal async Task DownloadAuthenticated(
         Uri uri,
         string target,
@@ -323,6 +345,8 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         }
     }
 
+    // 通用 GET 请求：附加 API 密钥与缓存控制头，
+    // 失败时抛出 CurseForgeApiException（不回显服务端正文）。
     async Task<T> GetAsync<T>(string relative, CancellationToken ct)
     {
         if (!IsEnabled)
@@ -367,6 +391,7 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         }
     }
 
+    // 校验分页参数：pageSize 1-50，index + pageSize <= 10000。
     static void ValidatePage(int index, int pageSize)
     {
         if (index < 0 || pageSize is < 1 or > 50 || index > 10000 - pageSize)

@@ -2,13 +2,17 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
+// JavaManager 的部分类：负责解析各 Java 发行版（品牌）的下载地址与校验信息。
 public static partial class JavaManager
 {
+    // Java 发行版品牌：Id 为内部标识，Name 为展示名称。
     public sealed record JavaBrand(string Id, string Name)
     {
         public override string ToString() => Name;
     }
 
+    // 按 Java 主版本号列出当前平台可下载的发行版品牌。
+    // Temurin 全平台可用；其余品牌仅在 Windows x64 上提供，且按主版本过滤。
     public static IEnumerable<JavaBrand> DownloadBrands(int major)
     {
         yield return new("temurin", "Eclipse Temurin");
@@ -26,6 +30,8 @@ public static partial class JavaManager
             yield return new("sapmachine", "SAP SapMachine");
     }
 
+    // 解析指定品牌的最新 Java 发行版下载地址与校验信息（URL、哈希、大小、算法）。
+    // 品牌不受支持或找不到兼容发行版时抛出异常。
     static async Task<(string Url, string Hash, long? Size, string Algorithm)> ResolveAdditionalJava(
         LauncherCore core, int major, string brand, CancellationToken ct
     )
@@ -36,6 +42,7 @@ public static partial class JavaManager
         const string azul = "https://api.azul.com/metadata/v1/zulu/packages/";
         if (brand == "zulu")
         {
+            // 通过 Azul 元数据 API 查询最新的 GA 版 Zulu JDK（Windows x64 zip）。
             var list = await core.Json(
                 $"{azul}?java_version={major}&os=windows&arch=x64&archive_type=zip&java_package_type=jdk&javafx_bundled=false&release_status=ga&availability_types=CA&latest=true", ct
             );
@@ -50,6 +57,8 @@ public static partial class JavaManager
         }
         if (brand == "microsoft")
         {
+            // 通过 aka.ms 重定向端点探测 Microsoft OpenJDK 的最新版本文件名，
+            // 并下载对应的 .sha256sum.txt 获取校验和。
             const string endpoint = "https://aka.ms/download-jdk/";
             using var request = new HttpRequestMessage(HttpMethod.Head,
                 $"{endpoint}microsoft-jdk-{major}-windows-x64.zip");
@@ -64,6 +73,7 @@ public static partial class JavaManager
         }
         if (brand == "liberica")
         {
+            // 通过 BellSoft API 查询 Liberica 发行版，优先选择 GA 且为特性版本内最新的构建。
             var assets = await core.Json(
                 $"https://api.bell-sw.com/v1/liberica/releases?version-feature={major}&os=windows&arch=x86&bitness=64&package-type=zip&bundle-type=jdk", ct
             );
@@ -78,6 +88,7 @@ public static partial class JavaManager
         }
         if (brand == "sapmachine")
         {
+            // 通过 GitHub Releases API 查询 SAP SapMachine 的最新正式版 Windows x64 包。
             var releases = await core.Json("https://api.github.com/repos/SAP/SapMachine/releases?per_page=30", ct);
             var asset = releases.Items()
                 .Where(release => release["prerelease"]?.GetValue<bool>() == false)

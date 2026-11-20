@@ -5,6 +5,9 @@ using System.Text.Json;
 
 namespace CMCLauncher;
 
+// 选项备份状态：
+// Pending=启动前快照（等待游戏退出后判定结果）、Healthy=游戏正常退出、
+// ReloadFailed=资源重载失败、Unknown=异常退出、BeforeRestore=恢复前自动备份、Manual=手动备份。
 public enum OptionsBackupState
 {
     Pending,
@@ -15,6 +18,9 @@ public enum OptionsBackupState
     Manual,
 }
 
+// 单个选项备份记录：
+// 保存 options.txt / optionsof.txt / optionsshaders.txt 的字节快照与 SHA-256 哈希，
+// 以及关联的游戏进程信息、日志前缀（用于检测日志追加）与失败证据。
 public sealed class OptionsBackup
 {
     public string Id { get; set; } = "";
@@ -32,9 +38,12 @@ public sealed class OptionsBackup
     public string? Evidence { get; set; }
 }
 
+// 选项恢复建议：包含导致失败的备份与推荐的回滚目标（最近一次健康快照）。
 public sealed record OptionsRecovery(OptionsBackup Failure, OptionsBackup? Recommended);
 
-/// <summary>Per-instance, byte-preserving options snapshots. No resource pack files are copied.</summary>
+// 按实例的选项文件字节级快照管理：
+// 启动前自动备份 options.txt 等文件，游戏退出后根据日志判定健康/失败，
+// 失败时提供一键回滚到最近健康快照的能力。不复制资源包文件本身。
 public sealed class OptionsBackups(Store store)
 {
     static readonly string[] Names = ["options.txt", "optionsof.txt", "optionsshaders.txt"];
@@ -49,6 +58,7 @@ public sealed class OptionsBackups(Store store)
     static readonly object[] Gates = Enumerable.Range(0, 64).Select(_ => new object()).ToArray();
     const int MaximumFileBytes = 8 * 1024 * 1024;
 
+    // 计算实例绑定标识（实例 ID + 游戏目录路径的 SHA-256），用于隔离不同实例的备份。
     string Binding(Instance instance)
     {
         var path = Path.TrimEndingDirectorySeparator(
@@ -61,12 +71,15 @@ public sealed class OptionsBackups(Store store)
             .ToLowerInvariant();
     }
 
+    // 返回实例备份根目录。
     public string DirectoryFor(Instance instance) =>
         Store.SafePath(store.Root, "options-backups/" + Binding(instance));
 
+    // 按绑定标识哈希选择 64 个锁槽之一，避免不同实例互相阻塞。
     object Gate(Instance instance) =>
         Gates[(int)(Convert.ToUInt32(Binding(instance)[..8], 16) % (uint)Gates.Length)];
 
+    // 校验备份 ID 格式（32 位十六进制 GUID）并返回其目录。
     string Folder(Instance instance, string id)
     {
         if (!Guid.TryParseExact(id, "N", out _))
@@ -74,9 +87,11 @@ public sealed class OptionsBackups(Store store)
         return Store.SafePath(DirectoryFor(instance), id);
     }
 
+    // 获取实例游戏目录下的选项文件完整路径。
     string GameFile(Instance instance, string name) =>
         Store.SafePath(store.GameDirectory(instance), name);
 
+    // 读取选项文件字节（最大 8MB，使用共享读避免锁定游戏正在写入的文件）。
     static byte[] Bytes(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -94,8 +109,10 @@ public sealed class OptionsBackups(Store store)
         return target.ToArray();
     }
 
+    // 计算字节数组的 SHA-256 哈希。
     static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 
+    // 读取文件前 N 字节的哈希（用于验证日志是否被追加而非截断）。
     static string Prefix(string path, long length)
     {
         using var stream = new FileStream(
@@ -109,6 +126,7 @@ public sealed class OptionsBackups(Store store)
         return Hash(bytes[..count]);
     }
 
+    // 原子写入备份元数据（先写临时文件再移动，防止中途崩溃导致损坏）。
     void Write(Instance instance, OptionsBackup backup)
     {
         var file = Store.SafePath(Folder(instance, backup.Id), "snapshot.json");
@@ -129,6 +147,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 读取实例全部有效备份（校验 ID、绑定、哈希键与状态枚举），按创建时间降序排列。
     List<OptionsBackup> Read(Instance instance)
     {
         var root = DirectoryFor(instance);
@@ -174,18 +193,23 @@ public sealed class OptionsBackups(Store store)
             .ToList();
     }
 
+    // 列出实例全部备份（加锁）。
     public IReadOnlyList<OptionsBackup> List(Instance instance)
     {
         lock (Gate(instance))
             return Read(instance);
     }
 
+    // 清理超出数量限制的旧备份（保留最近的健康快照与指定保留项）。
     public void Prune(Instance instance)
     {
         lock (Gate(instance))
             PruneCore(instance);
     }
 
+    // 清理核心逻辑：
+    // 保留指定项 + 最近一次健康快照 + 按时间倒序填充至上限（2~100），
+    // 删除不在保留列表且未被运行中游戏占用的备份目录。
     void PruneCore(Instance instance, string? retain = null)
     {
         var backups = Read(instance);
@@ -193,7 +217,7 @@ public sealed class OptionsBackups(Store store)
         var keep = new HashSet<string>();
         if (retain != null)
             keep.Add(retain);
-        // Preserve the latest confirmed-good config even after repeated failed launches.
+        // 即使多次启动失败，也保留最近一次确认良好的配置。
         if (
             backups.FirstOrDefault(b =>
                 (b.State == OptionsBackupState.Healthy || b.VerifiedAtStart)
@@ -211,6 +235,10 @@ public sealed class OptionsBackups(Store store)
             Directory.Delete(Folder(instance, backup.Id), true);
     }
 
+    // 创建备份：
+    // 读取现有选项文件 → 写入暂存目录 → 生成元数据（含哈希与日志前缀）→
+    // 原子移动到目标目录 → 清理旧备份。
+    // Pending 状态下额外检查是否与已有健康快照哈希一致（标记 VerifiedAtStart）。
     OptionsBackup? Create(Instance instance, OptionsBackupState state, CancellationToken ct)
     {
         var values = Names
@@ -281,6 +309,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 启动前备份：先对账（将遗留的 Pending 状态判定为最终状态），再创建 Pending 快照。
     public OptionsBackup? BeforeLaunch(Instance instance, CancellationToken ct = default)
     {
         lock (Gate(instance))
@@ -290,6 +319,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 手动备份：游戏运行中禁止操作，创建 Manual 状态快照。
     public OptionsBackup? BackupNow(Instance instance)
     {
         lock (Gate(instance))
@@ -300,6 +330,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 删除指定备份（运行中游戏占用的备份不可删除）。
     public void Delete(Instance instance, string id)
     {
         lock (Gate(instance))
@@ -313,6 +344,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 将备份与游戏进程关联（记录 PID 与启动时间，用于后续判定进程是否仍存活）。
     public void Attach(Instance instance, string id, Process process)
     {
         lock (Gate(instance))
@@ -328,6 +360,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 判断备份关联的游戏进程是否仍在运行（通过 PID + 启动时间双重校验）。
     static bool Running(OptionsBackup backup)
     {
         if (backup.ProcessId <= 0)
@@ -352,6 +385,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 判断日志行是否为资源重载失败标记（排除聊天消息）。
     public static bool IsResourceReloadFailure(string line)
     {
         if (line.Contains("[CHAT]", StringComparison.OrdinalIgnoreCase))
@@ -362,6 +396,7 @@ public sealed class OptionsBackups(Store store)
         return false;
     }
 
+    // 实时观察日志：检测到资源重载失败时立即将备份标记为 ReloadFailed 并记录证据。
     public void Observe(Instance instance, string id, string line)
     {
         if (!IsResourceReloadFailure(line))
@@ -377,6 +412,9 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 查找失败证据：
+    // 先扫描 latest.log（验证日志前缀未被截断后从备份时长度处开始读取），
+    // 再扫描 crash-reports 目录中最近的崩溃报告。
     string? FindFailure(Instance instance, OptionsBackup backup)
     {
         var log = GameFile(instance, "logs/latest.log");
@@ -425,6 +463,9 @@ public sealed class OptionsBackups(Store store)
         return null;
     }
 
+    // 完成备份判定：
+    // Pending → ReloadFailed（发现失败证据）/ Healthy（退出码 0）/ Unknown（其他）。
+    // Healthy 时记录退出时各选项文件的哈希（用于后续验证）。
     void Finish(Instance instance, OptionsBackup backup, int? exitCode)
     {
         if (backup.State != OptionsBackupState.Pending)
@@ -442,6 +483,7 @@ public sealed class OptionsBackups(Store store)
         Write(instance, backup);
     }
 
+    // 游戏退出后调用：完成备份判定并清理旧备份。
     public void Complete(Instance instance, string id, int? exitCode)
     {
         lock (Gate(instance))
@@ -452,6 +494,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 对账：将遗留的 Pending 状态备份（进程已不存在）判定为最终状态。
     void Reconcile(Instance instance)
     {
         foreach (
@@ -461,6 +504,8 @@ public sealed class OptionsBackups(Store store)
             Finish(instance, backup, null);
     }
 
+    // 获取待恢复建议：
+    // 若存在未确认的 ReloadFailed 备份，返回该备份与最近一次健康快照作为回滚目标。
     public OptionsRecovery? PendingRecovery(Instance instance)
     {
         lock (Gate(instance))
@@ -488,6 +533,7 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 确认（忽略）备份失败，不再提示恢复。
     public void Acknowledge(Instance instance, string id)
     {
         lock (Gate(instance))
@@ -499,6 +545,9 @@ public sealed class OptionsBackups(Store store)
         }
     }
 
+    // 恢复选项文件：
+    // 校验备份完整性（SHA-256）→ 自动创建 BeforeRestore 备份 →
+    // 逐文件替换（失败时回滚）→ 确认所有未处理的 ReloadFailed 备份。
     public void Restore(Instance instance, string id)
     {
         lock (Gate(instance))

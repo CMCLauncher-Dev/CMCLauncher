@@ -8,7 +8,10 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
-// One instance is retained by the window; the static gate also serializes separate consumers.
+// CMS（Creative Mechanic Server）蓝图服务：
+// 负责从 CMS 网站搜索、浏览、下载蓝图文件。
+// 单实例由窗口持有；静态信号量门控同时串行化多个消费者的请求。
+// 内置速率限制、429 冷却、CSRF 令牌管理与本地缓存。
 public sealed class CmsBlueprints : IDisposable
 {
     public const string Home = "https://www.creativemechanicserver.com/";
@@ -17,7 +20,7 @@ public sealed class CmsBlueprints : IDisposable
     static DateTimeOffset blockedUntil;
     static volatile bool accessDenied;
 
-    // Only explicit user actions resume access after a denial; 429 cooldown is never cleared here.
+    // 仅在用户显式操作后恢复访问；429 冷却期不会在此处清除。
     public void ResumeUserRequest() => accessDenied = false;
 
     readonly HttpClient http;
@@ -44,6 +47,7 @@ public sealed class CmsBlueprints : IDisposable
         interval = () => Math.Clamp(settings.CmsRequestIntervalMs, 1500, 60000);
     }
 
+    // 校验 URI 是否为 CMS 允许的 HTTPS 地址（仅限官方域名、443 端口、无用户信息）。
     public static bool Allowed(Uri uri) =>
         uri.Scheme == "https"
         && uri.Port == 443
@@ -52,6 +56,10 @@ public sealed class CmsBlueprints : IDisposable
             uri.Host == "www.creativemechanicserver.com" || uri.Host == "creativemechanicserver.com"
         );
 
+    // 核心 HTTP 请求方法：
+    // 串行化请求（信号量门控）、速率限制、429 冷却、重定向跟随（最多 4 次）、
+    // 403/CSRF 检测、5xx 错误处理、HTML 挑战页检测。
+    // 若指定 fileTarget，则直接将文件流写入目标路径（用于蓝图下载）。
     async Task<(byte[] Data, string Type)> Send(
         Func<HttpRequestMessage> create,
         int maximum,
@@ -177,6 +185,7 @@ public sealed class CmsBlueprints : IDisposable
         }
     }
 
+    // 读取 HTTP 响应内容，超过大小限制时抛出异常。
     static async Task<byte[]> Read(HttpContent content, int maximum, CancellationToken ct)
     {
         if (content.Headers.ContentLength > maximum)
@@ -194,6 +203,7 @@ public sealed class CmsBlueprints : IDisposable
         return bytes.ToArray();
     }
 
+    // 获取 CMS 页面 HTML 内容（最大 4MB）。
     async Task<string> Page(string path, CancellationToken ct)
     {
         var response = await Send(
@@ -213,8 +223,10 @@ public sealed class CmsBlueprints : IDisposable
         return Encoding.UTF8.GetString(response.Data);
     }
 
+    // 从 CMS 首页提取 CSRF 令牌（搜索请求需要携带）。
     async Task Prime(CancellationToken ct) => csrf = CmsHtml.Csrf(await Page("/", ct));
 
+    // 执行 CMS 搜索请求（POST 表单），CSRF 令牌失效时自动刷新重试一次。
     async Task<string> SearchHtml(string query, string sort, int page, CancellationToken ct)
     {
         if (csrf == null)
@@ -275,6 +287,7 @@ public sealed class CmsBlueprints : IDisposable
         );
     }
 
+    // CMS CSRF 验证失败异常（内部使用，触发令牌刷新重试）。
     sealed class CmsCsrfException : IOException
     {
         public CmsCsrfException()
@@ -283,6 +296,10 @@ public sealed class CmsBlueprints : IDisposable
             ) { }
     }
 
+    // 通用缓存层：
+    // 优先读取本地缓存（TTL 内直接返回），
+    // 缓存未命中时通过 pending 字典去重并发请求，
+    // 网络失败时回退到过期缓存（标记 Stale=true）。
     async Task<(T Data, bool Stale)> Cached<T>(
         string key,
         TimeSpan ttl,
@@ -344,6 +361,8 @@ public sealed class CmsBlueprints : IDisposable
         }
     }
 
+    // 搜索 CMS 蓝图列表：
+    // 支持按下载量或时间排序，空查询时首页仅返回前 12 条。
     public async Task<CmsPage> Search(string query, string sort, int page, CancellationToken ct)
     {
         if (query.Length > 200 || page < 1 || page > 10000 || sort is not ("download" or "time"))
@@ -371,6 +390,7 @@ public sealed class CmsBlueprints : IDisposable
         };
     }
 
+    // 获取蓝图详情页（解析 HTML 提取描述、文件列表等信息）。
     public async Task<(CmsDetail Detail, bool Stale)> Detail(Blueprint entry, CancellationToken ct)
     {
         if (!int.TryParse(entry.Id, out var id) || id <= 0)
@@ -389,6 +409,7 @@ public sealed class CmsBlueprints : IDisposable
         return (result.Data, result.Stale);
     }
 
+    // 下载蓝图封面图片（校验 URL 安全、MIME 类型与文件头魔数），24 小时本地缓存。
     public async Task<byte[]> Cover(string url, CancellationToken ct)
     {
         if (
@@ -470,6 +491,8 @@ public sealed class CmsBlueprints : IDisposable
         }
     }
 
+    // 下载蓝图文件：
+    // 先访问下载中转页获取真实文件链接，校验 URL 安全后下载到暂存目录。
     public async Task<string> Download(CmsFile file, string stage, CancellationToken ct)
     {
         if (!int.TryParse(file.Id, out var id) || id <= 0)
@@ -509,7 +532,9 @@ public sealed class CmsBlueprints : IDisposable
         }
     }
 
+    // 清理本地缓存。
     public void CleanCache() => cache.Clean();
 
+    // 释放 HTTP 客户端资源。
     public void Dispose() => http.Dispose();
 }

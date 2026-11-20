@@ -4,7 +4,8 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
-// CurseForge metadata and downloads use their own authenticated, non-redirecting transport.
+// CurseForge 社区内容服务：元数据查询与文件下载均使用独立的、带认证且不跟随重定向的传输通道。
+// 提供搜索、项目详情、版本列表、文件下载、模组包安装与依赖解析等功能。
 public sealed class CurseForgeCommunityService : IDisposable
 {
     readonly LauncherCore core;
@@ -33,9 +34,11 @@ public sealed class CurseForgeCommunityService : IDisposable
             );
     }
 
+    // 判断项目 ID 是否为 CurseForge 格式（"curseforge:<数字>"）。
     public static bool IsProject(string id) =>
         id.StartsWith("curseforge:", StringComparison.Ordinal);
 
+    // 从 "curseforge:<数字>" 格式的项目 ID 中解析出数字部分。
     public static int Number(string id)
     {
         if (!IsProject(id) || !int.TryParse(id[11..], out var number) || number <= 0)
@@ -43,8 +46,10 @@ public sealed class CurseForgeCommunityService : IDisposable
         return number;
     }
 
+    // 将数字 ID 转换为 "curseforge:<数字>" 格式。
     static string Id(int id) => "curseforge:" + id;
 
+    // 从项目 JSON 中安全提取下载量（支持 long 和 double 两种类型）。
     static long Downloads(JsonNode project)
     {
         if (project["downloadCount"] is not JsonValue value)
@@ -56,6 +61,7 @@ public sealed class CurseForgeCommunityService : IDisposable
             : 0;
     }
 
+    // 校验并返回文件名（必须是非空且不含路径分隔符的纯文件名）。
     static string FileName(JsonNode file)
     {
         var name = file.S("fileName");
@@ -64,6 +70,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         return name;
     }
 
+    // 发起 CurseForge API 查询（需已配置 API Key）。
     async Task<JsonNode> Query(string path, CancellationToken ct)
     {
         if (!IsEnabled)
@@ -73,10 +80,12 @@ public sealed class CurseForgeCommunityService : IDisposable
         return await client.Query(path, ct);
     }
 
+    // 查询 API 并提取 "data" 字段。
     async Task<JsonNode> Data(string path, CancellationToken ct) =>
         (await Query(path, ct))["data"]
         ?? throw new InvalidDataException("CurseForge returned no data.");
 
+    // 将资源类型映射为 CurseForge 的类别 slug。
     static string Slug(string type) =>
         type switch
         {
@@ -89,6 +98,7 @@ public sealed class CurseForgeCommunityService : IDisposable
             _ => throw new ArgumentException("Unsupported resource type."),
         };
 
+    // 查询 CurseForge 类别列表，返回指定资源类型对应的类别 ID。
     async Task<int> Class(string type, CancellationToken ct)
     {
         var classes = await Data("categories?gameId=432&classesOnly=true", ct);
@@ -105,6 +115,7 @@ public sealed class CurseForgeCommunityService : IDisposable
             : throw new InvalidDataException("CurseForge does not expose this resource class.");
     }
 
+    // 将加载器名称映射为 CurseForge 的 modLoaderType 数字编码。
     static int Loader(string loader) =>
         loader switch
         {
@@ -116,6 +127,7 @@ public sealed class CurseForgeCommunityService : IDisposable
             _ => throw new ArgumentException("This loader filter is not supported by CurseForge."),
         };
 
+    // 获取指定资源类型的筛选目录（类别列表、支持的加载器等）。
     public async Task<CommunityFilterCatalog> FilterCatalog(string type, CancellationToken ct)
     {
         var classId = await Class(type, ct);
@@ -139,6 +151,9 @@ public sealed class CurseForgeCommunityService : IDisposable
         );
     }
 
+    // 搜索 CurseForge 项目：
+    // 支持按关键词、游戏版本、加载器、类别筛选，最多返回 10000 条结果。
+    // 部分高级筛选条件（环境、许可证、开源等）仅 Modrinth 支持，传入时抛出异常。
     public async Task<CommunitySearchPage> SearchPage(
         string query,
         string type,
@@ -218,6 +233,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         );
     }
 
+    // 获取项目详情：名称、摘要、描述（HTML 转纯文本）、封面、下载量、类别、网站与作者。
     public async Task<CommunityProject> ProjectDetails(string project, CancellationToken ct)
     {
         var id = Number(project);
@@ -243,6 +259,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         );
     }
 
+    // 获取项目元数据并校验 ID 与游戏 ID 一致性。
     async Task<JsonNode> Project(int id, CancellationToken ct)
     {
         var project = await Data($"mods/{id}", ct);
@@ -251,6 +268,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         return project;
     }
 
+    // 获取项目下指定文件的元数据并校验归属关系。
     async Task<JsonNode> File(int project, int file, CancellationToken ct)
     {
         var result = await Data($"mods/{project}/files/{file}", ct);
@@ -265,6 +283,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         return result;
     }
 
+    // 将文件 JSON 转换为 CommunityVersion（提取显示名、文件名、发布类型、日期、游戏版本与加载器）。
     static CommunityVersion Version(JsonNode file)
     {
         var tags = file["gameVersions"].Items().Select(v => v.ToString()).ToArray();
@@ -291,6 +310,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         );
     }
 
+    // 分页获取项目全部可用版本（跳过不可用、抢先体验与服务器包文件）。
     public async Task<List<CommunityVersion>> ProjectVersions(string project, CancellationToken ct)
     {
         var id = Number(project);
@@ -319,7 +339,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         return result;
     }
 
-    // Page by raw API rows, including filtered files, so unavailable entries cannot repeat or stall a page.
+    // 按原始 API 行分页（包含被过滤的文件），确保不可用条目不会导致分页重复或停滞。
     public async Task<CommunityVersionPage> ProjectVersionPage(
         string project,
         int offset,
@@ -353,6 +373,9 @@ public sealed class CurseForgeCommunityService : IDisposable
         return new(versions, offset, next, total);
     }
 
+    // 下载指定文件到目标路径：
+    // 校验作者是否允许第三方分发、文件是否可用，
+    // 获取 SHA-1 哈希与授权下载 URL 后通过认证通道下载。
     public async Task DownloadFile(int projectId, int fileId, string target, CancellationToken ct)
     {
         var project = await Project(projectId, ct);
@@ -385,6 +408,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         );
     }
 
+    // 下载项目文件到暂存目录并返回本地路径。
     public async Task<string> DownloadProjectFile(string project, string version, string stage, CancellationToken ct)
     {
         var metadata = await File(Number(project), Number(version), ct);
@@ -394,6 +418,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         return target;
     }
 
+    // 下载并安装 CurseForge 模组包（ZIP 格式），委托给 ModrinthService 执行实际安装。
     public async Task<Instance> InstallPack(
         string project,
         string version,
@@ -418,6 +443,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         }
     }
 
+    // 获取文件依赖列表（最多 100 条），将关系类型映射为可读名称。
     public async Task<List<CommunityDependency>> Dependencies(
         string project,
         string version,
@@ -444,6 +470,8 @@ public sealed class CurseForgeCommunityService : IDisposable
         return result;
     }
 
+    // 查找已跟踪模组的可用更新：
+    // 读取实例的 .craft-mods-native.json 记录，查询 CurseForge 是否有更新的 release 版本。
     public async Task<(string Project, string Version, string Name)?> FindTrackedModUpdate(
         Instance instance,
         string file,
@@ -485,6 +513,10 @@ public sealed class CurseForgeCommunityService : IDisposable
         return (project, Id(candidate.Int("id")), candidate.S("displayName"));
     }
 
+    // 将 CurseForge 内容安装到实例：
+    // 支持 mod/shader/datapack/world 四种类型，
+    // 递归解析必需依赖（最多 100 个），校验版本与加载器兼容性，
+    // 下载后导入到实例目录，mod 类型额外写入跟踪记录。
     public async Task InstallContent(
         Instance instance,
         string project,

@@ -3,10 +3,13 @@ using System.IO.Compression;
 
 namespace CMCLauncher;
 
+// 运行时归档（JRE 等）的安全解压器。
+// 支持 ZIP 与 gzip 压缩的 tar 两种格式，仅解压到全新的暂存目录，
+// 并限制解压总大小与条目数，防止 zip-slip / 解压炸弹。
 public static class RuntimeArchive
 {
-    // Extract only into a new staging directory. Links are resolved after ordinary files,
-    // so an archive cannot redirect a later write outside that directory.
+    // 仅解压到新的暂存目录。符号链接在普通文件全部写入之后再解析，
+    // 因此归档无法把后续写入重定向到该目录之外。
     public static async Task Extract(
         string archive,
         string destination,
@@ -26,6 +29,7 @@ public static class RuntimeArchive
         Directory.CreateDirectory(destination);
         long expanded = 0;
         var entries = 0;
+        // 累计解压大小，超出 limit 则中止。
         void Count(long length)
         {
             if (length < 0 || length > limit - expanded)
@@ -34,6 +38,7 @@ public static class RuntimeArchive
         }
         if (!gzip)
         {
+            // ZIP 格式：逐条解压，拒绝符号链接条目。
             using var zip = ZipFile.OpenRead(archive);
             foreach (var entry in zip.Entries)
             {
@@ -56,6 +61,7 @@ public static class RuntimeArchive
             }
             return;
         }
+        // gzip tar 格式：先写入普通文件，收集符号链接待最后统一创建。
         var links = new List<(string Path, string Target)>();
         await using var file = File.OpenRead(archive);
         await using var stream = new GZipStream(file, CompressionMode.Decompress);
@@ -76,6 +82,7 @@ public static class RuntimeArchive
                 Directory.CreateDirectory(path);
                 continue;
             }
+            // 符号链接：校验目标仍在 destination 内，记录待最后创建。
             if (entry.EntryType == TarEntryType.SymbolicLink)
             {
                 var target = Path.GetFullPath(
@@ -95,6 +102,7 @@ public static class RuntimeArchive
             if (!OperatingSystem.IsWindows())
                 File.SetUnixFileMode(path, entry.Mode & (UnixFileMode)0x1FF);
         }
+        // 普通文件全部写入后，再统一创建符号链接。
         foreach (var link in links)
         {
             ct.ThrowIfCancellationRequested();
