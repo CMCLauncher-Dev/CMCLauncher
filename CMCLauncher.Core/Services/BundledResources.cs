@@ -7,10 +7,13 @@ namespace CMCLauncher;
 // 外层目录只放用户新增或修改的文件，同名时优先于自带文件。
 public static class BundledResources
 {
+    // 自带资源子目录名。
     public const string DefaultFolder = "Default";
 
+    // 历史版本自带文件的 SHA-256 哈希集合（懒加载自内嵌资源 BundledHistory）。
     static readonly Lazy<HashSet<string>> History = new(LoadHistory);
 
+    // 返回某资源目录下自带资源子目录（Default）的完整路径。
     public static string DefaultDirectory(string directory) =>
         Path.Combine(directory, DefaultFolder);
 
@@ -74,6 +77,7 @@ public static class BundledResources
         return removed;
     }
 
+    // 判断文件哈希是否与程序集内嵌的同名资源一致（即用户未修改过）。
     static bool MatchesEmbedded(string resourceGroup, string name, string hash)
     {
         using var stream = typeof(BundledResources).Assembly.GetManifestResourceStream(

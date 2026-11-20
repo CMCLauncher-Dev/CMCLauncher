@@ -9,6 +9,7 @@ using CMCLauncher.Platform;
 
 namespace CMCLauncher;
 
+// 一个 Terracotta 发行版：版本号、资产文件名、下载地址、SHA256 哈希与大小。
 public sealed record TerracottaRelease(
     string Version,
     string Asset,
@@ -17,6 +18,7 @@ public sealed record TerracottaRelease(
     long Size
 );
 
+// 一次已安装的 Terracotta：版本号、可执行文件相对路径、以及全部文件的 SHA256 哈希表。
 public sealed record TerracottaInstallation(
     string Version,
     string Executable,
@@ -92,6 +94,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 按版本号、操作系统与架构拼出官方资产文件名（terracotta-{ver}-{os}-{arch}-pkg.tar.gz）。
     public static string AssetName(string version, string os, string arch)
     {
         if (!Regex.IsMatch(version, @"^\d+\.\d+\.\d+$", RegexOptions.CultureInvariant))
@@ -112,6 +115,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         return $"terracotta-{version}-{os}-{arch}-pkg.tar.gz";
     }
 
+    // 解析 GitHub 最新发行版 JSON，挑出匹配当前平台的资产并校验其 URL、哈希与大小。
     public static TerracottaRelease ParseRelease(JsonNode data, string os, string arch)
     {
         var version = (data["tag_name"]?.GetValue<string>() ?? "").TrimStart('v');
@@ -133,6 +137,8 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         return new(version, name, url, hash[7..], size);
     }
 
+    // 下载并安装 Terracotta：拉取最新发行版、校验哈希、解包、
+    // 计算全部文件哈希并原子写入 current.json；失败时清理临时目录。
     public async Task Install(CancellationToken ct)
     {
         await operations.WaitAsync(ct);
@@ -222,6 +228,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 卸载 Terracotta：校验目录内无符号链接后递归删除组件目录。
     public async Task Remove(CancellationToken ct = default)
     {
         await operations.WaitAsync(ct);
@@ -262,6 +269,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 校验已安装文件与记录的哈希一致，防止组件被篡改。
     async Task<TerracottaInstallation> Verify(CancellationToken ct)
     {
         var installation = Installed ?? throw new IOException("Download Terracotta first.");
@@ -299,6 +307,8 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         Process.Start(PlatformCommand.SystemEnvironment(start))?.Dispose();
     }
 
+    // 启动 Terracotta 本地服务：校验安装、启动进程、等待其写出端口文件，
+    // 连接本地 API 并启动后台轮询。
     public async Task Start(CancellationToken ct = default)
     {
         await operations.WaitAsync(ct);
@@ -353,6 +363,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 连接本地 API：校验端口与运行版本，刷新状态；失败时复位端口。
     internal async Task Connect(int candidate, string version, CancellationToken ct)
     {
         if (candidate is < 1 or > 65535)
@@ -376,6 +387,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 向本地 API 发起一次查询（串行化），返回解析后的 JSON。
     async Task<JsonNode> Query(string path, CancellationToken ct)
     {
         await requests.WaitAsync(ct);
@@ -400,6 +412,8 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 刷新房间状态：只接受比当前更新的状态（按 index/profile_index 比较），
+    // 避免旧响应覆盖新状态。
     public async Task Refresh(CancellationToken ct = default)
     {
         var revision = connection;
@@ -423,6 +437,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         Changed?.Invoke();
     }
 
+    // 校验并 URL 编码房间码/玩家名（长度 1..512，无控制字符）。
     public static string Parameter(string value)
     {
         value = value.Trim();
@@ -437,6 +452,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
     public async Task JoinRoom(string room, string player, CancellationToken ct = default) =>
         await Room("guesting?room=" + Parameter(room) + "&player=" + Parameter(player), ct);
 
+    // 创建/加入房间：要求当前处于等待状态，执行动作后刷新。
     async Task Room(string action, CancellationToken ct)
     {
         await operations.WaitAsync(ct);
@@ -454,6 +470,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 离开当前房间；连接已断开时直接复位。
     public async Task Leave(CancellationToken ct = default)
     {
         await operations.WaitAsync(ct);
@@ -478,6 +495,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 停止本地服务（请求 panic 后断开）；连接已断开时直接复位。
     public async Task Stop(CancellationToken ct = default)
     {
         await operations.WaitAsync(ct);
@@ -501,6 +519,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         }
     }
 
+    // 断开连接并复位内部状态（端口、连接序号、状态）。
     void Disconnect(string? error = null)
     {
         lock (requests)
@@ -515,6 +534,8 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         Changed?.Invoke();
     }
 
+    // 后台轮询房间状态：Active 时 500ms、否则 15s 一次；
+    // 连续 5 次失败判定为断开。
     async Task Poll(int revision)
     {
         var failures = 0;

@@ -3,8 +3,12 @@ using System.Text.Json.Nodes;
 
 namespace CMCLauncher;
 
+// Mod 包导出：把实例中的游戏内容（mods、config、资源包等）打包成
+// Modrinth 或 CurseForge 格式的 zip 包，支持把部分文件以引用（reference）
+// 而非内嵌方式写入清单。
 public static class ModpackExporter
 {
+    // 可导出的目录白名单。
     public static readonly string[] Folders =
     [
         "mods",
@@ -19,6 +23,7 @@ public static class ModpackExporter
         "saves",
         "screenshots",
     ];
+    // 可导出的设置文件白名单。
     public static readonly string[] SettingsFiles =
     [
         "options.txt",
@@ -27,6 +32,8 @@ public static class ModpackExporter
         "servers.dat",
     ];
 
+    // 解析并校验相对路径：拒绝路径穿越（..、.、空段）、非白名单内容、
+    // 以及符号链接/联接点，返回安全的绝对路径。
     static string Resolve(string root, string relative)
     {
         relative = relative.Replace('\\', '/');
@@ -47,6 +54,7 @@ public static class ModpackExporter
         return path;
     }
 
+    // 递归枚举实例中所有可导出的文件（相对路径），上限 29000 个。
     public static IReadOnlyList<string> List(string root, CancellationToken ct)
     {
         var files = new List<string>();
@@ -79,6 +87,9 @@ public static class ModpackExporter
         return files;
     }
 
+    // 导出 Mod 包：根据所选文件生成 Modrinth/CurseForge 清单，
+    // 把内嵌文件写入 overrides/ 目录，引用文件写入清单的 files 数组，
+    // 最终打包为 zip（先写临时文件再原子移动）。
     public static async Task Export(
         string root,
         Instance instance,

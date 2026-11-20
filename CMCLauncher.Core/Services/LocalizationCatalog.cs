@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
+// 一个界面语言选项：语言代码（如 zh_cn）与显示名称。
 public sealed record InterfaceLanguage(string Code, string DisplayName)
 {
     public override string ToString() => DisplayName;
@@ -13,12 +14,14 @@ public sealed record InterfaceLanguage(string Code, string DisplayName)
 // 外部 JSON 覆盖随程序集附带的默认词条；损坏的语言包不会阻止启动。
 public sealed class LocalizationCatalog
 {
+    // 前缀替换规则：把词条 key 的 Source 前缀替换为 Target 前缀。
     sealed class Prefix
     {
         public string Source { get; set; } = "";
         public string Target { get; set; } = "";
     }
 
+    // 正则翻译规则：对动态 key（如带 ID 的词条）做模式匹配与替换。
     sealed class Rule
     {
         public string Pattern { get; set; } = "";
@@ -27,6 +30,7 @@ public sealed class LocalizationCatalog
         public Dictionary<string, Dictionary<string, string>>? Captures { get; set; }
     }
 
+    // 一个语言包：代码、显示名、词条表、别名表、前缀规则与正则规则。
     sealed class Pack
     {
         public string Code { get; set; } = "";
@@ -46,6 +50,7 @@ public sealed class LocalizationCatalog
 
     static bool ValidCode(string code) => Regex.IsMatch(code, "^[a-z]{2}_[a-z]{2}$");
 
+    // 初始化：清理目录中的过期副本并加载全部语言包。
     public LocalizationCatalog(string directory, Action<string>? diagnostic = null)
     {
         this.directory = directory;
@@ -54,6 +59,7 @@ public sealed class LocalizationCatalog
         Reload();
     }
 
+    // 可用语言列表（en_us、zh_cn 置顶，其余按代码排序）。
     public IReadOnlyList<InterfaceLanguage> Languages =>
         packs
             .Values.OrderBy(p =>
@@ -65,6 +71,8 @@ public sealed class LocalizationCatalog
             .Select(p => new InterfaceLanguage(p.Code, p.DisplayName))
             .ToArray();
 
+    // 重新加载语言包：先读程序集内嵌的默认词条，
+    // 再合并 Default/ 自带语言包与外层用户语言包（后者覆盖前者）。
     public void Reload()
     {
         var next = new Dictionary<string, Pack>(StringComparer.OrdinalIgnoreCase);
@@ -135,6 +143,7 @@ public sealed class LocalizationCatalog
         packs = next;
     }
 
+    // 解析并校验语言包 JSON（代码格式、显示名、词条、规则合法性）。
     static Pack Parse(string json)
     {
         var pack =
@@ -162,6 +171,8 @@ public sealed class LocalizationCatalog
         return pack;
     }
 
+    // 翻译词条：先查别名与词条表，再依次尝试正则规则与前缀规则，
+    // 都没有时回退到英文词条，最后原样返回 key。
     public string Translate(string language, string key)
     {
         language ??= "en_us";
@@ -230,6 +241,7 @@ public sealed class LocalizationCatalog
             : key;
     }
 
+    // 翻译并按目标语言文化格式化占位符；格式错误时回退英文模板，仍失败则返回 key。
     public string Format(string language, string key, params object?[] values)
     {
         language ??= "en_us";

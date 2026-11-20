@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 
 namespace CMCLauncher.Core.Minecraft.DataPacks;
 
+// 数据包条目的类型：配方（无序/有序/烹饪）、战利品表、进度、函数、标签、自定义 JSON。
 public enum DataPackEntryKind
 {
     ShapelessRecipe,
@@ -17,6 +18,7 @@ public enum DataPackEntryKind
     CustomJson,
 }
 
+// 数据包编辑器中一个可填写字段的定义：键、显示标签、默认值、帮助文本、是否多行、可选值列表。
 public sealed record DataPackField(
     string Key,
     string Label,
@@ -26,6 +28,8 @@ public sealed record DataPackField(
     string[]? Choices = null
 );
 
+// 一条数据包条目：类型、资源 ID 和字段值集合。
+// SourceOverride 非空时以原始 JSON/函数文本为准，忽略引导字段。
 public sealed record DataPackEntry(
     DataPackEntryKind Kind,
     string Id,
@@ -39,9 +43,13 @@ public sealed record DataPackEntry(
     public override string ToString() => Id + " · " + DataPackEntryEditor.Label(Kind);
 }
 
-/// <summary>Shared field definitions and version-aware document generation for both GUI frontends.</summary>
+/// <summary>
+/// 数据包条目编辑器：为两种 GUI 前端（WinUI / Avalonia）提供共享的字段定义
+/// 和版本感知的文档生成逻辑。
+/// </summary>
 public static class DataPackEntryEditor
 {
+    // 返回新建数据包时的初始示例条目（无序配方、战利品表、进度、load/tick 函数）。
     public static IReadOnlyList<DataPackEntry> StarterEntries()
     {
         DataPackEntry Function(string id) =>

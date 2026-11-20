@@ -7,22 +7,32 @@ using System.Text.Json.Nodes;
 
 namespace CMCLauncher;
 
+// 版本目录删除被阻止的原因。None 表示可以安全删除，其余值对应 InspectVersionDeletion
+// 检查出的具体风险，UI 据此提示用户并阻止删除操作。
 public enum VersionDeletionBlockReason
 {
     None,
+    // 目标目录不在 versions/ 或 instances/ 下，不属于可回收的版本目录。
     OutsideVersionDirectory,
+    // 规范化后路径越过存储根目录，或包含非法片段。
     UnsafePath,
+    // 其他实例也指向同一目录，删除会破坏它们。
     SharedDirectory,
+    // 其他版本档案通过 inheritsFrom 或 jar 字段引用了该版本。
     Dependency,
+    // 扫描依赖时遇到无法解析的版本档案。
     UnreadableProfile,
 }
 
+// 版本目录删除检查的结果。Directory 是被检查的目录，Reason 说明能否删除，
+// RelatedVersions 列出与之相关的版本名（共享或依赖时供 UI 展示）。
 public sealed record VersionDeletionInspection(
     string? Directory,
     VersionDeletionBlockReason Reason,
     IReadOnlyList<string> RelatedVersions
 )
 {
+    // 仅当检查通过（Reason == None）时返回可删除目录，否则为 null。
     public string? DeletableDirectory =>
         Reason == VersionDeletionBlockReason.None ? Directory : null;
 }
@@ -112,6 +122,8 @@ public sealed class Settings
     public string HomeNote { get; set; } = "";
 }
 
+// 首页卡片在网格中的摆放位置。Width/Height 以网格单元为单位，
+// 用于持久化用户拖拽调整后的首页布局。
 public sealed class HomeCardPlacement
 {
     public string Id { get; set; } = "";
@@ -135,6 +147,8 @@ public sealed class CustomAppearancePreset
     public Dictionary<string, string> CustomDarkColors { get; set; } = new();
 }
 
+// 一个已发现的 Java 运行时。ManagedRoot/ManagedHash 非空表示这是启动器
+// 自行下载并托管的运行时（位于 runtimes/ 下），否则是系统扫描到的外部安装。
 public sealed class JavaInstallation
 {
     public string ManagedRoot { get; set; } = "";
@@ -168,6 +182,9 @@ public sealed class Instance
     public override string ToString() => $"{Name}  ·  {GameVersion} / {Loader}";
 }
 
+// 启动器账号。Type 取值："offline"（离线）、"microsoft"（微软在线）、
+// "yggdrasil"（authlib-injector 外部服务器）。Uuid 是游戏内玩家 UUID，
+// 用于启动参数；Key 是启动器内部用于选择/删除账号的唯一键。
 public sealed class Account
 {
     public string Type { get; set; } = "offline";
@@ -207,6 +224,8 @@ public sealed class Account
     }
 }
 
+// settings.json 的完整结构：全局设置 + 实例列表 + 账号列表 + 已注册的
+// Minecraft 目录 + 当前选中的账号与实例。整个对象由 Store 负责读写。
 public sealed class Configuration
 {
     public Settings Settings { get; set; } = new();

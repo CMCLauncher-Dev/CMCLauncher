@@ -6,8 +6,12 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
+// 一个 frp 客户端发行版的元数据：版本号、官方下载地址、SHA-256 校验和与文件大小。
+// 下载前用 Url/Sha256/Size 三重校验，防止篡改或不完整的包。
 public sealed record FrpcRelease(string Version, string Url, string Sha256, long Size);
 
+// 一页 frp 客户端版本列表。Source 标记数据来源（"api" 走 GitHub API，"web" 走
+// 官方 releases 网页解析），IsCached 表示该页来自本地缓存而非实时请求。
 public sealed record FrpcReleasePage(
     string[] Versions,
     bool HasMore,
@@ -16,6 +20,7 @@ public sealed record FrpcReleasePage(
 );
 
 // frpc 的配置解析交给官方客户端；工作目录保持为配置所在目录，兼容 includes 和证书相对路径。
+// 负责 frp 客户端的下载、安装、校验、启动与停止，所有操作经 gate 串行化以避免并发冲突。
 public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
 {
     readonly SemaphoreSlim gate = new(1, 1);
@@ -25,6 +30,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
     bool disposed;
     public event Action<string>? Output;
     public event Action? Changed;
+    // frpc 客户端安装根目录（非 Windows x64 时按平台/架构分子目录）。
     public string Root =>
         Store.SafePath(
             store.Root,
@@ -36,6 +42,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
                         : "/" + MinecraftPlatform.OsName + "-" + MinecraftPlatform.Architecture
                 )
         );
+    // frpc 进程是否正在运行。
     public bool Running
     {
         get
@@ -50,18 +57,26 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
             }
         }
     }
+    // 最近一次进程退出码。
     public int? ExitCode { get; private set; }
+    // 当前运行使用的配置文件路径。
     public string? ActiveConfig { get; private set; }
+    // 当前运行使用的客户端版本号。
     public string? ActiveVersion { get; private set; }
+
+    // 合法版本号格式（允许前导 v）。
     static readonly Regex VersionPattern = new(@"^v?\d+\.\d+\.\d+$", RegexOptions.CultureInvariant);
 
+    // 规范化版本号（去掉前导 v），非法则抛异常。
     public static string Version(string value) =>
         VersionPattern.IsMatch(value)
             ? value.TrimStart('v')
             : throw new IOException("Invalid Frp Client version (example: 0.71.1).");
 
+    // 当前平台的 frpc 可执行文件名。
     static string ClientName => MinecraftPlatform.OsName == "windows" ? "frpc.exe" : "frpc";
 
+    // 构造当前平台对应的 GitHub 发布资产文件名。
     static string AssetName(string version)
     {
         var os = MinecraftPlatform.OsName switch
@@ -80,9 +95,11 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         return $"frp_{version}_{os}_{arch}." + (os == "windows" ? "zip" : "tar.gz");
     }
 
+    // 指定版本 frpc 可执行文件的完整路径。
     public string Executable(string version) =>
         Store.SafePath(Root, Version(version) + "/" + ClientName);
 
+    // 列出已安装的客户端版本（按版本号降序）。
     public string[] Installed() =>
         Directory.Exists(Root)
             ? Directory
@@ -94,6 +111,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
                 .ToArray()
             : [];
 
+    // 删除指定版本的客户端（运行中时禁止删除）。
     public async Task Remove(string version, CancellationToken ct = default)
     {
         await gate.WaitAsync(ct);
@@ -125,6 +143,8 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 查找指定版本（或 latest）的发布元数据；
+    // 优先 GitHub API，失败时回退到官方 releases 网页，再失败时读本地缓存。
     public async Task<FrpcRelease> FindRelease(string version, CancellationToken ct)
     {
         _ = AssetName("0.0.0");
@@ -198,6 +218,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 通过 GitHub API 获取发布元数据（含 SHA-256 校验和与文件大小）。
     async Task<FrpcRelease> FindApiRelease(string version, CancellationToken ct)
     {
         var endpoint =
@@ -238,6 +259,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         return new(resolved, url, hash, asset["size"]!.GetValue<long>());
     }
 
+    // 分页获取可用版本列表；优先 API，回退到网页解析，再回退到缓存。
     public async Task<FrpcReleasePage> Releases(int page, CancellationToken ct)
     {
         _ = AssetName("0.0.0");
@@ -277,6 +299,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 通过 GitHub API 分页获取版本列表（过滤 draft/prerelease，仅保留含当前平台资产的版本）。
     async Task<FrpcReleasePage> ApiReleases(int page, CancellationToken ct)
     {
         var items =
@@ -313,8 +336,10 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         return new(versions, items.Count == 100);
     }
 
+    // GitHub API 限流后的重试时间。
     DateTimeOffset apiRetryAfter;
 
+    // 请求 GitHub API，处理 403/429 限流并记录重试时间。
     async Task<string> Api(string url, CancellationToken ct)
     {
         if (DateTimeOffset.UtcNow < apiRetryAfter)
@@ -358,6 +383,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         return await response.Content.ReadAsStringAsync(ct);
     }
 
+    // 判断异常是否可触发回退逻辑（非取消且为网络/解析类异常）。
     static bool CanFallback(Exception ex, CancellationToken ct) =>
         !ct.IsCancellationRequested
         && ex
@@ -367,6 +393,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
                 or OperationCanceledException
                 or InvalidOperationException;
 
+    // 解析官方 releases 网页获取版本列表（API 不可用时的回退方案）。
     async Task<FrpcReleasePage> WebReleases(int page, CancellationToken ct)
     {
         var html = await core.Http.GetStringAsync(
@@ -384,8 +411,10 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         return new(versions, Regex.IsMatch(html, @"rel=[""']next[""']"), "web");
     }
 
+    // 缓存文件路径。
     string CachePath(string key) => Store.SafePath(Root, "cache/" + key + ".json");
 
+    // 将值写入本地缓存（失败仅记录日志，不中断主流程）。
     async Task Cache<T>(string key, T value, CancellationToken ct)
     {
         try
@@ -401,6 +430,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 从本地缓存读取值；不存在或损坏时返回 null。
     T? ReadCache<T>(string key)
         where T : class
     {
@@ -417,6 +447,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 校验 URL 是否为 GitHub 官方 frp 发布下载地址。
     static bool OfficialAsset(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var uri)
         && uri.Scheme == "https"
@@ -426,6 +457,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
             StringComparison.Ordinal
         );
 
+    // 下载并安装指定版本的 frpc 客户端（校验 SHA-256 与文件大小，原子移动到位）。
     public async Task Install(FrpcRelease release, CancellationToken ct)
     {
         _ = AssetName("0.0.0");
@@ -467,6 +499,8 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 从发布包中提取 frpc 可执行文件到目标目录；
+    // Windows 只提取白名单文件（frpc.exe + LICENSE），非 Windows 校验 ELF/Mach-O 魔数。
     public static async Task ExtractClient(string zip, string destination, CancellationToken ct)
     {
         if (MinecraftPlatform.OsName != "windows")
@@ -546,6 +580,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
             throw new IOException("Frp Client is not a Windows executable.");
     }
 
+    // 校验配置文件路径（.ini/.toml 且存在），返回完整路径。
     public static string Config(string path)
     {
         var full = Path.GetFullPath(path);
@@ -559,6 +594,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         return full;
     }
 
+    // 构造 frpc 进程启动信息（工作目录为配置所在目录，verify 时加 verify 参数）。
     public ProcessStartInfo StartInfo(string version, string config, bool verify = false)
     {
         _ = AssetName("0.0.0");
@@ -581,6 +617,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         return CMCLauncher.Platform.PlatformCommand.SystemEnvironment(info);
     }
 
+    // 验证配置文件是否合法（15 秒超时）。
     public async Task Verify(string version, string config, CancellationToken ct)
     {
         await gate.WaitAsync(ct);
@@ -595,6 +632,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 执行 frpc verify 子命令，非零退出码视为验证失败。
     async Task VerifyCore(string version, string config, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetime.Token);
@@ -624,6 +662,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 启动 frpc 进程（先验证配置，再启动并观察输出）。
     public async Task Start(string version, string config, CancellationToken ct)
     {
         await gate.WaitAsync(ct);
@@ -652,6 +691,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         }
     }
 
+    // 观察子进程：读取 stdout/stderr 并等待退出，更新退出码。
     async Task Observe(Process child)
     {
         var stdout = Pump(child.StandardOutput);
@@ -663,12 +703,14 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         Changed?.Invoke();
     }
 
+    // 逐行读取流并触发 Output 事件（单行截断 4096 字符）。
     async Task Pump(StreamReader reader)
     {
         while (await reader.ReadLineAsync() is { } line)
             Emit(line.Length > 4096 ? line[..4096] + "…" : line);
     }
 
+    // 脱敏输出：将 token/secret_key/password 等敏感值替换为 [REDACTED]。
     public static string CleanOutput(string line) =>
         Regex.Replace(
             line,
@@ -676,8 +718,10 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
             "$1$2[REDACTED]"
         );
 
+    // 触发 Output 事件（自动脱敏）。
     void Emit(string line) => Output?.Invoke(CleanOutput(line));
 
+    // 停止 frpc 进程并等待其退出。
     public async Task Stop()
     {
         await gate.WaitAsync();

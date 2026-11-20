@@ -1,5 +1,6 @@
 namespace CMCLauncher;
 
+// 一个导航菜单项：标题、Segoe 图标字形、矢量图标路径，以及 WinUI/Avalonia 两套前端各自的路由。
 public sealed record NavigationEntry(
     string Title,
     string Glyph,
@@ -8,6 +9,7 @@ public sealed record NavigationEntry(
     string AvaloniaRoute
 );
 
+// 一个导航分组（如"下载"、"设置"、"更多"），包含组标题、图标与组内菜单项列表。
 public sealed record NavigationGroup(
     string Title,
     string Key,

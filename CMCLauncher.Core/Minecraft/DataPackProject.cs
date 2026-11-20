@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 
 namespace CMCLauncher.Core.Minecraft.DataPacks;
 
+// 数据包模板选择（Flags）：可组合勾选要生成的示例条目类型。
 [Flags]
 public enum DataPackTemplates
 {
@@ -17,6 +18,8 @@ public enum DataPackTemplates
     All = Recipe | LootTable | Advancement | Functions,
 }
 
+// 数据包生成选项：名称、游戏版本、描述、命名空间，
+// 以及要生成的模板类型、自定义条目列表和示例条目使用的物品 ID。
 public sealed record DataPackOptions(
     string Name,
     string GameVersion,
@@ -31,9 +34,11 @@ public sealed record DataPackOptions(
     public string LootItem { get; init; } = "minecraft:apple";
 }
 
+// 数据包生成器（partial）：本部分负责按选项生成全部文件内容（Preview）、
+// 写入目录（CreateDataPack）和导出 ZIP（ExportZip）。
 public static partial class DataPackGenerator
 {
-    /// <summary>Returns the exact UTF-8 file contents used for preview and export; performs no IO.</summary>
+    /// <summary>返回用于预览和导出的精确 UTF-8 文件内容（相对路径 → 文本）；不执行任何 IO。</summary>
     public static IReadOnlyDictionary<string, string> Preview(DataPackOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -206,6 +211,7 @@ public static partial class DataPackGenerator
         return new ReadOnlyDictionary<string, string>(files);
     }
 
+    // 校验物品 ID 的资源位置语法（namespace:path）；不校验该物品是否真实存在于所选游戏/Mod 中。
     static void ValidateItem(string value)
     {
         // Validate resource-location syntax, not the selected game's/mods' item registry.
@@ -227,6 +233,7 @@ public static partial class DataPackGenerator
             throw new ArgumentException("Air cannot be used in these templates.");
     }
 
+    // 在 parentDirectory 下创建数据包目录：先写入临时暂存目录，成功后原子移动为目标目录。
     public static string CreateDataPack(
         string parentDirectory,
         DataPackOptions options,
@@ -263,7 +270,7 @@ public static partial class DataPackGenerator
         }
     }
 
-    /// <summary>Writes pack.mcmeta at ZIP root, commits atomically, never overwrites existing files.</summary>
+    /// <summary>将 pack.mcmeta 写入 ZIP 根目录，原子提交，绝不覆盖已存在的文件。</summary>
     public static string ExportZip(
         string destination,
         DataPackOptions options,

@@ -2,11 +2,14 @@ using System.Text;
 
 namespace CMCLauncher.Core.Minecraft.DataPacks;
 
+// 数据包生成器（partial）：本部分负责版本格式映射与选项校验；
+// 目录创建与条目写入逻辑在 DataPackProject.cs 中。
 public static partial class DataPackGenerator
 {
     // 数据包格式独立于资源包格式；只匹配明确列出的正式版，不猜测快照或未来版本。
     static readonly IReadOnlyDictionary<string, (int Major, int Minor)> Formats = BuildFormats();
 
+    // 所有受支持的 Minecraft 正式版列表（即 Formats 的键）。
     public static IReadOnlyList<string> SupportedGameVersions { get; } =
         Array.AsReadOnly(Formats.Keys.ToArray());
 
@@ -43,6 +46,7 @@ public static partial class DataPackGenerator
         return result;
     }
 
+    // 查询指定游戏版本对应的数据包 pack_format；不支持的版本抛出异常。
     public static (int Major, int Minor) GetDataPackFormat(string gameVersion)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(gameVersion);
@@ -69,6 +73,7 @@ public static partial class DataPackGenerator
             cancellationToken
         );
 
+    // 校验数据包选项：版本受支持、名称/命名空间合法且不含保留目录名。
     static void Validate(DataPackOptions options)
     {
         var (packName, gameVersion, description, packNamespace) = options;
@@ -100,6 +105,7 @@ public static partial class DataPackGenerator
             );
     }
 
+    // 判断是否为 Windows 保留设备名（con/prn/aux/nul/com1-9/lpt1-9 等）。
     static bool IsReservedDirectoryName(string value)
     {
         var name = value.Split('.')[0].TrimEnd(' ');
