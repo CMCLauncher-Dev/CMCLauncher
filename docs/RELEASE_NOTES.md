@@ -1,45 +1,45 @@
 # CMCLauncher 1.0.6
 
-这是 1.0.5 之后的正式版。主要更新包括 Java 管理、Options 备份、可视化数据包制作，以及 WinUI 与 Avalonia 的功能和界面改进。
+This stable release adds Java distribution management, Options backups, and a graphical data pack editor, and brings more of the WinUI experience to Avalonia.
 
-## 新功能
+## New features
 
-- **Java 管理（Windows）**：下载时可选择 Java 大版本、发行品牌和安装位置。Windows x64 支持 Eclipse Temurin、Amazon Corretto、Microsoft Build of OpenJDK、Azul Zulu、BellSoft Liberica 和 SAP SapMachine，品牌菜单按所选版本筛选。
-- **Java 更新和文件管理**：每个 Java 条目右侧提供更新、迁移、从列表移除及删除安装文件夹的紧凑图标。启动器管理的 Java 原地更新；支持的手动导入版会单独安装新版并切换引用，保留原文件。迁移保留安装文件夹及内部布局；删除可识别的安装目录前会显示完整路径并要求确认。
-- **Options 配置备份（双端）**：每次启动前备份已有的游戏设置，包含资源包选择、键位和图像设置；存在 OptiFine 配置时一并备份。可设置保留数量、立即备份、恢复或删除指定快照。检测到资源重载失败时会提示恢复，并优先推荐经过正常退出验证的配置。
-- **数据包制作（双端）**：按 Minecraft 版本匹配数据包格式，提供模板、可视化条目与源文件编辑、命名空间及 JSON 校验、文件预览和导出。
-- **实例诊断（双端）**：在实例设置中查看 Minecraft 保存的多人服务器列表，启用实例级调试模式。游戏失败时提供日志和崩溃原因线索，包括内存不足、Java 版本、Mixin 和缺失依赖。
-- **Mod 管理与翻译**：启动前检查缺少的前置和版本冲突。可从 Mod 读取语言文件、生成翻译资源包，列表显示名优先使用本地映射，再按设置请求翻译服务。
-- **WinUI 个性化**：新增纯透明玻璃和 Win7 Aero 风格，提供可折叠的玻璃设置、实时不透明度滑块和卡片边框开关。支持图片及视频壁纸，背景操作并排，路径单独显示。
-- **系统状态（双端）**：新增磁盘活动及实时网络速率，优化 CPU/GPU 持续采样。Linux 新增 DRM GPU 指标和驱动回退。
-- **界面语言与帮助**：新增文言文、萌猫语、倒置英语，补齐界面及部分运行日志翻译。关于页提供仓库和问题反馈快捷入口。
+- **Java management on Windows:** Choose the Java major version, distribution, and installation location. Windows x64 supports Eclipse Temurin, Amazon Corretto, Microsoft Build of OpenJDK, Azul Zulu, BellSoft Liberica, and SAP SapMachine. The distribution picker lists the brands available for the selected major version.
+- **Java updates and file management:** Each entry has compact buttons for updating, moving, removing the entry, and deleting the installation folder. Launcher-managed installations update in place. Supported imported installations can switch to a separately installed update while keeping their original files. Moving an installation preserves its outer folder and internal layout; deleting it requires confirming the exact path.
+- **Options backups on both frontends:** Back up existing Minecraft settings before launch, including resource pack selection, key bindings, and graphics settings, along with OptiFine settings when present. Set a retention limit, create a backup on demand, and restore or delete individual backups. After a resource reload failure, the launcher offers recovery and prefers a backup verified by a normal game exit.
+- **Data pack editor on both frontends:** Select a Minecraft version to get the matching data pack format. The wizard provides templates, graphical entry editing, source editing, namespace and JSON validation, a file preview, and export.
+- **Instance diagnostics:** View the saved multiplayer servers for an instance, enable per-instance debug mode, and inspect game output. Crash reports surface clues such as out-of-memory errors, Java incompatibilities, Mixin failures, and missing dependencies.
+- **Mod dependencies and translation:** Check for missing dependencies and version conflicts before launch. Read mod language files and generate translation resource packs. Mod list names prefer local translations and use the configured translation service as a fallback.
+- **WinUI personalization:** Use transparent glass or a Windows 7 Aero-style effect, adjust opacity with a live slider, and control card outlines from a collapsible settings section. Set an image or video wallpaper, with compact background controls and a separate file label.
+- **System monitoring:** Both frontends show disk activity and live network throughput, with improved CPU and GPU sampling. Linux adds DRM GPU metrics and a fallback for unsupported drivers.
+- **Languages and support:** Added Classical Chinese, LOLSpeak, and Back Slang; expanded UI and launcher log translations. The About page links to the project repository and issue tracker.
 
-## 修复和优化
+## Fixes and improvements
 
-- 正常处理的游戏退出不再先隐藏并重启 Windows 启动器；独立监视器仍负责恢复已关闭或无响应的启动器。完善游戏崩溃日志和任务取消状态。
-- 修复启动器最大化状态保存，保留上次窗口化尺寸与位置。
-- Java 启动选择兼容较新运行时；对受 Java4Shell 影响的版本显示易读警告，并应用现有启动缓解参数。
-- 修复 Java 迁移到同名空目录时出现两层同名文件夹的问题，拒绝覆盖已有安装。
-- 修复 Fabric 依赖的版本范围为数组时启动前检查报错。任一范围匹配即可通过，全部不匹配仍会报告冲突。
-- 修复搜索摘要 HTML 标签显示、Mod 名称误译及趣味语言包的 Mod 翻译。光影包筛选按来源调整，统一资源页标题和控件外观。
-- 自绘窗口按钮贴右边缘，统一为 32 DIP 高；透明玻璃标题栏保留接收鼠标输入所需的底色。修复边缘、圆角和壁纸覆盖范围，启动时对已开启的玻璃做一次关开切换。
-- 修复侧栏重复点击后文字缩小、确认弹层圆角和宽度、Toast 计时器及跨前端取消状态显示。
-- 修复 Avalonia 修改语言时，其他设置的保存可能导致菜单和当前页面未及时重建的问题。
-- 移除共享下载、蓝图和启动器更新包的固定文件大小上限；Java 下载以包校验值为准。保留文件完整性和解压保护，CMS 文件改用流式写入，修复无效下载留下空目录。
-- 自带语言包和主题移到各自的 Default 子目录并随版本更新。用户自定义文件继续优先加载；内容未修改的旧副本会清理。同步调整 ZIP、单文件及桌面更新流程。
+- A game exit handled by the Windows launcher no longer hides and restarts the launcher. The independent watchdog still recovers a closed or unresponsive launcher. Crash logging and cancellation feedback also improved.
+- Restoring or maximizing the window now saves the startup mode while preserving its last windowed size and position.
+- Java selection can use compatible newer runtimes for games that request an older major version. Affected Java4Shell runtimes are flagged with a high-contrast warning and receive the existing launch-time mitigation.
+- Moving Java into an empty folder with the same name no longer creates a duplicate folder level. Existing installations are not overwritten.
+- Fabric dependency metadata can specify multiple alternative version ranges without crashing the pre-launch check. Any matching range is accepted; a conflict is still reported if none match.
+- Fixed HTML tags appearing in search summaries, incorrect mod name translations, and mod translation behavior in novelty languages. Shader filters now follow the download source, with aligned headings and more consistent controls.
+- The 32-DIP custom window buttons sit flush with the right edge. The glass title bar keeps a minimal hit-test surface so clicks do not pass through to windows behind it. Fixed rounded corners, window edge coverage, and wallpaper behind the title bar. Glass settings saved as enabled receive one startup off/on cycle.
+- Fixed shrinking sidebar labels, confirmation flyout corners and width, the toast timer, and cancellation being shown as failure.
+- Fixed a settings save race that could prevent Avalonia from rebuilding navigation and the current page after changing language.
+- Removed fixed file size caps from shared downloads, blueprint downloads, and launcher update packages. Java packages are verified against their published checksums. CMS blueprint downloads stream to disk and invalid responses no longer leave an empty install folder. Integrity checks and extraction safeguards remain.
+- Bundled language packs and themes now live under their respective Default directories and update with the launcher. User overrides take precedence, and unmodified legacy copies are cleaned up. ZIP, single-file, and desktop update packaging follow the new layout.
 
-## 平台、打包和维护
+## Platforms and maintenance
 
-- Linux 与 macOS 的 Avalonia 界面继续对齐 WinUI：资源筛选、FRP 草稿与实时日志隔离、陶瓦直接下载、MinecraftPFP、Java 管理、文件操作、系统状态和主题控件。清理旧 Avalonia 界面。
-- Linux CI 增加平台集成、CJK 和阿拉伯文渲染检查、Fedora 45 RPM 安装覆盖及安装后界面诊断产物。补充数据包、Options 恢复、发布包和窗口回归验证。
-- 更新中、英、日 README、语言包文档及 Issue 模板，清除 Visual Studio 缓存文件。
-- **Windows x64** 持续维护。**Linux x64** 仍为实验性，提供 DEB、RPM、AppImage 和 TAR.GZ。**macOS Intel / Apple M 系列**处于早期阶段，缺乏测试，发行包未签名或公证。
+- Linux and macOS Avalonia continue to align with WinUI across resource filters, FRP draft handling and live logs, direct Terracotta downloads, MinecraftPFP, Java management, file actions, system status, and themed controls. Removed obsolete Avalonia UI code.
+- Linux CI adds platform integration checks, CJK and Arabic rendering coverage, Fedora 45 RPM installation coverage, and diagnostic artifacts from installed-app UI checks. Added regression coverage for data packs, Options recovery, release packaging, and window behavior.
+- Updated the Chinese, English, and Japanese READMEs, localization documentation, and issue templates. Removed Visual Studio cache files from the repository.
+- **Windows x64** is actively maintained. **Linux x64** remains experimental and is available as DEB, RPM, AppImage, or TAR.GZ. **macOS Intel and Apple silicon** builds are early-stage, have limited testing, and are not signed or notarized.
 
-## 下载与更新
+## Downloads
 
-- Windows：选择 ZIP 完整解压后启动，或下载单文件 EXE。
-- Linux：按发行版选择 DEB、RPM，或使用 AppImage / TAR.GZ。
-- macOS：选择对应 Intel（x64）或 Apple M 系列（ARM64）的 TAR.GZ。
-- 如果旧启动器提示需要手动下载，请直接从本页下载对应安装包。发行包包含 .NET，Java 和游戏文件由启动器另行下载或导入。
+- **Windows:** Extract the ZIP before launching, or use the single-file EXE.
+- **Linux:** Choose the appropriate DEB or RPM, or use the AppImage or TAR.GZ.
+- **macOS:** Choose the Intel (x64) or Apple silicon (ARM64) TAR.GZ.
+- If an older launcher asks you to update manually, download the appropriate package from this release. Packages include .NET; Java and game files are downloaded or imported separately.
 
-[查看从 1.0.5 到 1.0.6 的完整提交差异](https://github.com/CMCLauncher-Dev/CMCLauncher/compare/CMCL-v1.0.5-release...CMCL-v1.0.6-release)
+[Full comparison from 1.0.5 to 1.0.6](https://github.com/CMCLauncher-Dev/CMCLauncher/compare/CMCL-v1.0.5-release...CMCL-v1.0.6-release)
