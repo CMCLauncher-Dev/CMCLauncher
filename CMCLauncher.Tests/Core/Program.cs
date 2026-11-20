@@ -257,7 +257,21 @@ try
         );
     }
     var catalog = new ThemeCatalog(Path.Combine(root, "themes"));
-    Check(catalog.IsBuiltIn("craft"), "embedded theme belongs to core");
+    Check(
+        catalog.Presets.Count == 8 && catalog.Presets.All(theme => theme.IsBuiltIn),
+        "all built-in themes remain available without a packaged theme directory"
+    );
+    var packagedThemes = Path.Combine(root, "packaged-themes");
+    Directory.CreateDirectory(BundledResources.DefaultDirectory(packagedThemes));
+    File.WriteAllText(
+        Path.Combine(BundledResources.DefaultDirectory(packagedThemes), "packaged.json"),
+        """{"id":"packaged","displayName":"Packaged","colors":{"LightBg":"#123456"}}"""
+    );
+    Check(
+        new ThemeCatalog(Path.Combine(root, "user-themes"), packagedDirectory: packagedThemes)
+            .IsBuiltIn("packaged"),
+        "themes in the runtime Default directory are discovered with a separate user directory"
+    );
     var languages = new LocalizationCatalog(Path.Combine(root, "locales"));
     Check(
         languages.Languages.Any(l => l.Code == "en_us")

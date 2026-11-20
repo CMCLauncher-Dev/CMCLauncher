@@ -88,7 +88,8 @@ public sealed partial class MainWindow
 {
     readonly ThemeCatalog themeCatalog = new(
         Path.Combine(Program.UserDirectory, "themes"),
-        message => RuntimeLog.Write("WARN", message)
+        message => RuntimeLog.Write("WARN", message),
+        Path.Combine(AppContext.BaseDirectory, "themes")
     );
 
     // 共享画刷只更新颜色，已经展开的弹层和已生成的选项也会立即刷新。

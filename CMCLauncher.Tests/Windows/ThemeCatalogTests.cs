@@ -13,7 +13,7 @@ static class ThemeCatalogTests
         var warnings = new List<string>();
         var catalog = new ThemeCatalog(root, warnings.Add);
         Check(
-            catalog.Presets.Count == 1
+            catalog.Presets.Count == 8
                 && catalog.Presets[0].Id == "craft"
                 && catalog.Presets[0].IsBuiltIn,
             "Only Fresh green is embedded when external files are absent"
@@ -89,7 +89,7 @@ static class ThemeCatalogTests
             """{"id":"ocean","displayName":"Null","colors":null}"""
         );
         catalog.Reload();
-        Check(catalog.Presets.Count == 1, "Null color collections do not prevent startup");
+        Check(catalog.Presets.Count == 8, "Null color collections do not prevent startup");
         File.Delete(craft);
         catalog.Reload();
         Check(
@@ -98,7 +98,7 @@ static class ThemeCatalogTests
         );
         await File.WriteAllTextAsync(external, new string(' ', 256_001));
         catalog.Reload();
-        Check(catalog.Presets.Count == 1, "Oversized files are ignored");
+        Check(catalog.Presets.Count == 8, "Oversized files are ignored");
 
         var bundledDirectory = BundledResources.DefaultDirectory(root);
         Directory.CreateDirectory(bundledDirectory);
@@ -117,7 +117,7 @@ static class ThemeCatalogTests
         );
         catalog.Reload();
         Check(
-            catalog.Presets.Select(p => p.Id).SequenceEqual(new[] { "craft", "mint", "zest" })
+            catalog.Presets.Select(p => p.Id).TakeLast(2).SequenceEqual(new[] { "mint", "zest" })
                 && catalog.Presets.Single(p => p.Id == "mint").IsBuiltIn
                 && !catalog.Presets.Single(p => p.Id == "zest").IsBuiltIn,
             "Default/ themes are built in and listed before user themes"

@@ -20,16 +20,18 @@ public sealed class ThemeCatalog
 
     const string ResourcePrefix = "CMCLauncher.Themes.";
     readonly string directory;
+    readonly string? packagedDirectory;
     readonly Action<string>? diagnostic;
     Dictionary<string, Definition> definitions = new(StringComparer.Ordinal);
     HashSet<string> embeddedIds = new(StringComparer.Ordinal);
     HashSet<string> builtIns = new(StringComparer.Ordinal);
     static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
-    public ThemeCatalog(string directory, Action<string>? diagnostic = null)
+    public ThemeCatalog(string directory, Action<string>? diagnostic = null, string? packagedDirectory = null)
     {
         this.directory = directory;
         this.diagnostic = diagnostic;
+        this.packagedDirectory = packagedDirectory;
         BundledResources.RemoveStaleCopies(directory, "Themes", diagnostic);
         Reload();
     }
@@ -38,9 +40,10 @@ public sealed class ThemeCatalog
     public IReadOnlyList<ThemePreset> Presets =>
         definitions
             .Values.OrderBy(p =>
-                embeddedIds.Contains(p.Id) ? 0
-                : builtIns.Contains(p.Id) ? 1
-                : 2
+                p.Id == "craft" ? 0
+                : embeddedIds.Contains(p.Id) ? 1
+                : builtIns.Contains(p.Id) ? 2
+                : 3
             )
             .ThenBy(p => p.Id, StringComparer.Ordinal)
             .Select(p => new ThemePreset(p.Id, p.DisplayName, builtIns.Contains(p.Id)))
@@ -70,7 +73,11 @@ public sealed class ThemeCatalog
         var shipped = new HashSet<string>(embedded, StringComparer.Ordinal);
         try
         {
-            foreach (var (path, isDefault) in BundledResources.JsonFiles(directory))
+            var files = BundledResources.JsonFiles(directory);
+            if (packagedDirectory != null && !string.Equals(
+                Path.GetFullPath(packagedDirectory), Path.GetFullPath(directory), StringComparison.OrdinalIgnoreCase))
+                files = BundledResources.JsonFiles(packagedDirectory).Where(file => file.Bundled).Concat(files);
+            foreach (var (path, isDefault) in files)
             {
                 try
                 {
