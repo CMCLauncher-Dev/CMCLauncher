@@ -1,7 +1,11 @@
 namespace CMCLauncher;
 
+// JavaManager 的部分类：负责 Java 安装目录的识别、迁移与删除前的安全校验。
 public static partial class JavaManager
 {
+    // 识别可安全删除的 Java 安装目录：
+    // 校验可执行文件位于 <home>/bin 下、存在版本标记文件（release 或 lib/rt.jar），
+    // 且目录不包含其他已注册安装或启动器数据，否则抛出异常。
     public static string JavaDirectoryForDeletion(Store store, JavaInstallation java)
     {
         if (!Path.IsPathFullyQualified(java.Path) || !File.Exists(java.Path))
@@ -50,6 +54,10 @@ public static partial class JavaManager
         return directory;
     }
 
+    // 将 Java 安装迁移到目标父目录：
+    // 先复制到临时暂存目录并校验版本一致性，再原子性地移动到目标位置，
+    // 最后更新配置中的路径并（对托管安装）删除旧目录。
+    // 返回 true 表示旧目录已被删除，false 表示保留（未托管或删除失败）。
     public static async Task<bool> MigrateJava(
         Store store,
         JavaInstallation java,
@@ -183,6 +191,7 @@ public static partial class JavaManager
         }
     }
 
+    // 判断 path 是否等于或位于 directory 目录之内。
     static bool Within(string path, string directory) =>
         PathComparer.Equals(path, directory)
         || path.StartsWith(
@@ -190,6 +199,7 @@ public static partial class JavaManager
             PathComparison
         );
 
+    // 沿路径向上检查是否存在符号链接/重解析点，发现则拒绝迁移。
     static void RejectLinks(string path)
     {
         for (string? cursor = path; cursor != null; cursor = Path.GetDirectoryName(cursor))
@@ -197,6 +207,7 @@ public static partial class JavaManager
                 throw new IOException("Linked Java directories cannot be migrated.");
     }
 
+    // 递归复制 Java 目录树到暂存目录（拒绝符号链接，保留 Unix 文件权限）。
     static async Task CopyJavaTree(string source, string stage, CancellationToken ct)
     {
         var directories = new Stack<string>();

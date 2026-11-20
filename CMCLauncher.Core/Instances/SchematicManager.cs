@@ -2,13 +2,20 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
+// 单个投影文件信息：相对路径、大小与最后修改时间（UTC）。
 public sealed record SchematicFile(string RelativePath, long Size, DateTime ModifiedUtc);
 
+// 投影（Schematic）文件管理：
 // 所有路径都相对于实例的实际游戏目录；不移动文件、不转换投影格式。
+// 仅当实例安装了支持投影的 Mod（Create / Litematica 等）时才提供 schematics 目录。
 public static class SchematicManager
 {
+    // 支持的投影文件扩展名。
     public static readonly string[] Extensions = [".litematic", ".schematic", ".schem", ".nbt"];
 
+    // 确保实例的 schematics 目录可用：
+    // 原版（vanilla）实例返回 null；扫描 mods 目录中的 JAR，
+    // 若存在支持投影的 Mod 则返回（并按需创建）schematics 目录，否则返回 null。
     public static string? EnsureDirectory(Store store, Instance instance, bool create = true)
     {
         if (
@@ -47,6 +54,7 @@ public static class SchematicManager
         return null;
     }
 
+    // 判断 Mod ID 是否为支持投影的 Mod（Create 或 Litematica 的各加载器变体）。
     static bool SupportsSchematics(string id)
     {
         var normalized = id.Replace("_", "").Replace("-", "").ToLowerInvariant();
@@ -57,9 +65,12 @@ public static class SchematicManager
             );
     }
 
+    // 判断文件扩展名是否为受支持的投影格式。
     public static bool IsSupported(string file) =>
         Extensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase);
 
+    // 递归列出目录下全部投影文件（跳过符号链接与 .import- 暂存目录），
+    // 可选地收集子目录相对路径到 folders，结果按相对路径排序。
     public static List<SchematicFile> List(string directory, List<string>? folders = null)
     {
         var result = new List<SchematicFile>();
@@ -97,6 +108,7 @@ public static class SchematicManager
         return result.OrderBy(f => f.RelativePath, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    // 校验相对路径指向的投影文件存在且格式受支持，返回完整路径。
     public static string ExistingFile(string directory, string relative)
     {
         var path = Store.SafePath(directory, relative);
@@ -105,6 +117,9 @@ public static class SchematicManager
         return path;
     }
 
+    // 批量导入投影文件：
+    // 先校验全部源文件（格式、重名）→ 复制到 .import- 暂存目录 →
+    // 逐个移动到目标目录；失败时回滚已移动的文件并清理暂存目录。
     public static async Task Import(
         string directory,
         IReadOnlyList<string> sources,
@@ -164,6 +179,7 @@ public static class SchematicManager
         }
     }
 
+    // 重命名投影文件（保留所在子目录与扩展名），校验新名称合法性。
     public static void Rename(string directory, string relative, string name)
     {
         if (
@@ -185,6 +201,7 @@ public static class SchematicManager
         File.Move(source, target);
     }
 
+    // 导出投影文件到指定路径：先写临时文件再原子移动，失败时清理临时文件。
     public static async Task Export(
         string directory,
         string relative,

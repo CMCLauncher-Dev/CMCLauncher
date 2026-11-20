@@ -13,7 +13,7 @@ public static class LogRedactor
                 value = value.Replace(key, "[REDACTED]", StringComparison.Ordinal);
         }
         catch
-        { /* An invalid credential resource must not break logging. */
+        { /* 凭据资源无效时不能影响日志流程。 */
         }
         value = System.Text.RegularExpressions.Regex.Replace(
             value,

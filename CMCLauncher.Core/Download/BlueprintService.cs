@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 
 namespace CMCLauncher;
 
+// 蓝图条目：Id、标题、描述、作者、来源网站、封面图、版本、下载量、适用版本与尺寸。
 public sealed record Blueprint(
     string Id,
     string Title,
@@ -17,12 +18,16 @@ public sealed record Blueprint(
     string Size = ""
 );
 
+// 蓝图搜索结果页：条目列表、是否有下一页与总结果数。
 public sealed record BlueprintPage(IReadOnlyList<Blueprint> Items, bool HasNext, int? Total);
 
+// 蓝图（Schematic）下载服务：对接 Schematicraft 与 MCSchematic 两个来源，
+// 提供搜索、详情查询与文件下载（含重定向跟随与文件名安全校验）。
 public sealed class BlueprintService(HttpClient http)
 {
     const string Api = "https://api.schematicraft.com";
 
+    // 请求 JSON 接口并解析；响应超过 8MB 或为空时抛出异常。
     async Task<JsonNode> Json(string url, CancellationToken ct)
     {
         using var response = await http.GetAsync(url, ct);
@@ -33,6 +38,8 @@ public sealed class BlueprintService(HttpClient http)
         return JsonNode.Parse(text) ?? throw new IOException("Empty blueprint response.");
     }
 
+    // 按来源搜索蓝图：mcschematic 走其 REST API，schematicraft 走官方 API
+    // （无关键词时列出公开蓝图，有关键词时走搜索接口）。
     public async Task<BlueprintPage> Search(
         string query,
         int page,
@@ -101,6 +108,8 @@ public sealed class BlueprintService(HttpClient http)
         );
     }
 
+    // 查询蓝图详情：mcschematic 额外请求指定版本信息以获取原始文件名与格式，
+    // schematicraft 则从详情接口提取文件名与格式。
     public async Task<CmsDetail> Details(Blueprint entry, string source, CancellationToken ct)
     {
         if (source == "mcschematic")
@@ -144,6 +153,9 @@ public sealed class BlueprintService(HttpClient http)
         );
     }
 
+    // 下载蓝图文件到暂存目录并返回本地路径：
+    // schematicraft 需先 POST 初始化获取下载 token；
+    // 下载过程最多跟随 6 次重定向，并校验 URL 协议、文件名与扩展名安全性。
     public async Task<string> Download(
         string id,
         string stage,

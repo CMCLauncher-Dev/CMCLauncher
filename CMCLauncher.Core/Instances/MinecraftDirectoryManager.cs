@@ -2,19 +2,24 @@ using System.Security.Cryptography;
 
 namespace CMCLauncher;
 
+// 已注册的 Minecraft 目录记录：
+// Path 为目录路径，OwnershipId 为所有权标识（写入目录内的标记文件）。
 public sealed class MinecraftDirectory
 {
     public string Path { get; set; } = "";
     public string? OwnershipId { get; set; }
 }
 
-// Ownership needs both a local configuration record and a matching file. Existing
-// custom folders are never adopted simply because they contain Minecraft or launcher files.
+// Minecraft 目录管理器：
+// 负责注册、选择与迁移 Minecraft 数据目录。
+// 所有权需要本地配置记录与目录内标记文件双重匹配；
+// 已存在的自定义文件夹不会仅因包含 Minecraft 或启动器文件而被接管。
 public sealed class MinecraftDirectoryManager(Store store)
 {
     const string Marker = ".cmclauncher-directory";
     readonly SemaphoreSlim gate = new(1, 1);
 
+    // 规范化路径（完整路径 + 去除末尾分隔符）。
     static string Full(string path) =>
         System
             .IO.Path.GetFullPath(path)
@@ -23,9 +28,11 @@ public sealed class MinecraftDirectoryManager(Store store)
                 System.IO.Path.AltDirectorySeparatorChar
             );
 
+    // 判断两个路径是否相同（不区分大小写）。
     static bool Same(string a, string b) =>
         string.Equals(Full(a), Full(b), StringComparison.OrdinalIgnoreCase);
 
+    // 判断 path 是否位于 root 内部（或与之相同）。
     static bool Inside(string path, string root) =>
         Same(path, root)
         || Full(path)
@@ -34,6 +41,7 @@ public sealed class MinecraftDirectoryManager(Store store)
                 StringComparison.OrdinalIgnoreCase
             );
 
+    // 列出全部已注册目录（配置记录 + 内置的 Library/MinecraftRoot/实例存储目录）。
     public IReadOnlyList<MinecraftDirectory> List()
     {
         var result = store.Config.MinecraftDirectories.ToList();
@@ -47,8 +55,8 @@ public sealed class MinecraftDirectoryManager(Store store)
         return result;
     }
 
-    // The historical default library is inside our configuration directory and was
-    // created by Store before ownership markers existed. Custom roots stay external.
+    // 注册历史默认 Library 目录（位于配置目录内，早于所有权标记机制创建）。
+    // 自定义根目录保持外部状态，不在此处注册。
     internal bool RegisterDefaultLibrary()
     {
         if (store.Config.MinecraftDirectories.Any(r => Same(r.Path, store.Library)))
@@ -65,6 +73,7 @@ public sealed class MinecraftDirectoryManager(Store store)
         return true;
     }
 
+    // 标记目录为 CMCLauncher 创建：生成所有权 ID、写入标记文件并记录到配置。
     internal MinecraftDirectory MarkCreated(string path)
     {
         var record = new MinecraftDirectory
@@ -77,6 +86,9 @@ public sealed class MinecraftDirectoryManager(Store store)
         return record;
     }
 
+    // 判断目录是否可迁移：
+    // 必须拥有所有权（配置记录 + 标记文件匹配）、目录存在、
+    // 不在配置根目录内、且不被任何导入实例占用。
     public bool CanMigrate(MinecraftDirectory record)
     {
         try
@@ -101,6 +113,7 @@ public sealed class MinecraftDirectoryManager(Store store)
         }
     }
 
+    // 校验路径及其所有父级均非符号链接/重解析点（链接目录不可管理或迁移）。
     static void NoLinks(string path)
     {
         for (
@@ -115,6 +128,9 @@ public sealed class MinecraftDirectoryManager(Store store)
                 throw new IOException("Linked directories cannot be managed or migrated.");
     }
 
+    // 创建新目录：
+    // 校验无链接、不存在、不与已注册目录嵌套 → 创建 → 标记所有权 → 保存配置。
+    // 保存失败时回滚配置记录。
     public async Task Create(string path)
     {
         path = Full(path);
@@ -138,6 +154,7 @@ public sealed class MinecraftDirectoryManager(Store store)
         }
     }
 
+    // 选择默认 Minecraft 根目录（保存失败时回滚）。
     public async Task Select(string path)
     {
         path = Full(path);
@@ -156,8 +173,11 @@ public sealed class MinecraftDirectoryManager(Store store)
         }
     }
 
-    // Copy to a private sibling first, including across volumes. Publish the new path
-    // only after every file has been verified. Cancellation never deletes the source.
+    // 迁移目录到目标位置：
+    // 先复制到私有暂存目录（支持跨卷），逐文件 SHA-256 校验，
+    // 全部验证通过后才发布新路径。取消操作绝不删除源目录。
+    // 迁移后重映射所有实例的路径引用，保存失败时回滚全部配置。
+    // 返回 true 表示源目录已成功删除，false 表示迁移完成但源目录清理失败。
     public async Task<bool> Migrate(
         MinecraftDirectory record,
         string destination,

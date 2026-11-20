@@ -5,10 +5,13 @@ using AngleSharp.Html.Parser;
 
 namespace CMCLauncher;
 
+// CMS 蓝图文件条目：Id、名称与尺寸。
 public sealed record CmsFile(string Id, string Name, string Size);
 
+// CMS 蓝图详情页解析结果：入口条目、文件列表与注释。
 public sealed record CmsDetail(Blueprint Entry, IReadOnlyList<CmsFile> Files, string Note);
 
+// CMS 列表页解析结果：条目列表、当前页、总页数、总结果数与是否过期。
 public sealed record CmsPage(
     IReadOnlyList<Blueprint> Items,
     int Page,
@@ -17,8 +20,12 @@ public sealed record CmsPage(
     bool Stale = false
 );
 
+// CMS（Creative Mechanic Server）HTML 解析器：
+// 从 CMS 网站的列表页、详情页与下载页中提取蓝图信息，
+// 并检测 Cloudflare 等浏览器验证挑战。
 public static class CmsHtml
 {
+    // 解析 HTML 为文档；若检测到浏览器验证挑战则抛出异常。
     static IDocument Document(string html)
     {
         if (IsChallenge(html))
@@ -26,6 +33,7 @@ public static class CmsHtml
         return new HtmlParser().ParseDocument(html);
     }
 
+    // 检测页面是否为 Cloudflare / reCAPTCHA / hCaptcha 等浏览器验证挑战页。
     public static bool IsChallenge(string text) =>
         text.Contains("cf-chl-", StringComparison.OrdinalIgnoreCase)
         || text.Contains("Just a moment", StringComparison.OrdinalIgnoreCase)
@@ -35,6 +43,7 @@ public static class CmsHtml
         || text.Contains("cf-turnstile", StringComparison.OrdinalIgnoreCase)
         || text.Contains("Verify you are human", StringComparison.OrdinalIgnoreCase);
 
+    // 提取元素的纯文本（折叠空白并去除首尾空格）。
     static string Plain(IElement? element) =>
         Regex
             .Replace(
@@ -46,13 +55,16 @@ public static class CmsHtml
             )
             .Trim();
 
+    // 从卡片中按选择器提取字段文本，并去除指定前缀（如"作者："）。
     static string Field(IElement card, string selector, string prefix) =>
         Plain(card.QuerySelector(selector)).Replace(prefix, "").Trim();
 
+    // 从 HTML 中提取 CSRF token；未找到时抛出异常。
     public static string Csrf(string html) =>
         Document(html).QuerySelector("input[name=csrfmiddlewaretoken]")?.GetAttribute("value")
         ?? throw new IOException("CMS session could not be initialized. Open the CMS website.");
 
+    // 解析 CMS 列表页：提取蓝图卡片（标题、封面、作者、下载量、版本、尺寸）与分页信息。
     public static CmsPage List(string html, int page)
     {
         var document = Document(html);
@@ -113,6 +125,7 @@ public static class CmsHtml
         return new(entries, page, Math.Max(page, pages), total);
     }
 
+    // 解析 CMS 详情页：提取文件列表（Id、名称、尺寸）与"注释"段落。
     public static CmsDetail Detail(Blueprint entry, string html)
     {
         var document = Document(html);
@@ -152,6 +165,7 @@ public static class CmsHtml
         return new(entry, files, Plain(note));
     }
 
+    // 解析 CMS 下载页：提取蓝图文件的下载 URL 与文件名，并校验文件名安全性。
     public static (Uri Url, string Name) FileLink(string html)
     {
         var document = Document(html);

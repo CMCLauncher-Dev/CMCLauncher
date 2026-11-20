@@ -3,17 +3,22 @@ using System.Text;
 
 namespace CMCLauncher;
 
-// CMS caches contain parsed public data or images, never session HTML, cookies or tokens.
+// CMS 缓存：仅存放解析后的公开数据或图片，绝不缓存会话 HTML、Cookie 或令牌。
+// 文件以 key 的 SHA-256 命名，带 12 字节头（"CMS1" + 8 字节 TTL），
+// 按容量上限（默认 128MB）与 30 天过期策略自动清理。
 public sealed class CmsCache(string root, long capacity = 128L * 1024 * 1024)
 {
     static readonly object Gate = new();
 
+    // 由缓存 key 计算缓存文件路径（SHA-256 十六进制 + .cache）。
     string FileFor(string key) =>
         Store.SafePath(
             root,
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key))) + ".cache"
         );
 
+    // 读取缓存：返回数据与是否仍在 TTL 内（Fresh）。
+    // 文件不存在、超过 8MB 或读取失败时返回 null。
     public (byte[] Data, bool Fresh)? Read(string key, TimeSpan ttl)
     {
         lock (Gate)
@@ -37,6 +42,7 @@ public sealed class CmsCache(string root, long capacity = 128L * 1024 * 1024)
         }
     }
 
+    // 写入缓存：数据超过 8MB 则忽略；先写临时文件再原子移动，随后触发清理。
     public void Write(string key, byte[] data, TimeSpan? ttl = null)
     {
         if (data.Length > 8 * 1024 * 1024)
@@ -70,6 +76,7 @@ public sealed class CmsCache(string root, long capacity = 128L * 1024 * 1024)
         }
     }
 
+    // 清理过期缓存（读取文件头中的 TTL 判断是否过期）。
     public void Clean()
     {
         lock (Gate)
@@ -79,6 +86,8 @@ public sealed class CmsCache(string root, long capacity = 128L * 1024 * 1024)
         }
     }
 
+    // 清理核心逻辑（需持有锁）：
+    // 按最后写入时间排序，删除超出容量上限、超过 30 天或已过 TTL 的文件。
     void CleanLocked(bool expired = false)
     {
         var files = Directory
@@ -113,6 +122,7 @@ public sealed class CmsCache(string root, long capacity = 128L * 1024 * 1024)
     }
 }
 
+// CMS 缓存使用的源生成 JSON 序列化上下文。
 [System.Text.Json.Serialization.JsonSerializable(typeof(CmsPage))]
 [System.Text.Json.Serialization.JsonSerializable(typeof(CmsDetail))]
 [System.Text.Json.Serialization.JsonSerializable(typeof(string[]))]

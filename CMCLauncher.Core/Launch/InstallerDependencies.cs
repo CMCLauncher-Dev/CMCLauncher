@@ -9,6 +9,8 @@ namespace CMCLauncher;
 
 public sealed partial class LauncherCore
 {
+    // 将下载 URL 映射到镜像地址：
+    // NeoForged 官方 Maven 重定向到 ForgeCDN 镜像，其余走 BMCL 镜像。
     internal static Uri GameMirrorUrl(Uri uri)
     {
         // NeoForged publishes the same release artifacts on its official ForgeCDN mirror.
@@ -23,6 +25,8 @@ public sealed partial class LauncherCore
         return BmclUrl(uri);
     }
 
+    // 带重试的下载请求包装：
+    // 传输层失败（超时/5xx/连接中断）时最多重试 2 次，间隔递增。
     async Task<T> InstallerRequest<T>(
         Func<Task<T>> request,
         string description,
@@ -44,6 +48,7 @@ public sealed partial class LauncherCore
         }
     }
 
+    // 判断异常是否为可重试的传输层失败（非业务错误）。
     static bool IsInstallerTransportFailure(Exception ex) =>
         ex is HttpIOException
         || ex is IOException { InnerException: System.Net.Sockets.SocketException }
@@ -57,6 +62,9 @@ public sealed partial class LauncherCore
                         or HttpStatusCode.GatewayTimeout
             );
 
+    // 为 Java 安装器生成 JVM 代理参数：
+    // 支持系统代理与自定义 HTTP/SOCKS5 代理（不支持认证代理），
+    // 并设置连接/读取超时与绕过列表。
     internal static IReadOnlyList<string> InstallerProxyArguments(Settings settings)
     {
         var mode = NetworkProxy.Mode(settings);
@@ -103,6 +111,7 @@ public sealed partial class LauncherCore
         return options;
     }
 
+    // 下载 .sha1 校验文件并提取 SHA-1 哈希值，响应体限制 512 字节。
     internal async Task<string> InstallerChecksum(string url, CancellationToken ct) =>
         await InstallerRequest(
             async () =>

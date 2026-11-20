@@ -26,6 +26,7 @@ public static class WorldArchive
             foreach (var entry in archive.Entries)
             {
                 ct.ThrowIfCancellationRequested();
+                // 限制解压总大小，防止解压炸弹。
                 expanded += entry.Length;
                 if (expanded > 2L * 1024 * 1024 * 1024)
                     throw new Exception("存档解压内容超过限制。");
@@ -36,6 +37,7 @@ public static class WorldArchive
                 )
                     throw new Exception("存档 ZIP 包含不安全路径。");
                 var parts = relative.Split('/');
+                // 若 ZIP 外层多包了一层同名文件夹，则剥掉该层。
                 if (
                     parts.Length > 1
                     && parts[0].Equals(archiveRootName, StringComparison.OrdinalIgnoreCase)
@@ -54,6 +56,7 @@ public static class WorldArchive
                     await input.CopyToAsync(output, ct);
                 }
             }
+            // 校验 level.dat 存在，确认是有效的 Minecraft 存档后再移动到目标位置。
             if (!File.Exists(Path.Combine(staging, "level.dat")))
                 throw new Exception("ZIP 中未找到 level.dat，不是有效的 Minecraft 存档。");
             ct.ThrowIfCancellationRequested();
@@ -72,6 +75,7 @@ public static class WorldArchive
         if (!File.Exists(Path.Combine(worldFolder, "level.dat")))
             throw new Exception("存档缺少 level.dat。");
         var target = Path.GetFullPath(zipFile);
+        // 先写临时 ZIP，成功后再原子替换到目标文件。
         var temp = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {

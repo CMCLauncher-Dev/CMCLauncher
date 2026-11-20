@@ -1,6 +1,7 @@
 namespace CMCLauncher;
 
-// Hosts supply OS integration. The default never stores credentials as plaintext.
+// 平台宿主基类：由宿主程序（WinUI/Avalonia 等）提供操作系统集成能力。
+// 默认实现不会以明文形式存储凭据。
 public class LauncherPlatform : CMCLauncher.Platform.PlatformEnvironment
 {
     static LauncherPlatform current = new();

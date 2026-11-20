@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
+// 命令表单字段：标签、示例、是否可选与输入提示。
 public sealed record CommandField(
     string Label,
     string Example,
@@ -12,11 +13,15 @@ public sealed record CommandField(
     string? Hint = null
 );
 
+// 命令表单：命令名、语法说明与字段列表。
 public sealed record CommandForm(string Name, string Syntax, IReadOnlyList<CommandField> Fields);
 
+// Minecraft 命令生成器：按游戏版本提供 give/tp/effect/summon/fill 等命令表单，
+// 并对输入做严格校验后生成对应版本的命令文本。
 public static class CommandGenerator
 {
     public const string CustomCommand = "Custom command";
+    // 自定义命令表单：命令名 + 可选参数。
     public static CommandForm CustomForm { get; } =
         new(
             CustomCommand,
@@ -27,6 +32,7 @@ public static class CommandGenerator
             ]
         );
 
+    // 各特性引入的版本门槛：命名物品、坐标传送、物品标签、扁平化、物品组件、SNBT 文本组件。
     static readonly Version NamedItems = new(1, 7, 2);
     static readonly Version CoordinateTeleport = new(1, 4, 2);
     static readonly Version ItemTags = new(1, 8, 0);
@@ -34,6 +40,7 @@ public static class CommandGenerator
     static readonly Version ItemComponents = new(1, 20, 5);
     static readonly Version SnbtText = new(1, 21, 5);
 
+    // 解析并校验 Java 版稳定版本号（如 1.12.2、1.21.5）。
     static Version Release(string text)
     {
         if (
@@ -47,6 +54,8 @@ public static class CommandGenerator
         return new Version(version.Major, version.Minor, Math.Max(0, version.Build));
     }
 
+    // 按版本返回可用的命令表单列表（含自定义命令），
+    // 各命令的语法与字段随版本特性（扁平化、物品组件等）变化。
     public static IReadOnlyList<CommandForm> Forms(string release)
     {
         var version = Release(release);
@@ -142,6 +151,9 @@ public static class CommandGenerator
         return forms;
     }
 
+    // 按版本与表单生成命令文本：
+    // 先校验必填字段、长度与控制字符，再按命令类型分别生成
+    // （give 支持物品名/自定义数据/高级组件三种模式，fill 校验区域体积上限）。
     public static string Generate(string release, string command, IReadOnlyList<string> input)
     {
         if (command == CustomCommand)
@@ -285,6 +297,7 @@ public static class CommandGenerator
         }
     }
 
+    // 生成自定义命令：校验命令名格式与参数（单行、无控制字符）。
     static string GenerateCustom(IReadOnlyList<string> input)
     {
         if (input.Count is < 1 or > 2)
@@ -300,6 +313,9 @@ public static class CommandGenerator
         return arguments.Length == 0 ? "/" + root : "/" + root + " " + arguments;
     }
 
+    // 校验并规范化高级物品数据：
+    // 组件模式要求方括号包裹的组件列表，旧版要求花括号包裹的 SNBT 复合体；
+    // 逐字符扫描检查括号配对、字符串引号闭合与控制字符，并把换行折叠为空格。
     static string AdvancedItemData(string text, bool components)
     {
         var error = components
@@ -354,6 +370,8 @@ public static class CommandGenerator
         return result.ToString();
     }
 
+    // 把 JSON 对象转换为 NBT 标签列表（如 "display:{Name:...}"）：
+    // 递归处理对象/数组/字符串/布尔/数字，并校验键唯一性与值合法性。
     static List<string> CustomTags(string text)
     {
         try
@@ -419,9 +437,11 @@ public static class CommandGenerator
         }
     }
 
+    // 按 NBT 规则转义并加引号。
     static string Quote(string value) =>
         "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
+    // 校验目标选择器：玩家名（1-16 位字母数字下划线）或该版本支持的 @p/@a/@r/@s/@e。
     static string Target(string value, Version version, bool playersOnly = false)
     {
         if (Regex.IsMatch(value, @"^[A-Za-z0-9_]{1,16}$"))
@@ -435,6 +455,8 @@ public static class CommandGenerator
         throw new ArgumentException("Use a player name or a selector supported by this version.");
     }
 
+    // 校验 Minecraft ID：legacy 模式仅允许旧版命名（字母数字下划线），
+    // 现代模式允许带命名空间的小写 ID。
     static string Id(string value, bool legacy = false)
     {
         if (
@@ -447,6 +469,7 @@ public static class CommandGenerator
         return value;
     }
 
+    // 校验并规范化指定范围内的整数。
     static string Integer(string value, int minimum, int maximum)
     {
         if (
@@ -458,6 +481,8 @@ public static class CommandGenerator
         return number.ToString(CultureInfo.InvariantCulture);
     }
 
+    // 校验三个坐标分量：支持绝对值、~ 相对值与 ^ 局部值（局部值仅现代版本且须全部使用），
+    // block 模式要求整数（用于 /fill 的方块坐标）。
     static string Coordinates(string value, Version version, bool block = false)
     {
         var parts = value.Split(

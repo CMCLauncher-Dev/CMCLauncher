@@ -8,6 +8,7 @@ namespace CMCLauncher;
 // 元数据按内容哈希落盘，相同文件换名或在不同实例中出现时可以复用识别结果。
 public static class ContentInspectionCache
 {
+    // 缓存的识别结果条目，按内容哈希落盘。落盘落盘！！——fuzhu
     internal sealed record Entry(
         string Name,
         string Version,
@@ -16,12 +17,16 @@ public static class ContentInspectionCache
         bool Recognized
     );
 
+    // 识别结果：内容项 + 可选图标字节。
     public sealed record Result(ContentItem Item, byte[]? Icon);
 
+    // 待识别任务：同一内容的并发请求共用一次识别。
     static readonly ConcurrentDictionary<string, Lazy<Task<Entry>>> Pending = new(
         StringComparer.Ordinal
     );
+    // 图标字节缓存，按内容哈希索引。
     static readonly ConcurrentDictionary<string, byte[]> Icons = new(StringComparer.Ordinal);
+    // 文件指纹（长度 + 修改时间 + 哈希），用于跳过重复哈希计算。
     static readonly ConcurrentDictionary<
         string,
         (long Length, long Modified, string Hash)
@@ -31,8 +36,10 @@ public static class ContentInspectionCache
 
     // 运行期常驻缓存无界增长会导致内存持续攀升，达到阈值后整体收敛以限定内存上界。
     const int MaxEntries = 4096;
+    // 累计识别次数（用于统计）。
     public static int InspectionCount;
 
+    // 各缓存超过阈值时整体清空，限定内存上界。
     public static void Tighten()
     {
         if (Pending.Count > MaxEntries)
@@ -43,6 +50,7 @@ public static class ContentInspectionCache
             Fingerprints.Clear();
     }
 
+    // 清空所有内存缓存（不删除磁盘文件）。
     public static void ClearMemory()
     {
         Pending.Clear();
@@ -50,6 +58,7 @@ public static class ContentInspectionCache
         Fingerprints.Clear();
     }
 
+    // 异步获取内容识别结果（目录直接识别，文件走哈希缓存）。
     public static Task<Result> GetAsync(string file, string kind, bool enabled, string cacheRoot) =>
         Task.Run(() => GetCore(file, kind, enabled, cacheRoot));
 
@@ -61,6 +70,7 @@ public static class ContentInspectionCache
                 await Task.Run(() => ContentManager.Inspect(file, kind, enabled)),
                 null
             );
+        // 以 kind + 内容哈希作为缓存键，元数据与图标分别落盘。
         var key = kind + ":" + await Hash(file);
         var directory = Path.Combine(cacheRoot, "content-metadata");
         var metadataPath = Path.Combine(directory, key.Replace(':', '-') + ".json");
@@ -92,9 +102,11 @@ public static class ContentInspectionCache
             throw;
         }
 
+        // 优先读取磁盘缓存，命中则直接返回；否则执行识别并写回缓存。
         async Task<Entry> LoadOrInspect(string source, string contentKind, string savedMetadata)
         {
             Directory.CreateDirectory(directory);
+            // 尝试从磁盘读取已缓存的识别结果。
             try
             {
                 if (File.Exists(savedMetadata))
@@ -119,6 +131,7 @@ public static class ContentInspectionCache
                 inspected.Description,
                 inspected.Recognized
             );
+            // 识别结果先写临时文件再原子替换，避免写入中断导致缓存损坏。
             var temp = savedMetadata + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
@@ -136,6 +149,7 @@ public static class ContentInspectionCache
                     File.Delete(temp);
             }
 
+            // 仅 mod 类型提取图标，限制大小 8MB 以内。
             var bytes =
                 contentKind == "mod" ? await Task.Run(() => ContentManager.Icon(source)) : null;
             if (bytes is { Length: > 0 and <= 8_388_608 })
@@ -177,6 +191,7 @@ public static class ContentInspectionCache
         return hash;
     }
 
+    // 从磁盘读取图标字节，文件不存在或过大时返回 null。
     static byte[]? ReadIcon(string path)
     {
         try
@@ -194,3 +209,4 @@ public static class ContentInspectionCache
 
 [JsonSerializable(typeof(ContentInspectionCache.Entry))]
 internal partial class ContentInspectionJsonContext : JsonSerializerContext { }
+//必须吐槽一下我真像知道咋能写出这么雷霆的玩意的——fuzhu

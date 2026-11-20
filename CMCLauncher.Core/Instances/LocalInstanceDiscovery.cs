@@ -2,11 +2,16 @@ using System.Text.Json.Nodes;
 
 namespace CMCLauncher;
 
+// 本地实例扫描结果：根目录路径、发现的实例列表与解析失败的版本数。
 public sealed record LocalInstanceScan(string Root, IReadOnlyList<Instance> Instances, int Failed);
 
 public sealed partial class LauncherCore
 {
-    // Discovery reads local files only; a missing parent must not start a download or edit the source.
+    // 扫描本地 Minecraft 版本目录（只读，不触发下载、不修改源文件）：
+    // 定位版本根目录 → 枚举 versions/ 下的版本文件夹（或指定单个版本）→
+    // 解析版本 JSON（支持 inheritsFrom 继承链，最多 10 层防循环）→
+    // 识别加载器并构建 Instance 记录。
+    // 已导入的实例（ImportRoot + VersionId 或 Directory 匹配）会被跳过。
     public async Task<LocalInstanceScan> ScanLocalInstances(
         string path,
         CancellationToken ct = default,
@@ -44,6 +49,7 @@ public sealed partial class LauncherCore
             {
                 if (!File.Exists(Store.SafePath(root, $"versions/{id}/{id}.json")))
                     continue;
+                // 递归解析版本继承链（inheritsFrom），seen 集合防止循环引用（上限 10 层）。
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 JsonNode? baseVersion = null;
                 async Task<JsonNode> Read(string versionId)
@@ -59,6 +65,7 @@ public sealed partial class LauncherCore
                     baseVersion = profile;
                     return profile;
                 }
+                // 解析继承链得到完整版本配置，读取元数据（描述/图标/收藏），识别加载器。
                 var resolved = await Read(id);
                 var metadata = LauncherInstanceFormat.ReadMetadata(root, id, diagnostic);
                 var detected = IdentifyLoader(resolved);
@@ -78,6 +85,7 @@ public sealed partial class LauncherCore
                     ImportRoot = root,
                     Directory = root,
                 };
+                // 用版本配置中的 libraries 等字段补充实例元数据（如加载器版本）。
                 UpdateImportedMetadata(instance, resolved);
                 pending.Add(instance);
             }

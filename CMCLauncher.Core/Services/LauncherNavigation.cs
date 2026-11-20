@@ -18,9 +18,11 @@ public sealed record NavigationGroup(
     IReadOnlyList<NavigationEntry> Entries
 );
 
-// One menu definition keeps labels, ordering and destinations aligned across desktop frontends.
+// 统一的导航菜单定义，保证 WinUI 与 Avalonia 两套桌面前端的
+// 标签、顺序与路由目标一致。
 public static class LauncherNavigation
 {
+    // 各菜单项的矢量图标路径（24x24 视口）。
     public const string HomeIcon =
         "M3,10 L12,3 L21,10 M5,9 L5,21 L10,21 L10,15 L14,15 L14,21 L19,21 L19,9";
     public const string SettingsIcon =
@@ -34,10 +36,12 @@ public static class LauncherNavigation
         "M4,10 A2,2 0 1 0 4,14 A2,2 0 1 0 4,10 M12,10 A2,2 0 1 0 12,14 A2,2 0 1 0 12,10 M20,10 A2,2 0 1 0 20,14 A2,2 0 1 0 20,10";
     public const string TaskIcon =
         "M3,3 L21,3 L21,21 L3,21 Z M5,13 L8,13 L10,7 L13,18 L16,11 L19,11";
+    // 导航分组：下载、设置、更多。
     public static IReadOnlyList<NavigationGroup> Groups { get; } =
         Array.AsReadOnly(
             new[]
             {
+                // 下载分组：原版游戏、Mod、整合包、数据包、资源包、光影包、地图、蓝图。
                 new NavigationGroup(
                     "下载",
                     "downloads",
@@ -93,6 +97,7 @@ public static class LauncherNavigation
                         }
                     )
                 ),
+                // 设置分组：常规设置、个性化、Java 管理、账号管理。
                 new NavigationGroup(
                     "设置",
                     "settings",
@@ -132,6 +137,7 @@ public static class LauncherNavigation
                         }
                     )
                 ),
+                // 更多分组：工具箱、系统状态、关于。
                 new NavigationGroup(
                     "更多",
                     "more",
