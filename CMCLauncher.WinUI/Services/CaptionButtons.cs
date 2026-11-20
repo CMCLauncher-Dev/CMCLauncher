@@ -8,6 +8,8 @@ public sealed partial class MainWindow
 {
     void InitializeCaptionButtons()
     {
+        if (AppWindow.Presenter is OverlappedPresenter presenter)
+            presenter.SetBorderAndTitleBar(true, false);
         SetTitleBar(TitleDragRegion);
         CaptionMinimize.Click += (_, _) => (AppWindow.Presenter as OverlappedPresenter)?.Minimize();
         CaptionMaximize.Click += (_, _) =>
@@ -22,16 +24,6 @@ public sealed partial class MainWindow
         CaptionClose.Click += (_, _) => Close();
         AppWindow.Changed += (_, _) => RefreshCaptionButtons();
         RefreshCaptionButtons();
-    }
-
-    void SetCaptionMode(bool glass)
-    {
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-            presenter.SetBorderAndTitleBar(true, glass);
-        var visibility = glass ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
-        CaptionMinimize.Visibility = visibility;
-        CaptionMaximize.Visibility = visibility;
-        CaptionClose.Visibility = visibility;
     }
 
     void RefreshCaptionButtons()

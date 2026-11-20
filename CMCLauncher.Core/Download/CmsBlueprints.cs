@@ -125,6 +125,7 @@ public sealed class CmsBlueprints : IDisposable
                         || prefix.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase)
                         || prefix.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
                         throw new IOException("CMS returned an empty file or a web page instead of a blueprint.");
+                    Directory.CreateDirectory(Path.GetDirectoryName(fileTarget)!);
                     await using var output = File.Open(fileTarget, FileMode.CreateNew, FileAccess.Write);
                     await output.WriteAsync(head.AsMemory(0, count), ct);
                     await input.CopyToAsync(output, ct);
@@ -480,7 +481,6 @@ public sealed class CmsBlueprints : IDisposable
             || !link.Url.AbsolutePath.StartsWith("/upload/blueprint/", StringComparison.Ordinal)
         )
             throw new IOException("CMS returned an unsafe URL.");
-        Directory.CreateDirectory(stage);
         var path = Store.SafePath(stage, link.Name);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try

@@ -102,7 +102,6 @@ public sealed class LauncherUpdates(HttpClient client)
     public const string Repository = "CMCLauncher-Dev/CMCLauncher";
     const string LegacyRepository = "com-in/CMCLauncher";
     public const string ReleasesPage = "https://github.com/" + Repository + "/releases";
-    const long MaximumPackageSize = 512L * 1024 * 1024;
 
     public static string CurrentVersion =>
         typeof(LauncherUpdates)
@@ -268,7 +267,7 @@ public sealed class LauncherUpdates(HttpClient client)
                 )
                     continue;
                 var size = candidate.GetProperty("size").GetInt64();
-                if (size <= 0 || size > MaximumPackageSize)
+                if (size <= 0)
                     continue;
                 var digest = candidate.TryGetProperty("digest", out var d)
                     ? d.GetString() ?? ""
@@ -362,7 +361,6 @@ public sealed class LauncherUpdates(HttpClient client)
         if (
             !IsAssetUrl(asset.Url)
             || asset.Size <= 0
-            || asset.Size > MaximumPackageSize
             || !Regex.IsMatch(asset.Sha256, "^[0-9a-fA-F]{64}$")
         )
             throw new InvalidDataException(

@@ -75,14 +75,20 @@ public static partial class JavaManager
             throw new IOException("Cannot identify the Java installation folder.");
 
         var parent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(targetParent));
-        var destination = Path.Combine(parent, Path.GetFileName(source));
+        var sourceName = Path.GetFileName(source);
+        var useSelectedDirectory = PathComparer.Equals(Path.GetFileName(parent), sourceName);
+        var destination = useSelectedDirectory ? parent : Path.Combine(parent, sourceName);
+        var stageParent = Path.GetDirectoryName(destination)
+            ?? throw new IOException("Choose a separate Java installation folder.");
         RejectLinks(source);
         RejectLinks(parent);
         if (
             !Directory.Exists(parent)
             || Within(destination, source)
             || Within(source, destination)
-            || Path.Exists(destination)
+            || (useSelectedDirectory
+                ? Directory.EnumerateFileSystemEntries(destination).Any()
+                : Path.Exists(destination))
         )
             throw new IOException(
                 "Choose a separate folder without an installation of the same name."
@@ -97,7 +103,7 @@ public static partial class JavaManager
         )
             throw new IOException("The Java folder contains another registered installation.");
 
-        var stage = Path.Combine(parent, ".cmcl-java-" + Guid.NewGuid().ToString("N"));
+        var stage = Path.Combine(stageParent, ".cmcl-java-" + Guid.NewGuid().ToString("N"));
         var published = false;
         var committed = false;
         try
@@ -113,7 +119,21 @@ public static partial class JavaManager
             )
                 throw new IOException("The migrated Java does not match the original.");
             ct.ThrowIfCancellationRequested();
-            Directory.Move(stage, destination);
+            if (useSelectedDirectory)
+            {
+                RejectLinks(destination);
+                Directory.Delete(destination, recursive: false);
+            }
+            try
+            {
+                Directory.Move(stage, destination);
+            }
+            catch
+            {
+                if (useSelectedDirectory && !Path.Exists(destination))
+                    Directory.CreateDirectory(destination);
+                throw;
+            }
             published = true;
             var previousPath = java.Path;
             var previousRoot = java.ManagedRoot;
@@ -158,6 +178,8 @@ public static partial class JavaManager
                 }
                 catch (IOException) { }
                 catch (UnauthorizedAccessException) { }
+            if (!committed && published && useSelectedDirectory && !Path.Exists(destination))
+                Directory.CreateDirectory(destination);
         }
     }
 

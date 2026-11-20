@@ -114,11 +114,9 @@ public sealed partial class MainWindow
                 if (glass)
                     check(
                         WindowBackground.Color.A == 0x33
-                            && CaptionClose.Visibility == Microsoft.UI.Xaml.Visibility.Collapsed,
-                        "glass retains its translucent surface and native caption buttons"
+                            && CaptionClose.Visibility == Microsoft.UI.Xaml.Visibility.Visible,
+                        "glass retains its translucent surface and custom caption buttons"
                     );
-                if (glass)
-                    continue;
                 CustomTitleBar.UpdateLayout();
                 var closeEdge = CaptionClose.TransformToVisual(CustomTitleBar).TransformPoint(
                     new Windows.Foundation.Point(CaptionClose.ActualWidth, 0)

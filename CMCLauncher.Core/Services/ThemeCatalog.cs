@@ -30,7 +30,7 @@ public sealed class ThemeCatalog
     {
         this.directory = directory;
         this.diagnostic = diagnostic;
-        BundledResources.RemoveStaleCopies(directory, diagnostic);
+        BundledResources.RemoveStaleCopies(directory, "Themes", diagnostic);
         Reload();
     }
 

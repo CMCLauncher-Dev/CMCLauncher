@@ -32,7 +32,9 @@ public static class BundledResources
 
     // 旧版本把自带文件直接复制到外层目录，且之后从不覆盖，会一直遮住新版的 Default。
     // 内容与历史自带版本或当前 Default 完全一致的文件说明用户没改过，删除后即可回落到 Default。
-    public static int RemoveStaleCopies(string directory, Action<string>? diagnostic = null)
+    public static int RemoveStaleCopies(
+        string directory, string resourceGroup, Action<string>? diagnostic = null
+    )
     {
         var removed = 0;
         try
@@ -50,6 +52,7 @@ public static class BundledResources
                     if (
                         !History.Value.Contains(hash)
                         && !(File.Exists(current) && ContentHash(File.ReadAllBytes(current)) == hash)
+                        && !MatchesEmbedded(resourceGroup, Path.GetFileName(path), hash)
                     )
                         continue;
                     File.Delete(path);
@@ -69,6 +72,18 @@ public static class BundledResources
             diagnostic?.Invoke("Bundled copy cleanup unavailable: " + ex.Message);
         }
         return removed;
+    }
+
+    static bool MatchesEmbedded(string resourceGroup, string name, string hash)
+    {
+        using var stream = typeof(BundledResources).Assembly.GetManifestResourceStream(
+            $"CMCLauncher.{resourceGroup}.{name.ToLowerInvariant()}"
+        );
+        if (stream == null)
+            return false;
+        using var bytes = new MemoryStream();
+        stream.CopyTo(bytes);
+        return ContentHash(bytes.ToArray()) == hash;
     }
 
     // 换行符、BOM 和末尾空白随签出与打包方式变化，比较前统一去掉。

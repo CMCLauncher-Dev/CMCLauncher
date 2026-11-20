@@ -98,11 +98,7 @@ public sealed partial class MainWindow
     {
         if (fullClientCallback == null || (!refresh && glassClientFrame == glass))
             return;
-        if (glassClientFrame != glass)
-        {
-            glassClientFrame = glass;
-            SetCaptionMode(glass);
-        }
+        glassClientFrame = glass;
         var hwnd = WindowNative.GetWindowHandle(this);
         var style = GetWindowLong(hwnd, GWL_EXSTYLE);
         if ((style & WS_EX_LAYERED) == 0)
@@ -154,7 +150,7 @@ public sealed partial class MainWindow
         var result = DefSubclassProc(hwnd, message, wParam, lParam);
         if (
             message == FrameNcHitTest
-            && (result == 1 || result == 2)
+            && (result == 1 || result == 2 || result == 11 || result == 12 || result == 14)
             && !IsZoomed(hwnd)
             && (GetWindowLong(hwnd, -16) & 0x00040000) != 0
             && FrameGetWindowRect(hwnd, out var rect)
@@ -166,9 +162,14 @@ public sealed partial class MainWindow
             var position = lParam.ToInt64();
             var x = unchecked((short)position);
             var y = unchecked((short)(position >> 16));
-            if (glassClientFrame == false && x >= rect.Right - 138 * dpi / 96.0 && x < rect.Right
-                && y >= rect.Top + 1 && y < rect.Top + CaptionButtonInset.Height * dpi / 96.0)
+            var captionWidth = Math.Max(138, CaptionButtonInset.ActualWidth) * dpi / 96.0;
+            if (
+                x >= rect.Right - captionWidth && x < rect.Right
+                && y >= rect.Top + 1 && y < rect.Top + CaptionButtonInset.Height * dpi / 96.0
+            )
                 return 1;
+            if (result != 1 && result != 2)
+                return result;
             var hit = FrameResizeHit(
                 rect,
                 x,
@@ -176,7 +177,6 @@ public sealed partial class MainWindow
                 horizontal,
                 vertical
             );
-            // Preserve native caption buttons and other non-client results from WinUI.
             if (hit != 0)
                 return hit;
         }

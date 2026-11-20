@@ -179,7 +179,9 @@ public sealed partial class MainWindow
         CommunityFilterApplyButton.BorderBrush = ComboAccentBrush;
         TaskCountBadge.Background = Brush(PrimaryColor);
         TaskCountText.Foreground = new SolidColorBrush(Colors.White);
-        CustomTitleBar.Background = new SolidColorBrush(ContentBackdrop(Brush(bg).Color));
+        var titleSurface = ContentBackdrop(Brush(bg).Color);
+        titleSurface.A = Math.Max(titleSurface.A, (byte)12);
+        CustomTitleBar.Background = new SolidColorBrush(titleSurface);
         TitleBrandBackground.Background = new SolidColorBrush(
             ContentBackdrop(Brush(sidebar).Color)
         );

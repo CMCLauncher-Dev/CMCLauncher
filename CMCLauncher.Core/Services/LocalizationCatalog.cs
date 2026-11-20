@@ -50,7 +50,7 @@ public sealed class LocalizationCatalog
     {
         this.directory = directory;
         this.diagnostic = diagnostic;
-        BundledResources.RemoveStaleCopies(directory, diagnostic);
+        BundledResources.RemoveStaleCopies(directory, "Locales", diagnostic);
         Reload();
     }
 
