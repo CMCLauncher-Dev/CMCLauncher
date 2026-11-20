@@ -14,6 +14,8 @@ try
             throw new Exception(message);
         Console.WriteLine("PASS " + message);
     }
+    OptionsBackupTests.Run(Path.Combine(root, "options-backups"));
+    Check(true, "options snapshots, verified recovery, retention, rollback, restart, logging boundaries and integrity");
     DataPackGeneratorTests.Run(Path.Combine(root, "data-packs"));
     Check(true, "data pack versions, safe paths, metadata and concurrent creation");
     var child = new System.Diagnostics.ProcessStartInfo("java");
@@ -171,6 +173,26 @@ try
             && !diskRead.Item.Enabled
             && ContentInspectionCache.InspectionCount == beforeCache + 1,
         "portable content metadata cache survives memory reset and preserves enabled state"
+    );
+    var dependencyGame = Path.Combine(root, "dependency-game");
+    var dependencyMods = Directory.CreateDirectory(Path.Combine(dependencyGame, "mods"));
+    void DependencyJar(string name, string metadata)
+    {
+        using var zip = System.IO.Compression.ZipFile.Open(
+            Path.Combine(dependencyMods.FullName, name + ".jar"),
+            System.IO.Compression.ZipArchiveMode.Create
+        );
+        using var writer = new StreamWriter(zip.CreateEntry("fabric.mod.json").Open());
+        writer.Write(metadata);
+    }
+    DependencyJar("provider", """{"id":"fixture_provider","version":"2.0.0"}""");
+    DependencyJar("compatible", """{"id":"fixture_compatible","name":"Compatible","version":"1.0","depends":{"fixture_provider":["1.0.0","2.0.0"]}}""");
+    DependencyJar("conflict", """{"id":"fixture_conflict","name":"Conflict","version":"1.0","depends":{"fixture_provider":["1.0.0","3.0.0"]}}""");
+    var dependencyIssues = ModDependencyChecker.Check(dependencyGame);
+    Check(
+        dependencyIssues.Count == 1 && dependencyIssues[0].Kind == "conflict"
+            && dependencyIssues[0].Args[0] == "Conflict",
+        "Fabric dependency arrays accept any matching range and report incompatible ranges without crashing"
     );
     var skinRoot = Path.Combine(root, "skin-data");
     var skinId = Guid.NewGuid();

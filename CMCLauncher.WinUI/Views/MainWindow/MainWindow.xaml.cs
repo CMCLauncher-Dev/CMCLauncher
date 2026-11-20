@@ -237,10 +237,9 @@ public sealed partial class MainWindow : Window
         ToolTipService.SetToolTip(TaskDrawerBackButton, Ui("Back"));
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(TaskDrawerBackButton, Ui("Back"));
         ExtendsContentIntoTitleBar = true;
-        SetTitleBar(CustomTitleBar);
+        InitializeCaptionButtons();
         InitializeFullClientFrame();
-        CustomTitleBar.SizeChanged += (_, _) => UpdateTitleBarInset();
-        AppWindow.Changed += (_, _) => UpdateTitleBarInset();
+        Activated += InitializeVisibleBackdrop;
         // Frame 加载前先缓存正文，等它准备好后再执行首次导航。
         var startupUpdateChecked = false;
         PageFrame.Loaded += async (_, _) =>
@@ -251,6 +250,7 @@ public sealed partial class MainWindow : Window
                 startupUpdateChecked = true;
                 if (store.Config.Settings.MinecraftDirectorySetupPending)
                     await SetupMinecraftDirectory();
+                await ShowStartupOptionsRecoveries();
                 if (store.Config.Settings.CheckLauncherUpdates)
                     _ = CheckLauncherUpdate(true);
             }
@@ -458,6 +458,7 @@ public sealed partial class MainWindow : Window
     }
 
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? windowSizeSaveTimer;
+    OverlappedPresenterState? observedWindowState;
 
     private void RestoreWindowSize()
     {
@@ -485,6 +486,11 @@ public sealed partial class MainWindow : Window
 
     private void InitializeWindowSizeSaving()
     {
+        observedWindowState =
+            AppWindow.Presenter is OverlappedPresenter initial
+            && initial.State != OverlappedPresenterState.Minimized
+                ? initial.State
+                : null;
         windowSizeSaveTimer = DispatcherQueue.CreateTimer();
         windowSizeSaveTimer.Interval = TimeSpan.FromMilliseconds(500);
         windowSizeSaveTimer.IsRepeating = false;
@@ -493,6 +499,7 @@ public sealed partial class MainWindow : Window
         {
             try
             {
+                CaptureWindowPlacement();
                 await store.Save();
             }
             catch (Exception ex)
@@ -515,6 +522,7 @@ public sealed partial class MainWindow : Window
             windowSizeSaveTimer.Stop();
             try
             {
+                CaptureWindowPlacement();
                 await store.Save();
             }
             catch (Exception ex)
@@ -530,27 +538,40 @@ public sealed partial class MainWindow : Window
 
         AppWindow.Changed += (sender, args) =>
         {
-            if (!args.DidSizeChange && !args.DidPositionChange)
-                return;
-
+            var state = (sender.Presenter as OverlappedPresenter)?.State;
             if (
-                sender.Presenter is not OverlappedPresenter presenter
-                || presenter.State != OverlappedPresenterState.Restored
+                !args.DidSizeChange && !args.DidPositionChange && !args.DidPresenterChange
+                && state == observedWindowState
             )
                 return;
-
-            var size = sender.Size;
-
-            if (size.Width < 800 || size.Height < 500)
-                return;
-
-            store.Config.Settings.WindowWidth = size.Width;
-            store.Config.Settings.WindowHeight = size.Height;
-            store.Config.Settings.WindowX = sender.Position.X;
-            store.Config.Settings.WindowY = sender.Position.Y;
+            CaptureWindowPlacement();
 
             windowSizeSaveTimer.Stop();
             windowSizeSaveTimer.Start();
         };
+    }
+
+    void CaptureWindowPlacement()
+    {
+        if (
+            AppWindow.Presenter is not OverlappedPresenter presenter
+            || presenter.State == OverlappedPresenterState.Minimized
+        )
+            return;
+        var settings = store.Config.Settings;
+        // Only an actual state transition changes the startup preference. Closing an
+        // unchanged window must not overwrite a mode explicitly selected in Settings.
+        if (observedWindowState != presenter.State)
+            settings.StartMaximized = presenter.State == OverlappedPresenterState.Maximized;
+        observedWindowState = presenter.State;
+        if (presenter.State != OverlappedPresenterState.Restored)
+            return;
+        var size = AppWindow.Size;
+        if (size.Width < 800 || size.Height < 500)
+            return;
+        settings.WindowWidth = size.Width;
+        settings.WindowHeight = size.Height;
+        settings.WindowX = AppWindow.Position.X;
+        settings.WindowY = AppWindow.Position.Y;
     }
 }

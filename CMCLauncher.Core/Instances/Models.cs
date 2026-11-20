@@ -64,6 +64,8 @@ public sealed class Settings
     public string ColorPreset { get; set; } = "craft";
     public bool ShowScrollBars { get; set; }
     public bool MicaEffect { get; set; } = true;
+    public bool ShowGlassCardBorders { get; set; } = true;
+    public int GlassOpacityPercent { get; set; } = 20;
 
     // 液态玻璃的视觉效果风格："transparent"（纯透明，透出桌面）或
     // "aero"（模拟 Windows 7 Aero 玻璃，叠加顶部高光与毛玻璃质感）。
@@ -74,9 +76,6 @@ public sealed class Settings
     // 图片由启动器读取，不影响已安装模组或游戏文件。
     public string CustomBackground { get; set; } = "";
     public string CustomBackgroundFit { get; set; } = "cover";
-    // 列表卡片是否跟随自定义背景图半透明化：true 时卡片也半透明透出背景图，
-    // false（默认）时卡片保持不透明以保证文字与控件清晰可读。
-    public bool CardFollowBackground { get; set; }
     public double UiScale { get; set; } = 1;
     public double UiButtonScale { get; set; } = 1;
     public double UiMenuScale { get; set; } = 1;
@@ -138,6 +137,8 @@ public sealed class CustomAppearancePreset
 
 public sealed class JavaInstallation
 {
+    public string ManagedRoot { get; set; } = "";
+    public string ManagedHash { get; set; } = "";
     public string Path { get; set; } = "";
     public string Version { get; set; } = "";
     public int Major { get; set; }
@@ -162,6 +163,7 @@ public sealed class Instance
     public DateTime? LastPlayed { get; set; }
     public bool Favorite { get; set; }
     public bool DebugMode { get; set; }
+    public int OptionsBackupLimit { get; set; } = 10;
 
     public override string ToString() => $"{Name}  ·  {GameVersion} / {Loader}";
 }

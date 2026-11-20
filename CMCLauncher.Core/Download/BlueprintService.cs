@@ -240,8 +240,6 @@ public sealed class BlueprintService(HttpClient http)
             while ((read = await input.ReadAsync(buffer, ct)) > 0)
             {
                 total += read;
-                if (total > 100 * 1024 * 1024)
-                    throw new IOException("Blueprint exceeds 100 MB.");
                 await output.WriteAsync(buffer.AsMemory(0, read), ct);
             }
             if (total == 0)

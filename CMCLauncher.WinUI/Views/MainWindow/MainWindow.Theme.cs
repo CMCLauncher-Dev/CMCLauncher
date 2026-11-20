@@ -74,11 +74,10 @@ public sealed partial class MainWindow
         RefreshVersionDeletePalette();
         if (page == "frpc")
             RefreshFrpcPalette();
-        var micaEnabled = store.Config.Settings.MicaEffect;
-        // 开启液态玻璃时给上层内容/标题栏背景保留 20% 不透明度（alpha≈0x33），
+        var micaEnabled = GlassActive;
         // 底部仍由 TransparentBackdrop + WS_EX_LAYERED 保持纯透明，透出桌面内容。
         Color Backdrop(Color c) =>
-            micaEnabled ? Color.FromArgb(0x33, c.R, c.G, c.B) : c;
+            micaEnabled ? GlassSurface(c) : c;
         // Win7 Aero 风格：在透明玻璃之上叠加顶部弧形高光，模拟 Aero 的窗框反光。
         // 仅当液态玻璃开启且 GlassStyle=="aero" 时显示；深色主题反光更明显。
         var aeroGlass = micaEnabled && store.Config.Settings.GlassStyle == "aero";
@@ -133,10 +132,8 @@ public sealed partial class MainWindow
         var text = lightTheme ? ThemeTokens.LightText : ThemeTokens.DarkText;
         var muted = lightTheme ? ThemeTokens.LightMuted : ThemeTokens.DarkMuted;
         var accent = lightTheme ? ThemeTokens.LightAccent : ThemeTokens.LightAccentText;
-        // 自定义背景启用时把底色压到半透明（0x33，约 20% 不透明），让下方图片清晰透出；
-        // 关闭时沿用原有的液态玻璃 0x33 / 不透明底色逻辑。文字与卡片仍保持不透明保证可读。
         Color ContentBackdrop(Color c) =>
-            hasCustomBackground
+            hasCustomBackground && !micaEnabled
                 ? Color.FromArgb(0x33, c.R, c.G, c.B)
                 : Backdrop(c);
         var bgBrush = Brush(bg);
@@ -275,23 +272,23 @@ public sealed partial class MainWindow
     // 新建与已显示的卡片采用同一取色规则，避免首次进入页面时仍使用旧的表面色。
     void ApplyCardTheme(Border card)
     {
+        var settings = store.Config.Settings;
         var surface = SoftSurfaceColor();
-        var hasCustomBackground =
-            !string.IsNullOrWhiteSpace(store.Config.Settings.CustomBackground)
-            && File.Exists(store.Config.Settings.CustomBackground);
-        // 卡片是否透明的规则：
-        // - 启用自定义背景时，由"卡片跟随背景透明化"开关决定半透明或不透明；
-        // - 未启用背景图、仅开启液态玻璃时，按液态玻璃的 0x33 半透明；
-        // - 其余情况保持不透明，保证文字与控件清晰可读。
-        var followGlass =
-            hasCustomBackground
-                ? store.Config.Settings.CardFollowBackground
-                : store.Config.Settings.MicaEffect;
-        if (followGlass)
-            surface = Color.FromArgb(0x33, surface.R, surface.G, surface.B);
+        if (GlassActive)
+            surface = GlassSurface(surface);
         card.Background = new SolidColorBrush(surface);
-        card.BorderBrush = Brush(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorder);
+        card.BorderBrush = GlassActive && !settings.ShowGlassCardBorders
+            ? new SolidColorBrush(Colors.Transparent)
+            : Brush(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorder);
     }
+
+    Color GlassSurface(Color color) =>
+        Color.FromArgb(
+            (byte)Math.Round(Math.Clamp(store.Config.Settings.GlassOpacityPercent, 0, 100) * 255 / 100.0),
+            color.R,
+            color.G,
+            color.B
+        );
 
     readonly SolidColorBrush versionDeleteText = new();
     readonly SolidColorBrush versionDeleteBackground = new();
@@ -321,13 +318,6 @@ public sealed partial class MainWindow
             button.Resources["ButtonBorderBrush" + state] = versionDeleteText;
         }
         return button;
-    }
-
-    void UpdateTitleBarInset()
-    {
-        var scale = CustomTitleBar.XamlRoot?.RasterizationScale ?? 1;
-        // RightInset 是物理像素，XAML 的宽度要先除以显示缩放比例。
-        CaptionButtonInset.Width = Math.Max(138, AppWindow.TitleBar.RightInset / scale);
     }
 
     // 创建并登记可刷新配色的 SolidColorBrush，hex 为 #RRGGBB 基础色值，优先使用 ThemeTokens。

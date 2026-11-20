@@ -6,7 +6,7 @@ namespace CMCLauncher.WinUI;
 
 public sealed partial class MainWindow
 {
-    void EnsureGameFilesIdle()
+    internal void EnsureGameFilesIdle()
     {
         if (game is { HasExited: false } || launching)
             throw new InvalidOperationException(

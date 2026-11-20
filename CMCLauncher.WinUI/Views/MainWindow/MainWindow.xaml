@@ -75,7 +75,6 @@
         Background="{ThemeResource ControlStrokeColorDefaultBrush}"
       />
     </Grid>
-    <!-- 自绘标题区留出系统按钮位置，实际预留宽度由 UpdateTitleBarInset 更新。 -->
     <Grid
       x:Name="CustomTitleBar"
       Height="40"
@@ -102,11 +101,44 @@
           VerticalAlignment="Center"
         />
       </StackPanel>
-      <Border
+      <Grid
+        x:Name="TitleDragRegion"
+        Grid.ColumnSpan="2"
+        Background="Transparent"
+      />
+      <Grid
         x:Name="CaptionButtonInset"
         Grid.Column="2"
-        Width="138"
-      />
+        Height="32"
+        VerticalAlignment="Top"
+        ColumnDefinitions="46,46,46"
+      >
+        <Grid.Resources>
+          <Style x:Key="CaptionButtonStyle" TargetType="Button">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+          </Style>
+        </Grid.Resources>
+        <Button x:Name="CaptionMinimize" Style="{StaticResource CaptionButtonStyle}">
+          <FontIcon FontFamily="Segoe Fluent Icons" FontSize="10" Glyph="&#xE921;" />
+        </Button>
+        <Button x:Name="CaptionMaximize" Grid.Column="1" Style="{StaticResource CaptionButtonStyle}">
+          <FontIcon x:Name="CaptionMaximizeIcon" FontFamily="Segoe Fluent Icons" FontSize="10" Glyph="&#xE922;" />
+        </Button>
+        <Button x:Name="CaptionClose" Grid.Column="2" Style="{StaticResource CaptionButtonStyle}">
+          <Button.Resources>
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#E81123" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#C50F1F" />
+            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="White" />
+            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="White" />
+          </Button.Resources>
+          <FontIcon FontFamily="Segoe Fluent Icons" FontSize="10" Glyph="&#xE8BB;" />
+        </Button>
+      </Grid>
     </Grid>
     <SplitView
       Grid.Row="1"

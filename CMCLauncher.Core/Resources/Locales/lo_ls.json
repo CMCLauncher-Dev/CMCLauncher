@@ -155,6 +155,7 @@
                     "JVM reported a fatal error (crash report saved)":  "JVM reported a fatal error (crash report saved)",
                     "Show scrollbars":  "Show scrollbars",
                     "Liquid glass effect":  "Liquid glass effect",
+                    "Show card borders":  "Show card borders",
                     "No Java installation was found on PATH.":  "No Java installation wuz found on PATH.",
                     "No compatible loader versions found.":  "No compatible loader versions found.",
                     "No matching versions. Try a different version number or release type.":  "No matching versions. Try a different version number or release type.",

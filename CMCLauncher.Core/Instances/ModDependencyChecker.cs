@@ -110,21 +110,24 @@ public static class ModDependencyChecker
             foreach (var path in new[] { "fabric.mod.json", "quilt.mod.json" })
                 if (Read(path) is string json)
                 {
-                    var data = JsonNode.Parse(json);
+                    var data = JsonNode.Parse(json) as JsonObject;
                     var depends =
                         path.StartsWith("quilt")
-                            ? data?["quilt_loader"]?["depends"] as JsonObject
+                            ? (data?["quilt_loader"] as JsonObject)?["depends"] as JsonObject
                             : data?["depends"] as JsonObject;
                     if (depends == null)
                         continue;
                     foreach (var dep in depends)
                     {
-                        var range =
-                            dep.Value is JsonValue v ? v.ToString()
-                            : dep.Value?["version"]?.ToString() ?? "";
+                        var value = dep.Value is JsonObject metadata ? metadata["version"] : dep.Value;
+                        var alternatives = value is JsonArray array ? array.AsEnumerable() : new[] { value };
+                        var range = string.Join(" || ", alternatives
+                            .OfType<JsonValue>()
+                            .Select(node => node.TryGetValue<string>(out var text) ? Clean(text) : "")
+                            .Where(text => !string.IsNullOrWhiteSpace(text)));
                         if (string.IsNullOrWhiteSpace(range))
                             continue;
-                        deps.Add(new Dependency(dep.Key, Clean(range)));
+                        deps.Add(new Dependency(dep.Key, range));
                     }
                 }
             foreach (
@@ -188,6 +191,9 @@ public static class ModDependencyChecker
 
     static bool Satisfies(string version, string range)
     {
+        if (range.Contains(" || ", StringComparison.Ordinal))
+            return range.Split(" || ", StringSplitOptions.RemoveEmptyEntries)
+                .Any(alternative => Satisfies(version, alternative));
         foreach (var part in range.Split(','))
         {
             var req = part.Trim();

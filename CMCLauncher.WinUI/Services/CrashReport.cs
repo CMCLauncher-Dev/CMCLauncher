@@ -17,15 +17,23 @@ public sealed partial class MainWindow
     // 正常退出且没有本次新产生的崩溃文件时，不弹报告对话框。
     async Task HandleGameExit(Instance instance, Process process, DateTimeOffset launchStarted)
     {
+        var restoringOptions = false;
         try
         {
             process.Refresh();
             var exitCode = process.ExitCode;
+            OptionsRecovery? optionsRecovery = null;
+            try
+            {
+                await core.CompleteOptionsLaunch(process);
+                optionsRecovery = await Task.Run(() => core.OptionsBackups.PendingRecovery(instance));
+            }
+            catch (Exception ex) { AddLog("Options backup check failed: " + ex.Message); }
             var crashFile = await Task.Run(() =>
                 CrashReport.LatestCrashFile(store, instance, launchStarted)
             );
             if (
-                exitCode == 0
+                exitCode == 0 && optionsRecovery == null
                 && (
                     crashFile == null
                     || File.GetLastWriteTimeUtc(crashFile) < launchStarted.UtcDateTime
@@ -115,15 +123,17 @@ public sealed partial class MainWindow
                     content.Children.Add(item);
                 }
             }
+            if (optionsRecovery != null) content.Children.Insert(0, Text(OptionsRecoveryText(optionsRecovery)));
             var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
             {
                 XamlRoot = Content.XamlRoot,
                 RequestedTheme = lightTheme
                     ? Microsoft.UI.Xaml.ElementTheme.Light
                     : Microsoft.UI.Xaml.ElementTheme.Dark,
-                Title = Ui("The game crashed"),
+                Title = Ui(optionsRecovery == null ? "The game crashed" : "Resource reload failed"),
                 Content = content,
                 PrimaryButtonText = Ui("Export error report"),
+                SecondaryButtonText = optionsRecovery == null ? "" : Ui(optionsRecovery.Recommended == null ? "Choose a backup" : "Restore options"),
                 CloseButtonText = Ui("context.crashreport.close"),
                 DefaultButton = Microsoft.UI.Xaml.Controls.ContentDialogButton.Primary,
             };
@@ -131,8 +141,23 @@ public sealed partial class MainWindow
             try
             {
                 var result = await showCrashReportDialog(dialog);
+                dialogOpen = false;
                 if (result == ContentDialogResult.Primary)
                     await ExportCrashReport(report);
+                else if (result == ContentDialogResult.Secondary && optionsRecovery?.Recommended != null)
+                {
+                    restoringOptions = true;
+                    EnsureGameFilesIdle();
+                    await Task.Run(() => core.OptionsBackups.Restore(instance, optionsRecovery.Recommended.Id));
+                    Report(Ui("Options restored. They will take effect on the next game launch."));
+                }
+                else if (result == ContentDialogResult.Secondary && optionsRecovery != null)
+                {
+                    restoringOptions = true;
+                    await ShowOptionsBackups(instance);
+                }
+                if (optionsRecovery != null)
+                    await Task.Run(() => core.OptionsBackups.Acknowledge(instance, optionsRecovery.Failure.Id));
             }
             finally
             {
@@ -142,6 +167,7 @@ public sealed partial class MainWindow
         catch (Exception ex)
         {
             AddLog("Crash report failed: " + ex.Message);
+            if (restoringOptions) await Error(ex);
         }
     }
 

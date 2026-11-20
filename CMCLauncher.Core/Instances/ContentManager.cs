@@ -40,8 +40,8 @@ public static class ContentManager
             foreach (var path in new[] { "fabric.mod.json", "quilt.mod.json" })
                 if (Read(path) is string json)
                 {
-                    var data = JsonNode.Parse(json);
-                    var id = (path.StartsWith("quilt") ? data?["quilt_loader"] : data).S("id");
+                    var data = JsonNode.Parse(json) as JsonObject;
+                    var id = (path.StartsWith("quilt") ? data?["quilt_loader"] as JsonObject : data).S("id");
                     if (id.Length > 0)
                         ids.Add(id);
                 }
@@ -65,8 +65,8 @@ public static class ContentManager
                 var data = JsonNode.Parse(legacy);
                 foreach (
                     var mod in (
-                        data is JsonArray array ? array : data?["modList"] as JsonArray
-                    ).Items()
+                        data is JsonArray array ? array : (data as JsonObject)?["modList"] as JsonArray
+                    ).Items().OfType<JsonObject>()
                 )
                     if (mod.S("modid").Length > 0)
                         ids.Add(mod.S("modid"));
@@ -101,9 +101,11 @@ public static class ContentManager
             foreach (var path in new[] { "fabric.mod.json", "quilt.mod.json" })
                 if (Read(path) is string json)
                 {
-                    var data = JsonNode.Parse(json);
+                    var data = JsonNode.Parse(json) as JsonObject;
                     var node =
-                        path.StartsWith("quilt") ? data?["quilt_loader"]?["depends"] : data?["depends"];
+                        path.StartsWith("quilt")
+                            ? (data?["quilt_loader"] as JsonObject)?["depends"]
+                            : data?["depends"];
                     if (node is JsonObject depends)
                         foreach (var dep in depends)
                             if (!SystemModProviders.Contains(dep.Key))

@@ -106,18 +106,46 @@ public sealed partial class MainWindow
             yield return descendant;
     }
 
-    // 窗口级液态玻璃：不挂任何系统 backdrop 材质（Mica/Acrylic 的模糊与噪点滤镜全部清除）。
-    // 仅将 SystemBackdrop 置空不够——WinUI 3 合成器会强制把窗口底色填成不透明白/黑。
-    // 因此挂载一个没有内容的自定义 TransparentBackdrop（空 SpriteVisual），
-    // 让合成器渲染管线不提交任何不透明内容，窗口即透出下方桌面。
-    void ApplyBackdrop(bool _)
+    bool startupGlassSuspended;
+    bool GlassActive => store.Config.Settings.MicaEffect && !startupGlassSuspended;
+
+    void InitializeVisibleBackdrop(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState == WindowActivationState.Deactivated)
+            return;
+        Activated -= InitializeVisibleBackdrop;
+        if (!store.Config.Settings.MicaEffect || Verifying)
+            return;
+        startupGlassSuspended = true;
+        ApplyBackdrop(false);
+        ApplyTheme();
+        CompositionTarget.Rendering += CompleteVisibleBackdrop;
+        Closed += (_, _) => CompositionTarget.Rendering -= CompleteVisibleBackdrop;
+    }
+
+    void CompleteVisibleBackdrop(object? sender, object args)
+    {
+        CompositionTarget.Rendering -= CompleteVisibleBackdrop;
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (Content == null)
+                return;
+            startupGlassSuspended = false;
+            ApplyBackdrop(GlassActive);
+            ApplyTheme();
+        });
+    }
+
+    void ApplyBackdrop(bool glass)
     {
         if (Content == null)
             return;
+        UpdateClientFrame(glass && !startupGlassSuspended);
         // CI 验证无交互会话，跳过透明样式处理。
         if (Verifying)
             return;
-        SystemBackdrop = new TransparentBackdrop();
+        if (SystemBackdrop is not TransparentBackdrop)
+            SystemBackdrop = new TransparentBackdrop();
     }
 
     // 继承 SystemBackdrop，但不附加任何系统背景材质（不创建 Mica/Acrylic 控制器）。
@@ -131,14 +159,12 @@ public sealed partial class MainWindow
             XamlRoot xamlRoot
         )
         {
-            // 有意留空：不调用 base，也不附加控制器，合成器便不绘制系统背景。
         }
 
         protected override void OnTargetDisconnected(
             ICompositionSupportsSystemBackdrop connectedTarget
         )
         {
-            // 有意留空。
         }
     }
 
@@ -362,29 +388,67 @@ public sealed partial class MainWindow
             IsOn = settings.MicaEffect,
             Tag = "mica-effect",
         };
-        // 玻璃风格选择：透明（默认，纯透明透出桌面）或 Aero（模拟 Win7 玻璃高光）。
-        // 仅在液态玻璃总开关开启时可用。
         var glassStyle = new BelowComboBox
         {
             Header = Ui("Glass style"),
             ItemsSource = new[] { Ui("Transparent glass"), Ui("Aero glass (Win7)") },
-            SelectedIndex = settings.MicaEffect && settings.GlassStyle == "aero" ? 1 : 0,
+            SelectedIndex = settings.GlassStyle == "aero" ? 1 : 0,
             Tag = "glass-style",
+            Padding = new Thickness(12, 5, 12, 5),
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
-        void RefreshGlassStyle() => glassStyle.IsEnabled = micaEffect.IsOn;
+        var showGlassCardBorders = new ToggleSwitch
+        {
+            Header = Ui("Show card borders"),
+            IsOn = settings.ShowGlassCardBorders,
+            Tag = "show-glass-card-borders",
+        };
+        string OpacityLabel(int percent) => $"{Ui("Glass opacity / %")} · {percent}%";
+        var glassOpacity = new Slider
+        {
+            Header = OpacityLabel(Math.Clamp(settings.GlassOpacityPercent, 0, 100)),
+            Minimum = 0,
+            Maximum = 100,
+            StepFrequency = 1,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Value = Math.Clamp(settings.GlassOpacityPercent, 0, 100),
+        };
+        var opacitySaveTimer = DispatcherQueue.CreateTimer();
+        opacitySaveTimer.Interval = TimeSpan.FromMilliseconds(250);
+        opacitySaveTimer.IsRepeating = false;
+        opacitySaveTimer.Tick += async (_, _) => await SaveAppearance();
+        glassOpacity.ValueChanged += (_, args) =>
+        {
+            if (syncingAppearanceControls || !double.IsFinite(args.NewValue))
+                return;
+            settings.GlassOpacityPercent = (int)Math.Round(Math.Clamp(args.NewValue, 0, 100));
+            glassOpacity.Header = OpacityLabel(settings.GlassOpacityPercent);
+            ApplyTheme();
+            opacitySaveTimer.Stop();
+            opacitySaveTimer.Start();
+        };
+        var glassOptions = new Expander
+        {
+            Header = Ui("Glass settings"),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Content = new StackPanel
+            {
+                Spacing = 12,
+                Children = { AppearanceRow(glassStyle, showGlassCardBorders), glassOpacity },
+            },
+        };
+        void RefreshGlassOptions() =>
+            glassOptions.Visibility = micaEffect.IsOn ? Visibility.Visible : Visibility.Collapsed;
+
         micaEffect.Toggled += async (_, _) =>
         {
             if (syncingAppearanceControls)
                 return;
             settings.MicaEffect = micaEffect.IsOn;
-            RefreshGlassStyle();
-            // 关闭液态玻璃时切回透明风格，避免残留 Aero 设置。
-            if (!micaEffect.IsOn && glassStyle.SelectedIndex == 1)
-            {
-                glassStyle.SelectedIndex = 0;
-                settings.GlassStyle = "transparent";
-            }
+            if (!micaEffect.IsOn)
+                glassOptions.IsExpanded = false;
+            RefreshGlassOptions();
             try
             {
                 ApplyBackdrop(micaEffect.IsOn);
@@ -409,14 +473,24 @@ public sealed partial class MainWindow
             ApplyTheme();
             await SaveAppearance();
         };
-        RefreshGlassStyle();
+        showGlassCardBorders.Toggled += async (_, _) =>
+        {
+            if (syncingAppearanceControls)
+                return;
+            settings.ShowGlassCardBorders = showGlassCardBorders.IsOn;
+            foreach (var card in themeCards.Concat(taskCards))
+                ApplyCardTheme(card);
+            await SaveAppearance();
+        };
+        RefreshGlassOptions();
         // 自定义背景图：选择一张本地图片铺在内容区底层。选择后立即应用并保存，
         // 移除按钮恢复为默认主题底色。文件名在当前界面语言下线性显示。
         var backgroundFileName = new TextBlock
         {
             Text = BackgroundLabel(settings.CustomBackground),
             FontSize = 12,
-            TextWrapping = TextWrapping.Wrap,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center,
             Opacity = 0.8,
         };
         var chooseBackground = Action(
@@ -456,21 +530,10 @@ public sealed partial class MainWindow
                 await SaveAppearance();
             }
         );
-        // 卡片是否跟随背景图半透明化：开启后列表卡片也半透明透出背景，
-        // 关闭（默认）时卡片保持不透明以保证内容清晰。仅在自定义背景时生效。
-        var cardFollowBackground = new ToggleSwitch
+        var backgroundControls = new StackPanel
         {
-            Header = Ui("Cards follow background transparency"),
-            IsOn = settings.CardFollowBackground,
-            Tag = "card-follow-background",
-        };
-        cardFollowBackground.Toggled += async (_, _) =>
-        {
-            if (syncingAppearanceControls)
-                return;
-            settings.CardFollowBackground = cardFollowBackground.IsOn;
-            ApplyTheme();
-            await SaveAppearance();
+            Spacing = 6,
+            Children = { Buttons(chooseBackground, removeBackground), backgroundFileName },
         };
         var scale = new NumberBox
         {
@@ -567,7 +630,17 @@ public sealed partial class MainWindow
                 new StackPanel
                 {
                     Spacing = 12,
-                    Children = { showScrollBars, micaEffect, glassStyle, chooseBackground, backgroundFileName, removeBackground, cardFollowBackground, scale, buttonScale, menuScale, font, fontSize },
+                    Children =
+                    {
+                        AppearanceRow(showScrollBars, micaEffect),
+                        glassOptions,
+                        backgroundControls,
+                        scale,
+                        buttonScale,
+                        menuScale,
+                        font,
+                        fontSize,
+                    },
                 }
             )
         );
@@ -745,9 +818,9 @@ public sealed partial class MainWindow
             {
                 showScrollBars.IsOn = settings.ShowScrollBars;
                 micaEffect.IsOn = settings.MicaEffect;
-                glassStyle.SelectedIndex =
-                    settings.MicaEffect && settings.GlassStyle == "aero" ? 1 : 0;
-                RefreshGlassStyle();
+                glassStyle.SelectedIndex = settings.GlassStyle == "aero" ? 1 : 0;
+                showGlassCardBorders.IsOn = settings.ShowGlassCardBorders;
+                RefreshGlassOptions();
                 foreach (var control in AppearanceElements(PageBody))
                 {
                     if (control is ComboBox combo && combo.Header?.ToString() == Ui("Appearance"))
@@ -866,6 +939,18 @@ public sealed partial class MainWindow
         string.IsNullOrWhiteSpace(path)
             ? Ui("No background selected")
             : Path.GetFileName(path) + " · " + path;
+
+    static Grid AppearanceRow(FrameworkElement left, FrameworkElement right)
+    {
+        var row = new Grid
+        {
+            ColumnSpacing = 12,
+            ColumnDefinitions = { new(), new() },
+            Children = { left, right },
+        };
+        Grid.SetColumn(right, 1);
+        return row;
+    }
 
     async Task SaveAppearance()
     {

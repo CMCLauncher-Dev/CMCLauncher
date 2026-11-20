@@ -7,7 +7,7 @@ namespace CMCLauncher;
 
 // Java 运行时管理：发现、匹配、注册、下载
 // 候选路径来源：PATH 环境变量 → JAVA_HOME → 注册表 → 预置扫描目录 → 用户注册列表
-public static class JavaManager
+public static partial class JavaManager
 {
     public static string JavaExecutable =>
         MinecraftPlatform.OsName == "windows" ? "java.exe" : "java";
@@ -235,6 +235,12 @@ public static class JavaManager
     // 将 Java 安装信息注册到设置中（去重、从忽略列表移除）
     public static void Register(Settings settings, JavaInstallation java)
     {
+        var previous = settings.JavaInstallations.FirstOrDefault(j => PathComparer.Equals(j.Path, java.Path));
+        if (previous != null && java.ManagedRoot.Length == 0)
+        {
+            java.ManagedRoot = previous.ManagedRoot;
+            java.ManagedHash = previous.ManagedHash;
+        }
         settings.IgnoredJavaPaths.RemoveAll(p => string.Equals(p, java.Path, PathComparison));
         settings.JavaInstallations.RemoveAll(j => string.Equals(j.Path, java.Path, PathComparison));
         settings.JavaInstallations.Add(java);
@@ -356,12 +362,25 @@ public static class JavaManager
             .FirstOrDefault();
 
     // 从 Adoptium API 下载指定大版本的 Temurin JDK 并安装到 runtimes 目录
-    public static async Task<JavaInstallation> Download(
+    public static Task<JavaInstallation> Download(
         LauncherCore core,
         Store store,
         int major,
         CancellationToken ct,
-        Action<string> stage
+        Action<string> stage,
+        string brand = "temurin",
+        string? installParent = null
+    ) => Install(core, store, major, ct, stage, brand, installParent, null);
+
+    static async Task<JavaInstallation> Install(
+        LauncherCore core,
+        Store store,
+        int major,
+        CancellationToken ct,
+        Action<string> stage,
+        string brand,
+        string? installParent,
+        JavaInstallation? current
     )
     {
         var os = MinecraftPlatform.OsName == "osx" ? "mac" : MinecraftPlatform.OsName;
@@ -372,26 +391,59 @@ public static class JavaManager
             _ => throw new PlatformNotSupportedException("Unsupported Java architecture."),
         };
         var gzip = os != "windows";
-        stage("获取 Temurin Java " + major + " 下载信息");
-        var assets = await core.Json(
-            $"https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture={arch}&image_type=jdk&os={os}&vendor=eclipse",
-            ct
-        );
-        var package =
-            assets.Items().FirstOrDefault()?["binary"]?["package"] ?? throw new Exception(
-                "没有适用的 Java 下载包"
-            );
-        var hash = package.S("checksum");
-        if (!Regex.IsMatch(hash, "^[a-fA-F0-9]{64}$"))
-            throw new Exception("Java 下载包缺少有效校验值");
-        var root = Path.Combine(store.Root, "runtimes");
-        Directory.CreateDirectory(root);
-        var destination = Path.Combine(root, $"temurin-{major}-{hash[..12]}");
-        if (Directory.Exists(destination))
+        stage($"Java {major} · {brand}");
+        string hash;
+        string url;
+        var algorithm = "sha256";
+        if (brand == "corretto" && os == "windows" && arch == "x64")
         {
+            var file = $"amazon-corretto-{major}-x64-windows-jdk.zip";
+            url = $"https://corretto.aws/downloads/latest/{file}";
+            hash = (await core.Http.GetStringAsync(
+                $"https://corretto.aws/downloads/latest_sha256/{file}", ct
+            )).Trim();
+        }
+        else if (brand == "temurin")
+        {
+            var assets = await core.Json(
+                $"https://api.adoptium.net/v3/assets/latest/{major}/hotspot?architecture={arch}&image_type=jdk&os={os}&vendor=eclipse",
+                ct
+            );
+            var package = assets.Items().FirstOrDefault()?["binary"]?["package"]
+                ?? throw new IOException("没有适用的 Java 下载包");
+            hash = package.S("checksum");
+            url = package.S("link");
+        }
+        else
+            (url, hash, _, algorithm) = await ResolveAdditionalJava(core, major, brand, ct);
+        if (!Regex.IsMatch(hash, algorithm == "sha1" ? "^[a-fA-F0-9]{40}$" : "^[a-fA-F0-9]{64}$")
+            || !Uri.TryCreate(url, UriKind.Absolute, out var downloadUri)
+            || downloadUri.Scheme != Uri.UriSchemeHttps)
+            throw new Exception("Java 下载包缺少有效校验值");
+        hash = hash.ToLowerInvariant();
+        var original = current == null ? null : ManagedLocation(store, current)?.Directory
+            ?? throw new InvalidOperationException("This Java installation is not managed by CMCLauncher.");
+        if (current != null && (PathComparer.Equals(current.ManagedHash, hash)
+            || (current.ManagedHash.Length == 0
+                && PathComparer.Equals(Path.GetFileName(original), $"{brand}-{major}-{hash[..12]}"))))
+            return current;
+        var root = original == null
+            ? Path.GetFullPath(installParent ?? Path.Combine(store.Root, "runtimes"))
+            : Path.GetDirectoryName(original)!;
+        Directory.CreateDirectory(root);
+        var destination = original ?? Path.Combine(root, $"{brand}-{major}-{hash[..12]}");
+        if (original == null && Directory.Exists(destination))
+        {
+            if (installParent != null)
+                throw new IOException("Java installation folder already exists: " + destination);
             var existing = DownloadedJavaExecutable(destination);
             if (existing != null)
-                return await Inspect(existing, ct);
+            {
+                var detected = await Inspect(existing, ct);
+                detected.ManagedRoot = destination;
+                detected.ManagedHash = hash;
+                return detected;
+            }
             throw new Exception("Java 目标目录已存在但不完整，请检查：" + destination);
         }
         // 解压和版本检查都在临时目录完成，通过后才改名为正式安装目录。
@@ -399,14 +451,13 @@ public static class JavaManager
         var staging = Path.Combine(root, ".install-" + Guid.NewGuid());
         try
         {
-            stage("下载 Temurin Java " + major);
+            stage($"下载 Java {major} · {brand}");
             await core.Download(
-                package.S("link"),
+                url,
                 archive,
                 hash,
-                "sha256",
-                long.TryParse(package.S("size"), out var size) ? size : null,
-                ct
+                algorithm,
+                ct: ct
             );
             stage("解压并检查 Java");
             await RuntimeArchive.Extract(archive, staging, gzip, 2L * 1024 * 1024 * 1024, ct);
@@ -416,11 +467,43 @@ public static class JavaManager
                     "The Java archive does not contain a Java executable."
                 );
             var inspected = await Inspect(executable, ct);
-            if (inspected.Major != major)
+            if (inspected.Major != major || !CompatibleArchitecture(inspected.Architecture))
                 throw new Exception("下载的 Java 版本不匹配");
+            if (current != null)
+            {
+                var previous = ReleaseVersion(current.Version);
+                var next = ReleaseVersion(inspected.Version);
+                if (previous == null || next == null || next < previous)
+                    return current;
+            }
             ct.ThrowIfCancellationRequested();
-            Directory.Move(staging, destination);
+            if (original == null)
+                Directory.Move(staging, destination);
+            else
+            {
+                var backup = Path.Combine(root, ".java-backup-" + Guid.NewGuid());
+                Directory.Move(destination, backup);
+                try
+                {
+                    Directory.Move(staging, destination);
+                }
+                catch
+                {
+                    Directory.Move(backup, destination);
+                    throw;
+                }
+                try
+                {
+                    Directory.Delete(backup, true);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    stage("旧 Java 文件未能清理：" + backup);
+                }
+            }
             inspected.Path = Path.Combine(destination, Path.GetRelativePath(staging, executable));
+            inspected.ManagedRoot = destination;
+            inspected.ManagedHash = hash;
             return inspected;
         }
         finally
@@ -430,5 +513,80 @@ public static class JavaManager
             if (Directory.Exists(staging))
                 Directory.Delete(staging, true);
         }
+    }
+
+    public static string? ManagedBrand(Store store, JavaInstallation java) =>
+        ManagedLocation(store, java)?.Brand;
+
+    static (string Brand, string Directory)? ManagedLocation(Store store, JavaInstallation java)
+    {
+        if (!Path.IsPathFullyQualified(java.Path))
+            return null;
+        var root = Path.GetFullPath(Path.Combine(store.Root, "runtimes"));
+        var relative = Path.GetRelativePath(root, java.Path);
+        var destination = Path.IsPathFullyQualified(java.ManagedRoot)
+            ? Path.TrimEndingDirectorySeparator(Path.GetFullPath(java.ManagedRoot))
+            : Path.Combine(root, relative.Split(Path.DirectorySeparatorChar)[0]);
+        var folder = Path.GetFileName(destination);
+        var match = Regex.Match(folder, @"^([a-z]+)-([0-9]+)-[0-9a-fA-F]{12}$");
+        return match.Success
+            && Path.GetFullPath(java.Path).StartsWith(destination + Path.DirectorySeparatorChar, PathComparison)
+            && Directory.Exists(destination)
+            && !File.GetAttributes(destination).HasFlag(FileAttributes.ReparsePoint)
+            && match.Groups[2].Value == java.Major.ToString()
+            && DownloadBrands(java.Major).Any(brand => brand.Id == match.Groups[1].Value)
+            ? (match.Groups[1].Value, destination) : null;
+    }
+
+    static Version? ReleaseVersion(string value) =>
+        TryJavaVersion(value.Replace('_', '.'), out var parsed) ? parsed : null;
+
+    public static string? UpdateBrand(Store store, JavaInstallation java)
+    {
+        if (ManagedBrand(store, java) is { } managed)
+            return managed;
+        if (!CompatibleArchitecture(java.Architecture))
+            return null;
+        var brand = java.Vendor.Trim().ToLowerInvariant() switch
+        {
+            "eclipse adoptium" or "adoptopenjdk" => "temurin",
+            "amazon.com inc." or "amazon.com, inc." => "corretto",
+            "microsoft" or "microsoft corporation" => "microsoft",
+            "azul systems, inc." or "azul systems inc." or "azul systems" => "zulu",
+            "bellsoft" or "bellsoft ltd." => "liberica",
+            "sap se" or "sap" => "sapmachine",
+            _ => null,
+        };
+        return DownloadBrands(java.Major).Any(option => option.Id == brand) ? brand : null;
+    }
+
+    public static async Task<bool> UpdateJava(
+        LauncherCore core, Store store, JavaInstallation current, CancellationToken ct,
+        Action<string> stage
+    )
+    {
+        var managed = ManagedBrand(store, current) != null;
+        var brand = UpdateBrand(store, current)
+            ?? throw new InvalidOperationException("This Java distribution does not support automatic updates.");
+        var latest = await Install(core, store, current.Major, ct, stage, brand, null, managed ? current : null);
+        if (ReferenceEquals(current, latest))
+            return false;
+        if (!managed)
+        {
+            var previous = ReleaseVersion(current.Version);
+            var next = ReleaseVersion(latest.Version);
+            if (previous == null || next == null || next <= previous)
+                return false;
+            ct.ThrowIfCancellationRequested();
+        }
+        var settings = store.Config.Settings;
+        var wasSelected = PathComparer.Equals(settings.JavaPath, current.Path);
+        if (!PathComparer.Equals(current.Path, latest.Path))
+            Remove(settings, current);
+        Register(settings, latest);
+        if (wasSelected)
+            settings.JavaPath = latest.Path;
+        await store.Save();
+        return true;
     }
 }

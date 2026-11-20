@@ -88,7 +88,8 @@ public sealed partial class MainWindow
         var savedGlass = settings.MicaEffect;
         try
         {
-            foreach (var glass in new[] { false, true, false })
+            object? stableBackdrop = null;
+            foreach (var glass in new[] { false, true, false, true, false })
             {
                 settings.MicaEffect = glass;
                 var verifying = Verifying;
@@ -104,19 +105,62 @@ public sealed partial class MainWindow
                 }
                 check(
                     SystemBackdrop is TransparentBackdrop
-                        && (GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_LAYERED) != 0,
-                    "pure transparent compositor pipeline is retained with glass option " + glass + " (" + SystemBackdrop?.GetType().Name + ", style=" + GetWindowLong(hwnd, GWL_EXSTYLE).ToString("X") + ")"
+                        && (GetWindowLong(hwnd, GWL_EXSTYLE) & WS_EX_LAYERED) != 0
+                        && (stableBackdrop == null || ReferenceEquals(stableBackdrop, SystemBackdrop))
+                        && glassClientFrame == glass,
+                    "switching glass preserves the window's compositor: " + glass
                 );
+                stableBackdrop = SystemBackdrop;
                 if (glass)
                     check(
-                        WindowBackground.Color.A == 0x33,
-                        "glass content retains commit-defined 20 percent opacity"
+                        WindowBackground.Color.A == 0x33
+                            && CaptionClose.Visibility == Microsoft.UI.Xaml.Visibility.Collapsed,
+                        "glass retains its translucent surface and native caption buttons"
                     );
+                if (glass)
+                    continue;
+                CustomTitleBar.UpdateLayout();
+                var closeEdge = CaptionClose.TransformToVisual(CustomTitleBar).TransformPoint(
+                    new Windows.Foundation.Point(CaptionClose.ActualWidth, 0)
+                );
+                check(
+                    CaptionClose.ActualWidth > 0
+                        && CaptionClose.ActualHeight == 32
+                        && CaptionMinimize.ActualHeight == CaptionClose.ActualHeight
+                        && CaptionMaximize.ActualHeight == CaptionClose.ActualHeight
+                        && Math.Abs(closeEdge.Y) < 0.5
+                        && Math.Abs(closeEdge.X - CustomTitleBar.ActualWidth) < 0.5,
+                    "32-DIP caption buttons align with the top and right edges with glass option " + glass
+                );
+                check(
+                    FrameSendMessage(hwnd, FrameNcHitTest, 0, (nint)(
+                        (long)(ushort)(window.Right - 2) | ((long)(ushort)(window.Top + 16) << 16)
+                    )) == 1,
+                    "the close button receives pointer input at the window's right edge"
+                );
             }
             if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
             {
+                var normalWidth = settings.WindowWidth;
+                var normalHeight = settings.WindowHeight;
                 presenter.Maximize();
                 await Task.Delay(120);
+                await store.Save();
+                check(new Store(store.Root).Config.Settings.StartMaximized, "maximizing persists startup mode to disk");
+                check(settings.WindowWidth == normalWidth && settings.WindowHeight == normalHeight, "maximized geometry does not replace the last normal dimensions");
+                presenter.Minimize(); await Task.Delay(80);
+                CaptureWindowPlacement(); await store.Save();
+                check(new Store(store.Root).Config.Settings.StartMaximized, "minimizing preserves the last maximized mode");
+                presenter.Maximize(); await Task.Delay(80);
+                var reopened = new MainWindow(new[] { "--verify-datapack-ui", directory });
+                var reopenedClosed = new TaskCompletionSource();
+                reopened.Closed += (_, _) => reopenedClosed.TrySetResult();
+                reopened.Activate(); await Task.Delay(100);
+                check(reopened.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter { State: Microsoft.UI.Windowing.OverlappedPresenterState.Maximized },
+                    "a fresh window reloads and restores the saved maximized state");
+                check(reopened.store.Config.Settings.WindowWidth == normalWidth && reopened.store.Config.Settings.WindowHeight == normalHeight,
+                    "maximizing does not overwrite normal restore dimensions");
+                reopened.Close(); await reopenedClosed.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 FrameGetClientRect(hwnd, out var maximized);
                 var work = Microsoft
                     .UI.Windowing.DisplayArea.GetFromWindowId(
@@ -142,6 +186,12 @@ public sealed partial class MainWindow
                     )
                 );
                 await Task.Delay(120);
+                await store.Save();
+                check(!new Store(store.Root).Config.Settings.StartMaximized, "restoring to normal persists windowed startup mode");
+                settings.StartMaximized = true;
+                CaptureWindowPlacement(); await store.Save();
+                check(new Store(store.Root).Config.Settings.StartMaximized, "an explicit startup preference survives capture without a window state transition");
+                settings.StartMaximized = false; await store.Save();
                 FrameGetWindowRect(hwnd, out var restored);
                 FrameGetClientRect(hwnd, out var restoredClient);
                 check(
@@ -158,6 +208,7 @@ public sealed partial class MainWindow
             try
             {
                 Verifying = false;
+                ApplyBackdrop(savedGlass);
                 ApplyTheme();
             }
             finally

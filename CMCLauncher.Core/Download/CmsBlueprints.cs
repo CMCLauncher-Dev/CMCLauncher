@@ -55,7 +55,8 @@ public sealed class CmsBlueprints : IDisposable
     async Task<(byte[] Data, string Type)> Send(
         Func<HttpRequestMessage> create,
         int maximum,
-        CancellationToken ct
+        CancellationToken ct,
+        string? fileTarget = null
     )
     {
         await PageGate.WaitAsync(ct);
@@ -112,8 +113,24 @@ public sealed class CmsBlueprints : IDisposable
                     current.Headers.Referrer = new Uri(Home);
                     continue;
                 }
-                var data = await Read(response.Content, maximum, deadline.Token);
                 var type = response.Content.Headers.ContentType?.MediaType ?? "";
+                if (fileTarget != null && response.IsSuccessStatusCode
+                    && !type.Contains("html", StringComparison.OrdinalIgnoreCase))
+                {
+                    await using var input = await response.Content.ReadAsStreamAsync(ct);
+                    var head = new byte[512];
+                    var count = await input.ReadAtLeastAsync(head, head.Length, false, ct);
+                    var prefix = Encoding.UTF8.GetString(head, 0, count).TrimStart();
+                    if (count == 0
+                        || prefix.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase)
+                        || prefix.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
+                        throw new IOException("CMS returned an empty file or a web page instead of a blueprint.");
+                    await using var output = File.Open(fileTarget, FileMode.CreateNew, FileAccess.Write);
+                    await output.WriteAsync(head.AsMemory(0, count), ct);
+                    await input.CopyToAsync(output, ct);
+                    return ([], type);
+                }
+                var data = await Read(response.Content, maximum, deadline.Token);
                 if (response.StatusCode == HttpStatusCode.Forbidden)
                 {
                     var body = Encoding.UTF8.GetString(data);
@@ -463,34 +480,24 @@ public sealed class CmsBlueprints : IDisposable
             || !link.Url.AbsolutePath.StartsWith("/upload/blueprint/", StringComparison.Ordinal)
         )
             throw new IOException("CMS returned an unsafe URL.");
-        var download = await Send(
-            () =>
-            {
-                var request = new HttpRequestMessage(HttpMethod.Get, link.Url);
-                request.Headers.Referrer = new Uri(Home + "download/" + id + "/");
-                return request;
-            },
-            8 * 1024 * 1024,
-            ct
-        );
-        var prefix = Encoding
-            .UTF8.GetString(download.Data.AsSpan(0, Math.Min(download.Data.Length, 512)))
-            .TrimStart();
-        if (
-            download.Data.Length == 0
-            || download.Type.Contains("html", StringComparison.OrdinalIgnoreCase)
-            || prefix.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase)
-            || prefix.StartsWith("<html", StringComparison.OrdinalIgnoreCase)
-        )
-            throw new IOException(
-                "CMS returned an empty file or a web page instead of a blueprint."
-            );
         Directory.CreateDirectory(stage);
         var path = Store.SafePath(stage, link.Name);
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            await File.WriteAllBytesAsync(temporary, download.Data, ct);
+            var response = await Send(
+                () =>
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Get, link.Url);
+                    request.Headers.Referrer = new Uri(Home + "download/" + id + "/");
+                    return request;
+                },
+                4 * 1024 * 1024,
+                ct,
+                temporary
+            );
+            if (response.Type.Contains("html", StringComparison.OrdinalIgnoreCase))
+                throw new IOException("CMS returned a web page instead of a blueprint.");
             ct.ThrowIfCancellationRequested();
             File.Move(temporary, path);
             return path;

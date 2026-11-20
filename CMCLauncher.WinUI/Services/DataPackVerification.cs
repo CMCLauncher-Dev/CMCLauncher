@@ -19,6 +19,7 @@ public sealed partial class MainWindow
             );
         }
         await VerifyWindowClientFrame(Check, directory);
+        await VerifyOptionsRecoveryUi(Check, directory);
         foreach (var theme in new[] { "light", "dark" })
         {
             store.Config.Settings.Theme = theme;

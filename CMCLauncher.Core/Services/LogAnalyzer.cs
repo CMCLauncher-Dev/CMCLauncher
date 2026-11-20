@@ -29,6 +29,8 @@ public static class LogAnalyzer
 
     static readonly Rule[] Rules =
     {
+        new("resource-reload", "Resource reload failed", LogIssueSeverity.Error,
+            new Regex(@"^(?!.*\[CHAT\]).*(Resource reload failed|Failed to (load|reload) resource packs|资源重载失败|资源包重载失败)", RegexOptions.IgnoreCase | RegexOptions.Compiled)),
         new(
             "out-of-memory",
             "Out of memory (mods may need more RAM)",

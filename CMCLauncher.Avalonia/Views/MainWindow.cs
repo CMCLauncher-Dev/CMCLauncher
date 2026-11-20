@@ -250,12 +250,30 @@ public sealed partial class MainWindow : Window
                 }
                 else if (session.Store.Config.Settings.MinecraftDirectorySetupPending)
                     await FirstRun();
+                if (!Verifying) await ShowStartupOptionsRecoveries();
                 if (!Verifying && session.Store.Config.Settings.CheckLauncherUpdates)
                     _ = CheckDesktopUpdates(false);
             }
             catch (Exception ex)
             {
                 await Error(ex);
+            }
+        };
+        observedWindowState = WindowState is WindowState.Normal or WindowState.Maximized
+            ? WindowState
+            : null;
+        PropertyChanged += async (_, change) =>
+        {
+            if (change.Property != WindowStateProperty)
+                return;
+            CapturePlacement();
+            try
+            {
+                await session.Save();
+            }
+            catch (Exception ex)
+            {
+                session.Log("ERROR", "Could not save window state: " + ex);
             }
         };
         PositionChanged += (_, _) => CapturePlacement();
@@ -287,11 +305,17 @@ public sealed partial class MainWindow : Window
         };
     }
 
+    WindowState? observedWindowState;
     void CapturePlacement()
     {
-        if (WindowState != WindowState.Normal)
+        if (WindowState is not (WindowState.Normal or WindowState.Maximized))
             return;
         var settings = session.Store.Config.Settings;
+        if (observedWindowState != WindowState)
+            settings.StartMaximized = WindowState == WindowState.Maximized;
+        observedWindowState = WindowState;
+        if (WindowState != WindowState.Normal)
+            return;
         settings.WindowX = Position.X;
         settings.WindowY = Position.Y;
         settings.WindowWidth = (int)Width;

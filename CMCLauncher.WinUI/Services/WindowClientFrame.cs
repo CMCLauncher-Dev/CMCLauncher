@@ -11,6 +11,7 @@ public sealed partial class MainWindow
     const uint FrameNcDestroy = 0x0082;
     const nuint FullClientSubclassId = 0x434D434C;
     FrameSubclassProc? fullClientCallback;
+    bool? glassClientFrame;
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     delegate nint FrameSubclassProc(
@@ -90,6 +91,30 @@ public sealed partial class MainWindow
             if (fullClientCallback != null)
                 RemoveWindowSubclass(hwnd, fullClientCallback, FullClientSubclassId);
         };
+        UpdateClientFrame(store.Config.Settings.MicaEffect);
+    }
+
+    void UpdateClientFrame(bool glass, bool refresh = false)
+    {
+        if (fullClientCallback == null || (!refresh && glassClientFrame == glass))
+            return;
+        if (glassClientFrame != glass)
+        {
+            glassClientFrame = glass;
+            SetCaptionMode(glass);
+        }
+        var hwnd = WindowNative.GetWindowHandle(this);
+        var style = GetWindowLong(hwnd, GWL_EXSTYLE);
+        if ((style & WS_EX_LAYERED) == 0)
+            SetWindowLong(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED);
+        var margins = new MARGINS
+        {
+            cxLeftWidth = -1,
+            cxRightWidth = -1,
+            cyTopHeight = -1,
+            cyBottomHeight = -1,
+        };
+        DwmExtendFrameIntoClientArea(hwnd, ref margins);
         SetWindowPos(
             hwnd,
             0,
@@ -139,10 +164,15 @@ public sealed partial class MainWindow
             var horizontal = GetSystemMetricsForDpi(32, dpi) + GetSystemMetricsForDpi(92, dpi);
             var vertical = GetSystemMetricsForDpi(33, dpi) + GetSystemMetricsForDpi(92, dpi);
             var position = lParam.ToInt64();
+            var x = unchecked((short)position);
+            var y = unchecked((short)(position >> 16));
+            if (glassClientFrame == false && x >= rect.Right - 138 * dpi / 96.0 && x < rect.Right
+                && y >= rect.Top + 1 && y < rect.Top + CaptionButtonInset.Height * dpi / 96.0)
+                return 1;
             var hit = FrameResizeHit(
                 rect,
-                unchecked((short)position),
-                unchecked((short)(position >> 16)),
+                x,
+                y,
                 horizontal,
                 vertical
             );
