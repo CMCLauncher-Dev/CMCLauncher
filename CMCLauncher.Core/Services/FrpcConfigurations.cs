@@ -2,6 +2,7 @@ using System.Text;
 
 namespace CMCLauncher;
 
+// 一个已保存的 frpc 配置：相对名称（用于显示）与完整路径。
 public sealed record FrpcConfiguration(string Name, string Path)
 {
     public override string ToString() => Name;
@@ -11,14 +12,18 @@ public sealed record FrpcConfiguration(string Name, string Path)
 public sealed class FrpcConfigurations(string root)
 {
     public string Root { get; } = System.IO.Path.GetFullPath(root);
+
+    // 单个配置文件的最大字节数（2 MB）。
     const int MaxConfigBytes = 2 * 1024 * 1024;
 
+    // 是否为受支持的配置文件扩展名（.ini / .toml）。
     static bool Supported(string path) =>
         new[] { ".ini", ".toml" }.Contains(
             System.IO.Path.GetExtension(path),
             StringComparer.OrdinalIgnoreCase
         );
 
+    // 递归列出根目录下所有受支持的配置文件（跳过符号链接与 .import- 暂存目录）。
     public List<FrpcConfiguration> List()
     {
         if (!Directory.Exists(Root))
@@ -44,6 +49,7 @@ public sealed class FrpcConfigurations(string root)
         return result.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    // 校验路径位于受管根目录内且为受支持的配置文件，返回完整路径。
     public string Owned(string path)
     {
         var full = Store.SafePath(
@@ -55,6 +61,7 @@ public sealed class FrpcConfigurations(string root)
         return full;
     }
 
+    // 判断路径是否位于受管根目录内。
     public bool Contains(string path) =>
         System
             .IO.Path.GetFullPath(path)
@@ -63,6 +70,7 @@ public sealed class FrpcConfigurations(string root)
                 StringComparison.OrdinalIgnoreCase
             );
 
+    // 读取配置文件文本（限制 2 MB）。
     public async Task<string> Read(string path)
     {
         path = Owned(path);
@@ -71,6 +79,7 @@ public sealed class FrpcConfigurations(string root)
         return await File.ReadAllTextAsync(path);
     }
 
+    // 生成不冲突的目录名：重名时追加 " (2)"、" (3)" 等序号。
     string UniqueDirectory(string name)
     {
         if (
@@ -91,6 +100,8 @@ public sealed class FrpcConfigurations(string root)
         }
     }
 
+    // 导入单个配置文件或整个配置目录：先复制到 .import- 暂存目录，成功后原子移动；
+    // 保留 includes、证书等相对引用，限制 64 MB / 2000 文件。
     public async Task<List<FrpcConfiguration>> Import(string source, CancellationToken ct)
     {
         source = System.IO.Path.GetFullPath(source);
@@ -183,6 +194,7 @@ public sealed class FrpcConfigurations(string root)
         }
     }
 
+    // 新建一个配置：在独立目录下写入 frpc.ini / frpc.toml。
     public async Task<FrpcConfiguration> Create(
         string name,
         string format,
@@ -210,6 +222,7 @@ public sealed class FrpcConfigurations(string root)
         return new(System.IO.Path.GetRelativePath(Root, path), path);
     }
 
+    // 校验配置文本非空且不超过 2 MB。
     static void ValidateText(string text)
     {
         if (string.IsNullOrWhiteSpace(text) || Encoding.UTF8.GetByteCount(text) > MaxConfigBytes)
@@ -220,6 +233,7 @@ public sealed class FrpcConfigurations(string root)
     static string EditorLineEndings(string text) =>
         text.Replace("\r\n", "\n").Replace('\r', '\n').Replace("\n", "\r\n");
 
+    // 保存配置：先写临时文件再原子替换，避免写一半损坏原文件。
     public async Task Save(string path, string text, CancellationToken ct)
     {
         path = Owned(path);

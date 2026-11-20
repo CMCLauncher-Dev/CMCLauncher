@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace CMCLauncher;
 
+// 日志问题严重程度。
 public enum LogIssueSeverity
 {
     Error,
@@ -20,6 +21,7 @@ public sealed record LogIssue(
 // 不依赖 Store / Instance，WinUI 与 Avalonia 可以共享同一份分析逻辑。
 public static class LogAnalyzer
 {
+    // 一条匹配规则：问题类别、本地化标题 key、严重程度与匹配正则。
     readonly record struct Rule(
         string Category,
         string TitleKey,
@@ -27,6 +29,8 @@ public static class LogAnalyzer
         Regex Pattern
     );
 
+    // 预编译的匹配规则表，覆盖资源重载、内存溢出、Java 版本不匹配、Mixin 注入失败、
+    // 缺失依赖、Mod 加载失败、JVM 致命错误等常见崩溃模式。
     static readonly Rule[] Rules =
     {
         new("resource-reload", "Resource reload failed", LogIssueSeverity.Error,
@@ -87,8 +91,10 @@ public static class LogAnalyzer
         ),
     };
 
+    // 每个类别最多报告的问题条数。
     const int MaxFindingsPerCategory = 3;
 
+    // 逐行扫描日志，按规则匹配并去重，返回问题清单（每类最多 MaxFindingsPerCategory 条）。
     public static IReadOnlyList<LogIssue> Analyze(string log)
     {
         var findings = new List<LogIssue>();

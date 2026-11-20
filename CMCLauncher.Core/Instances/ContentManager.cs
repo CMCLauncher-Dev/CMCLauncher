@@ -292,6 +292,7 @@ public static class ContentManager
         );
     }
 
+    // 枚举游戏 saves/ 下所有有效存档（含 level.dat 且非联接目录）。
     public static List<string> Worlds(string game)
     {
         var root = Store.SafePath(game, "saves");
@@ -307,6 +308,7 @@ public static class ContentManager
             : [];
     }
 
+    // 把 Minecraft 富文本节点（text/translate/extra）拍平成纯文本用于展示。
     static string Plain(JsonNode? value) =>
         value switch
         {
@@ -466,6 +468,7 @@ public static class ContentManager
         );
     }
 
+    // 判断当前实例是否支持安装 Mod；返回 null 表示支持，否则返回面向用户的提示文案。
     public static string? ModInstallUnsupportedReason(Instance? instance)
     {
         if (instance == null)
@@ -478,6 +481,7 @@ public static class ContentManager
         return null;
     }
 
+    // 检测实例是否具备着色器支持：已启用的 Iris/Oculus/OptiFine Mod，或版本档案中的 OptiFine 库。
     public static bool HasShaderSupport(Instance instance, string game)
     {
         // Inspect enabled Mod identities, not filenames (a renamed JAR may still contain Iris).
@@ -576,6 +580,7 @@ public static class ContentManager
         return false;
     }
 
+    // 列出某类内容（mod/resourcepack/shader/datapack）的完整元数据，逐项打开包识别。
     public static List<ContentItem> List(string game, string kind, string? world = null)
     {
         return ListFiles(game, kind, world)
@@ -678,6 +683,7 @@ public static class ContentManager
             File.Move(source, target);
     }
 
+    // 把外部文件导入到对应内容目录；先整体校验再统一复制，避免半途失败留下部分文件。
     public static void Import(string game, string kind, string? world, IEnumerable<string> files)
     {
         var root = Folder(game, kind, world);

@@ -3,8 +3,12 @@ using System.Text.Json.Nodes;
 
 namespace CMCLauncher;
 
+// Mod 包导出引用解析：把本地 Mod 文件解析为 Modrinth/CurseForge 的远程引用，
+// 使导出的 Mod 包不内嵌这些文件，而是按哈希/ID 指向社区源。
+// 解析失败（网络、API、数据异常）时返回 null，调用方会回退为内嵌。
 public static class ModpackExportReferences
 {
+    // 解析单个文件为引用；任何异常都吞掉并返回 null（不中断导出）。
     public static async Task<JsonNode?> Resolve(
         LauncherCore core,
         string root,
@@ -39,6 +43,8 @@ public static class ModpackExportReferences
         }
     }
 
+    // 实际解析逻辑：读取 .craft-mods-native.json 中的跟踪记录，
+    // Modrinth 按 SHA512 哈希查询版本文件，CurseForge 按 project/file ID 查询并校验 SHA1。
     static async Task<JsonNode?> ResolveCore(
         LauncherCore core,
         string root,

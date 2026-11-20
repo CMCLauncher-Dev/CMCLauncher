@@ -4,6 +4,9 @@ namespace CMCLauncher;
 // than interpolating so HD skins and exported avatars retain their pixel edges.
 public static class MinecraftPfp
 {
+    // 从皮肤像素数据渲染头像（BGRA 格式）。
+    // 支持方形头像（仅头部）与肖像模式（头+身体+手臂），
+    // 可选叠加层、背景色/渐变、阴影与细手臂（slim）模型。
     public static byte[] Render(
         byte[] bgra,
         int width,
@@ -76,6 +79,7 @@ public static class MinecraftPfp
         return result;
     }
 
+    // 填充背景：纯色（end 为 null）或沿指定角度的双色渐变。
     static void FillBackground(byte[] pixels, int size, byte[]? start, byte[]? end, double angle)
     {
         if (start == null)
@@ -103,6 +107,8 @@ public static class MinecraftPfp
         }
     }
 
+    // 渲染肖像模式头像：按皮肤图集坐标绘制头部、躯干与手臂，
+    // 支持叠加层、细手臂模型、背景与软阴影（三次可分离盒式模糊近似）。
     static byte[] Portrait(
         byte[] skin,
         int width,
@@ -129,6 +135,8 @@ public static class MinecraftPfp
         var bodyHeight = (int)Math.Round(unit * 6);
         var atlas = width / 64;
 
+        // 从皮肤图集的源矩形（sx,sy,sw,sh）绘制到目标矩形（dx,dy,dw,dh），
+        // 按整像素缩放（不插值）以保持像素边缘；outer 为 true 时使用叠加层透明度。
         void Draw(
             int sx,
             int sy,

@@ -2,14 +2,23 @@ using System.Diagnostics;
 
 namespace CMCLauncher;
 
+// 桌面版（Avalonia）更新安装器：把更新包解压到暂存目录，
+// 再启动一个 worker 进程在旧进程退出后把文件覆盖到安装目录（带回滚）。
 public static class DesktopUpdateInstaller
 {
+    // worker 进程的启动开关参数。
     public const string WorkerSwitch = "--apply-desktop-update";
+
+    // 是否由发布包管理（存在 cmclauncher-distribution 标记文件，或运行在 AppImage 中）。
     public static bool PackageManaged =>
         File.Exists(Path.Combine(AppContext.BaseDirectory, "cmclauncher-distribution"))
         || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("APPIMAGE"));
+
+    // 桌面版主程序可执行文件名（Windows 带 .exe 后缀）。
     public static string ExecutableName =>
         MinecraftPlatform.OsName == "windows" ? "CMCLauncher.Avalonia.exe" : "CMCLauncher.Avalonia";
+
+    // 当前平台的 RID 标识（如 win-x64、osx-arm64、linux-x64）。
     public static string Rid =>
         (
             MinecraftPlatform.OsName == "osx" ? "osx"
@@ -28,7 +37,9 @@ public static class DesktopUpdateInstaller
             }
         );
 
-    // Bundled packs under locales/Default and themes/Default always follow the update.
+    // 判断更新时是否保留该文件（用户数据不覆盖）：
+    // locales/themes/frpc/state/logs/instances/tools/.minecraft/.config 目录及 settings.json 保留；
+    // 但 locales/Default、themes/Default 下的自带资源始终跟随更新。
     public static bool Preserve(string relative) =>
         relative.Split('/') is [var top, var folder, _, ..]
         && top.ToLowerInvariant() is "locales" or "themes"
@@ -46,6 +57,7 @@ public static class DesktopUpdateInstaller
                 or ".config"
         || Path.GetFileName(relative).Equals("settings.json", StringComparison.OrdinalIgnoreCase);
 
+    // 解压更新包到暂存目录，并校验其中包含桌面运行时文件。
     public static async Task Stage(string package, string stage, CancellationToken ct)
     {
         await RuntimeArchive.Extract(
@@ -60,6 +72,7 @@ public static class DesktopUpdateInstaller
             throw new IOException("The update package is missing desktop runtime files.");
     }
 
+    // 递归列出目录下所有文件（相对路径）；拒绝符号链接，限制文件数量。
     static string[] Files(string root)
     {
         var files = new List<string>();
@@ -80,6 +93,7 @@ public static class DesktopUpdateInstaller
         return files.ToArray();
     }
 
+    // 启动 worker 更新进程，参数携带父进程 PID/启动时间与目标、暂存目录。
     public static void Start(string stage, string target)
     {
         var probe = Path.Combine(target, ".update-probe-" + Guid.NewGuid().ToString("N"));
@@ -107,6 +121,7 @@ public static class DesktopUpdateInstaller
             Process.Start(info) ?? throw new IOException("Could not start the desktop updater.");
     }
 
+    // worker 进程入口：校验参数，等待父进程退出后应用更新并重启主程序。
     public static bool Handle(string[] args)
     {
         if (args.Length == 0 || args[0] != WorkerSwitch)
@@ -133,6 +148,8 @@ public static class DesktopUpdateInstaller
         return true;
     }
 
+    // 把暂存目录中的文件覆盖到安装目录（跳过需保留的用户文件）；
+    // 被覆盖的旧文件先备份到 .rollback，失败时回滚。
     public static void Apply(string stage, string root)
     {
         stage = Path.GetFullPath(stage);
@@ -201,6 +218,7 @@ public static class DesktopUpdateInstaller
         }
     }
 
+    // 按 PID 与启动时间双重校验获取父进程；不存在则返回 null。
     static Process? TryParent(int pid, long ticks)
     {
         try

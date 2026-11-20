@@ -1,7 +1,10 @@
 namespace CMCLauncher;
 
+// 首页卡片布局：管理卡片（account/game/performance/note/news）的排序。
 public static class HomeCardLayout
 {
+    // 把指定卡片移动到目标卡片之前/之后（target 为 null 时移到末尾）；
+    // 卡片不存在时按默认宽度 1 新建。返回布局是否发生变化。
     public static bool Move(
         List<HomeCardPlacement> cards,
         string id,

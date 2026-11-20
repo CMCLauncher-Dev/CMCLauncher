@@ -9,6 +9,8 @@ public sealed class MinecraftSkins(LauncherCore core, string root, Action<string
 {
     readonly ConcurrentDictionary<string, Lazy<Task<byte[]?>>> requests = new();
 
+    // 获取账号皮肤 PNG（按 UUID 合并并发请求，一天缓存）；
+    // cacheOnly 为 true 时只读缓存、不发起网络请求。
     public Task<byte[]?> Get(string uuid, bool cacheOnly = false)
     {
         if (!Guid.TryParse(uuid, out var id))
@@ -21,6 +23,9 @@ public sealed class MinecraftSkins(LauncherCore core, string root, Action<string
             .Value;
     }
 
+    // 实际拉取皮肤：优先读本地缓存（一天内有效），否则经 Mojang sessionserver
+    // 解析 textures 属性并校验皮肤 URL（仅允许 textures.minecraft.net、https、默认端口），
+    // 下载限 1 MB 并写入缓存；失败时回退到旧缓存。
     async Task<byte[]?> Fetch(string uuid, bool cacheOnly)
     {
         var cache = Path.Combine(root, "skin-cache", uuid + ".png");

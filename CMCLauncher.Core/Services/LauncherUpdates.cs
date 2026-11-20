@@ -11,6 +11,7 @@ namespace CMCLauncher;
 public sealed record LauncherVersion(int Major, int Minor, int Patch, string PreRelease)
     : IComparable<LauncherVersion>
 {
+    // 解析版本号（兼容 CMCL-v1.0.0-release、v1.0.0、1.0.0-beta 等历史标签格式），非法时返回 null。
     public static LauncherVersion? Parse(string value)
     {
         var match = Regex.Match(
@@ -33,6 +34,7 @@ public sealed record LauncherVersion(int Major, int Minor, int Patch, string Pre
         return new(major, minor, patch, pre);
     }
 
+    // 按语义化版本比较：先比主/次/修订号，再比预发布号（正式版大于预发布版）。
     public int CompareTo(LauncherVersion? other)
     {
         if (other is null)
@@ -86,8 +88,10 @@ public sealed record LauncherVersion(int Major, int Minor, int Patch, string Pre
         $"{Major}.{Minor}.{Patch}" + (PreRelease.Length == 0 ? "" : "-" + PreRelease);
 }
 
+// 一个更新包资产：文件名、下载地址、大小与 SHA-256 校验和。
 public sealed record LauncherUpdateAsset(string Name, Uri Url, long Size, string Sha256);
 
+// 一个 GitHub 发布：标签、解析后的版本、是否预发布、发布页地址、说明文本与匹配的更新包资产。
 public sealed record LauncherRelease(
     string Tag,
     LauncherVersion Version,
@@ -97,12 +101,17 @@ public sealed record LauncherRelease(
     LauncherUpdateAsset? Asset
 );
 
+// 启动器更新检查与下载：从 GitHub Releases 获取版本列表，
+// 校验资产 URL 与 SHA-256，支持镜像加速下载。
 public sealed class LauncherUpdates(HttpClient client)
 {
+    // 当前仓库（更新资产 URL 校验白名单）。
     public const string Repository = "CMCLauncher-Dev/CMCLauncher";
+    // 旧仓库（兼容历史发布资产）。
     const string LegacyRepository = "com-in/CMCLauncher";
     public const string ReleasesPage = "https://github.com/" + Repository + "/releases";
 
+    // 当前程序集版本号（取 InformationalVersion 的 + 前部分）。
     public static string CurrentVersion =>
         typeof(LauncherUpdates)
             .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
@@ -118,6 +127,7 @@ public sealed class LauncherUpdates(HttpClient client)
         return new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(15) };
     }
 
+    // 构造带 User-Agent 与 GitHub API Accept 头的 GET 请求。
     static HttpRequestMessage Request(Uri uri)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, uri);
@@ -126,6 +136,7 @@ public sealed class LauncherUpdates(HttpClient client)
         return request;
     }
 
+    // 校验 URL 是否为官方 GitHub 发布资产下载地址（https、默认端口、无用户信息）。
     public static bool IsAssetUrl(Uri uri) =>
         uri.Scheme == "https"
         && uri.IsDefaultPort
@@ -167,6 +178,7 @@ public sealed class LauncherUpdates(HttpClient client)
         "https://ghproxy.cc",
     ];
 
+    // 把镜像前缀拼到资产 URL 前。
     static Uri Mirrored(Uri assetUrl, string prefix) =>
         new(prefix.TrimEnd('/') + "/" + assetUrl.AbsoluteUri);
 
@@ -222,6 +234,8 @@ public sealed class LauncherUpdates(HttpClient client)
         return best.Prefix;
     }
 
+    // 解析 GitHub Releases API 的 JSON 响应为发布列表；
+    // 按 singleFile/desktopRid 匹配当前平台对应的更新包资产（含 SHA-256 校验和）。
     public static IReadOnlyList<LauncherRelease> ParseReleases(
         string json,
         bool singleFile,
@@ -290,6 +304,7 @@ public sealed class LauncherUpdates(HttpClient client)
         return releases;
     }
 
+    // 从发布列表中选出应安装的最新版本（高于当前版本，按是否接收预发布过滤）。
     public static LauncherRelease? Select(
         IEnumerable<LauncherRelease> releases,
         string current,
@@ -306,6 +321,7 @@ public sealed class LauncherUpdates(HttpClient client)
             .FirstOrDefault();
     }
 
+    // 分页拉取全部发布（最多 10 页，单页响应限制 8 MB）并选出最新版本。
     public async Task<LauncherRelease?> Check(
         string current,
         bool receiveBeta,
@@ -350,6 +366,8 @@ public sealed class LauncherUpdates(HttpClient client)
         );
     }
 
+    // 下载更新包到目标路径：先写 .partial 临时文件，边下载边计算 SHA-256，
+    // 校验大小与哈希通过后原子移动到位。
     public async Task Download(
         LauncherUpdateAsset asset,
         string destination,
