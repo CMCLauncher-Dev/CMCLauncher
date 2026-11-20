@@ -26,6 +26,7 @@ public sealed partial class MainWindow
                     "pfp"
                 ),
                 ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator"),
+                ("Command generator", "Build Minecraft Java Edition commands with a live preview.", "command-generator"),
             }
         )
         {

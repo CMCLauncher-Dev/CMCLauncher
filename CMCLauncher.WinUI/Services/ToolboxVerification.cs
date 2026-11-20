@@ -12,7 +12,7 @@ public sealed partial class MainWindow
         page = "toolbox";
         expandedNavigation = "more";
         await RenderAsync();
-        check(themeCards.Count == 4, "toolbox presents four independent tool cards");
+        check(themeCards.Count == 5, "toolbox presents five independent tool cards");
         check(
             navigationButtons.ContainsKey("page:toolbox")
                 && !navigationButtons.ContainsKey("page:frpc")

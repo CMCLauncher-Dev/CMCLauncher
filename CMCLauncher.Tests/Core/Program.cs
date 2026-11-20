@@ -15,6 +15,44 @@ try
         Console.WriteLine("PASS " + message);
     }
     OptionsBackupTests.Run(Path.Combine(root, "options-backups"));
+    Check(
+        CommandGenerator.Generate("24w10a", CommandGenerator.CustomCommand, ["/minecraft:execute", "as @a run say hello"])
+            == "/minecraft:execute as @a run say hello"
+        && CommandGenerator.Generate("", CommandGenerator.CustomCommand, ["reload"]) == "/reload",
+        "generic commands preserve namespaced verbs and arguments without assuming a release"
+    );
+    Check(
+        CommandGenerator.Generate("1.12.2", "give", ["Steve", "stone", "1", "", "", """{Unbreakable:1b,RepairCost:2}"""])
+            == "/give Steve stone 1 0 {Unbreakable:1b,RepairCost:2}"
+        && CommandGenerator.Generate("1.21.5", "give", ["Steve", "stone", "1", "", "", "[minecraft:custom_data={bytes:[B;1b,2b]},\nminecraft:custom_name={text:'[Sword]'}]"])
+            == "/give Steve stone[minecraft:custom_data={bytes:[B;1b,2b]}, minecraft:custom_name={text:'[Sword]'}] 1",
+        "advanced item editing preserves typed SNBT arrays and namespaced components"
+    );
+    Check(
+        CommandGenerator.Generate("1.0", "give", ["Steve", "1", "2"]) == "/give Steve 1 2"
+        && CommandGenerator.Generate("1.8", "give", ["Steve", "minecraft:stone", "1", "Demo"])
+            == "/give Steve minecraft:stone 1 0 {display:{Name:\"Demo\"}}"
+        && CommandGenerator.Generate("1.20.4", "give", ["Steve", "stone", "1", "Demo"])
+            == "/give Steve stone{display:{Name:\"{\\\"text\\\":\\\"Demo\\\"}\"}} 1"
+        && CommandGenerator.Generate("1.20.5", "give", ["Steve", "stone", "1", "Demo"])
+            == "/give Steve stone[minecraft:custom_name=\"{\\\"text\\\":\\\"Demo\\\"}\"] 1"
+        && CommandGenerator.Generate("1.21.5", "give", ["Steve", "stone", "1", "Demo"])
+            == "/give Steve stone[minecraft:custom_name={text:\"Demo\"}] 1"
+        && CommandGenerator.Generate("1.12.2", "effect", ["Steve", "1", "30", "0"])
+            == "/effect Steve 1 30 0"
+        && CommandGenerator.Generate("1.13", "effect", ["Steve", "speed", "30", "0"])
+            == "/effect give Steve speed 30 0"
+        && CommandGenerator.Forms("1.6.4").All(form => form.Name is not ("summon" or "fill")),
+        "command generation follows legacy tags, item components and inline SNBT text transitions"
+    );
+    Check(
+        CommandGenerator.Generate("1.0", "tp", ["Steve", "Alex"]) == "/tp Steve Alex"
+        && CommandGenerator.Generate("1.21.5", "give", ["Steve", "stone", "1", "", """{"marker":true,"level":4}"""])
+            == """/give Steve stone[minecraft:custom_data={"marker":1b,"level":4}] 1"""
+        && CommandGenerator.Generate("1.12.2", "give", ["Steve", "stone", "1", "", """{"marker":true}"""])
+            == """/give Steve stone 1 0 {"marker":1b}""",
+        "old teleport syntax and custom NBT compounds match the target release"
+    );
     Check(true, "options snapshots, verified recovery, retention, rollback, restart, logging boundaries and integrity");
     DataPackGeneratorTests.Run(Path.Combine(root, "data-packs"));
     Check(true, "data pack versions, safe paths, metadata and concurrent creation");
