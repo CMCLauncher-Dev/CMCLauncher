@@ -55,7 +55,8 @@
     <Compile Remove="CompanionData.g.cs" />
   </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <PublishTrimmed Condition="'$(PublishTrimmed)' == ''">true</PublishTrimmed>
+    <!-- The Windows App SDK projections must be included in the self-contained package. -->
+    <PublishTrimmed Condition="'$(PublishTrimmed)' == ''">false</PublishTrimmed>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PublishTrimmed)' == 'true'">
     <TrimMode>partial</TrimMode>

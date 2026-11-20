@@ -10,7 +10,8 @@ public sealed record CommandField(
     string Label,
     string Example,
     bool Optional = false,
-    string? Hint = null
+    string? Hint = null,
+    IReadOnlyList<string>? EnabledForFirstField = null
 );
 
 // 命令表单：命令名、语法说明与字段列表。
@@ -18,7 +19,7 @@ public sealed record CommandForm(string Name, string Syntax, IReadOnlyList<Comma
 
 // Minecraft 命令生成器：按游戏版本提供 give/tp/effect/summon/fill 等命令表单，
 // 并对输入做严格校验后生成对应版本的命令文本。
-public static class CommandGenerator
+public static partial class CommandGenerator
 {
     public const string CustomCommand = "Custom command";
     // 自定义命令表单：命令名 + 可选参数。
@@ -39,6 +40,50 @@ public static class CommandGenerator
     static readonly Version Flattening = new(1, 13, 0);
     static readonly Version ItemComponents = new(1, 20, 5);
     static readonly Version SnbtText = new(1, 21, 5);
+
+    public static string CommandLabel(string name, Func<string, string> translate)
+    {
+        if (name == CustomCommand)
+            return translate(name);
+        var key = "Command usage." + name[(name.LastIndexOf(':') + 1)..];
+        var usage = translate(key);
+        return usage == key ? name : name + " " + usage;
+    }
+
+    public static string CommandOptionLabel(string name, Func<string, string> translate, string? command = null)
+    {
+        if (command != null)
+        {
+            var contextualKey = "Command option." + command[(command.LastIndexOf(':') + 1)..] + "." + name;
+            var contextualLabel = translate(contextualKey);
+            if (contextualLabel != contextualKey)
+                return contextualLabel;
+        }
+        var key = "Command option." + name;
+        var label = translate(key);
+        return label == key ? translate(name) : label;
+    }
+
+    public static IReadOnlyList<string> VersionChoices(
+        IReadOnlyList<GameRelease> catalog,
+        IEnumerable<string> installed,
+        bool showSnapshots,
+        bool showAprilFools
+    )
+    {
+        var choices = new List<string>();
+        foreach (var item in catalog)
+        {
+            if (GameRelease.IsAprilFoolsVersion(item.Id) ? showAprilFools
+                : item.Type == "snapshot" ? showSnapshots
+                : item.Type == "release")
+                choices.Add(item.Id);
+        }
+        choices.AddRange(installed.Where(id => Version.TryParse(id, out var release) && release >= new Version(1, 0)));
+        if (catalog.Count == 0)
+            choices.AddRange(["1.21.1", "1.20.4", "1.16.5", "1.12.2", "1.8.9", "1.0"]);
+        return choices.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
 
     // 解析并校验 Java 版稳定版本号（如 1.12.2、1.21.5）。
     static Version Release(string text)
@@ -147,6 +192,7 @@ public static class CommandGenerator
                     ]
                 )
             );
+        forms.AddRange(ServerForms(version));
         forms.Add(CustomForm);
         return forms;
     }
@@ -201,7 +247,7 @@ public static class CommandGenerator
             "summon" =>
                 $"/summon {Id(values[0], legacy: !modern)} {Coordinates(values[1], version)}",
             "fill" => Fill(),
-            _ => throw new ArgumentException("Unsupported command."),
+            _ => GenerateServer(command, values),
         };
 
         string Give()
@@ -482,8 +528,24 @@ public static class CommandGenerator
     }
 
     // 校验三个坐标分量：支持绝对值、~ 相对值与 ^ 局部值（局部值仅现代版本且须全部使用），
+    internal static bool ValidTreeCoordinates(string parser, string value)
+    {
+        try
+        {
+            var horizontal = parser is "minecraft:vec2" or "minecraft:column_pos";
+            Coordinates(value, horizontal ? new Version(1, 12) : Flattening,
+                block: parser is "minecraft:block_pos" or "minecraft:column_pos",
+                dimensions: horizontal ? 2 : 3);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     // block 模式要求整数（用于 /fill 的方块坐标）。
-    static string Coordinates(string value, Version version, bool block = false)
+    static string Coordinates(string value, Version version, bool block = false, int dimensions = 3)
     {
         var parts = value.Split(
             ' ',
@@ -491,7 +553,7 @@ public static class CommandGenerator
         );
         var local = parts.Any(part => part.StartsWith('^'));
         if (
-            parts.Length != 3
+            parts.Length != dimensions
             || (local && (version < Flattening || parts.Any(part => !part.StartsWith('^'))))
             || parts.Any(part =>
                 !Regex.IsMatch(

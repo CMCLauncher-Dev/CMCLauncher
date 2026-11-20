@@ -15,6 +15,113 @@ try
         Console.WriteLine("PASS " + message);
     }
     OptionsBackupTests.Run(Path.Combine(root, "options-backups"));
+    GameRelease[] commandVersions =
+    [
+        new("1.21.5", "release"),
+        new("25w14craftmine", "snapshot"),
+        new("25w13a", "snapshot"),
+        new("1.21.1", "release"),
+        new("1.21", "release"),
+    ];
+    Check(
+        CommandGenerator.VersionChoices(commandVersions, ["1.12.2"], false, false)
+            .SequenceEqual(["1.21.5", "1.21.1", "1.21", "1.12.2"])
+        && CommandGenerator.VersionChoices(commandVersions, [], true, false).Contains("25w13a")
+        && !CommandGenerator.VersionChoices(commandVersions, [], true, false).Contains("25w14craftmine")
+        && CommandGenerator.VersionChoices(commandVersions, [], false, true).Contains("25w14craftmine")
+        && !CommandGenerator.VersionChoices(commandVersions, [], false, true).Contains("25w13a"),
+        "command versions preserve release order, include older releases and independently filter snapshots and April Fools versions"
+    );
+    Check(
+        CommandValueCatalog.OptionsForArgument("minecraft:gamemode")
+            .SequenceEqual(["survival", "creative", "adventure", "spectator"])
+        && CommandValueCatalog.OptionsForArgument("brigadier:bool").SequenceEqual(["true", "false"])
+        && CommandValueCatalog.TargetSelectors("minecraft:entity", "1.21.1", true)
+            .SequenceEqual(["@p", "@r", "@s", "@n"])
+        && !CommandValueCatalog.TargetSelectors("minecraft:entity", "1.21.1", playersOnly: true)
+            .Contains("@e"),
+        "command controls provide fixed choices and respect target selector restrictions"
+    );
+    var commandLabels = new Dictionary<string, string>
+    {
+        ["block.minecraft.stone"] = "石头",
+        ["gamerule.drowningDamage"] = "溺水伤害",
+        ["gamerule.drowningDamage.description"] = "控制溺水时是否受到伤害",
+    };
+    var localizedRule = CommandValueCatalog.LocalizedChoice(
+        "minecraft:drowning_damage", "gamerule", commandLabels, key => key
+    );
+    Check(
+        CommandValueCatalog.LocalizedChoice("minecraft:stone", "item", commandLabels, key => key).Name
+            == "石头"
+        && localizedRule.Id == "minecraft:drowning_damage"
+        && localizedRule.Name == "溺水伤害"
+        && localizedRule.Description == "控制溺水时是否受到伤害",
+        "command choice labels use localized Minecraft text without changing command IDs"
+    );
+    ItemTag EnchantmentTag(string key) => new()
+    {
+        Key = key,
+        Enchantments = [new() { Id = "minecraft:sharpness", Level = 5 }],
+    };
+    Check(
+        CommandGenerator.BuildItemTags("1.8.9", "", [EnchantmentTag("Enchantments")])
+            == """{"ench":[{"id":16s,"lvl":5s}]}"""
+        && CommandGenerator.BuildItemTags("1.20.4", "", [EnchantmentTag("Enchantments")])
+            == """{"Enchantments":[{"id":"minecraft:sharpness","lvl":5s}]}"""
+        && CommandGenerator.BuildItemTags("1.21.1", "", [EnchantmentTag("minecraft:enchantments")])
+            == """[minecraft:enchantments={"levels":{"minecraft:sharpness":5}}]"""
+        && CommandGenerator.BuildItemTags("1.21.5", "", [EnchantmentTag("minecraft:stored_enchantments")])
+            == """[minecraft:stored_enchantments={"minecraft:sharpness":5}]""",
+        "enchantment rows serialize for numeric NBT, namespaced NBT and both component formats"
+    );
+    var typedTag = new ItemTag { Key = "custom_data", Type = ItemTagType.Compound };
+    var byteArray = new ItemTag { Key = "bytes", Type = ItemTagType.ByteArray };
+    byteArray.Children.Add(new ItemTag { Type = ItemTagType.Byte, Value = "-2" });
+    typedTag.Children.Add(byteArray);
+    Check(
+        CommandGenerator.BuildItemTags("1.21.5", "", [typedTag])
+            == """[minecraft:custom_data={"bytes":[B;-2b]}]"""
+        && CommandGenerator.BuildItemTags("1.12.2", "", [typedTag])
+            == """{"custom_data":{"bytes":[B;-2b]}}""",
+        "graphical item tags preserve compound and typed-array syntax on both sides of the component transition"
+    );
+    Check(
+        CommandGenerator.Generate("1.21.5", "ban", ["Steve", "Repeated griefing"])
+            == "/ban Steve Repeated griefing"
+        && CommandGenerator.Generate("1.21.5", "whitelist", ["add", "Steve"])
+            == "/whitelist add Steve"
+        && CommandGenerator.Generate("1.21.5", "save-all", ["flush"]) == "/save-all flush"
+        && CommandGenerator.Generate("1.12.2", "save-all", []) == "/save-all"
+        && CommandGenerator.Generate("1.21.5", "stop", []) == "/stop",
+        "dedicated server forms generate administration commands and version-specific save syntax"
+    );
+    var reportPath = Path.Combine(root, "commands.json");
+    File.WriteAllText(reportPath, """
+        {"type":"root","children":{
+          "rule":{"type":"literal","children":{"value":{"type":"argument","parser":"brigadier:bool","executable":true}}},
+          "alias":{"type":"literal","redirect":["rule"]},
+          "run":{"type":"literal","redirect":[]},
+          "position":{"type":"literal","children":{"point":{"type":"argument","parser":"minecraft:vec3","executable":true}}},
+          "column":{"type":"literal","children":{"point":{"type":"argument","parser":"minecraft:column_pos","executable":true}}}
+        }}
+        """);
+    var commandReport = CommandTree.Load(reportPath);
+    Check(
+        commandReport.Preview(["position", "point"], ["", "^ ^1 ^-2"]) == "/position ^ ^1 ^-2"
+        && commandReport.Preview(["position", "point"], ["", "~1 64"]).Length == 0
+        && commandReport.Preview(["column", "point"], ["", "~1 -2"]) == "/column ~1 -2"
+        && commandReport.Preview(["column", "point"], ["", "~1 64 -2"]).Length == 0,
+        "command trees validate three-axis coordinates and horizontal columns"
+    );
+    Check(
+        commandReport.Choices(["alias"]).Single().Parser == "brigadier:bool"
+            && commandReport.Preview(["alias", "value"], ["", "true"]) == "/alias true"
+            && commandReport.Preview(["run", "rule", "value"], ["", "", "false"]) == "/run rule false"
+            && commandReport.Preview(["rule", "value"], ["", "no"]).Length == 0
+            && commandReport.Preview(["rule"], [""]).Length == 0,
+        "imported command trees support literals, typed arguments, redirects and executable branches"
+    );
     Check(
         CommandGenerator.Generate("24w10a", CommandGenerator.CustomCommand, ["/minecraft:execute", "as @a run say hello"])
             == "/minecraft:execute as @a run say hello"

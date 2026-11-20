@@ -150,6 +150,43 @@ public sealed class BelowComboBox : ComboBox
     internal Microsoft.UI.Xaml.FrameworkElement? InputBorder =>
         GetTemplateChild("Background") as Microsoft.UI.Xaml.FrameworkElement;
 
+    internal void FocusUnselectedItem(object item)
+    {
+        if (SelectedIndex >= 0)
+            return;
+        var index = Items.IndexOf(item);
+        if (index < 0)
+            return;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!IsDropDownOpen || SelectedIndex >= 0)
+                return;
+            if (ContainerFromIndex(index) is not ComboBoxItem && PopupBorder is { } border
+                && FindScrollViewer(border) is { } scroll)
+            {
+                scroll.ChangeView(null, scroll.ExtentHeight * index / Items.Count, null, true);
+                scroll.UpdateLayout();
+            }
+            if (ContainerFromIndex(index) is ComboBoxItem container)
+            {
+                container.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0.5 });
+                container.Focus(FocusState.Programmatic);
+            }
+        });
+    }
+
+    static ScrollViewer? FindScrollViewer(DependencyObject root)
+    {
+        if (root is ScrollViewer scroll)
+            return scroll;
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            if (FindScrollViewer(VisualTreeHelper.GetChild(root, i)) is { } child)
+                return child;
+        }
+        return null;
+    }
+
     // 模板应用和下拉打开时都重新定位，窗口尺寸和滚动位置可能已经变化。
     void AnchorPopup()
     {
