@@ -402,6 +402,7 @@ public sealed partial class MainWindow
             Grid.SetColumn(rest, 1);
             track.Children.Add(fill);
             track.Children.Add(rest);
+            SetProgress(track, 0);
             return track;
         }
         void SetProgress(Grid track, double fraction)

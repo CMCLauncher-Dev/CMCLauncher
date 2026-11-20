@@ -196,24 +196,22 @@ public sealed partial class MainWindow : Window
             if (e.PropertyName == nameof(session.Toast))
                 ShowToast(session.Toast);
         };
-        session.RestartRequested += () =>
+        session.GameExited += async () =>
         {
-            if (!session.ExitWatchdogRunning)
+            switch (session.Store.Config.Settings.LauncherVisibility)
             {
-                var host = LauncherSession.HostExecutable;
-                var start = new ProcessStartInfo(host)
-                {
-                    UseShellExecute = false,
-                    WorkingDirectory = AppContext.BaseDirectory,
-                };
-                if (
-                    Path.GetFileNameWithoutExtension(host)
-                        .Equals("dotnet", StringComparison.OrdinalIgnoreCase)
-                )
-                    start.ArgumentList.Add(typeof(Program).Assembly.Location);
-                Process.Start(start)?.Dispose();
+                case "hide_close":
+                    Close();
+                    return;
+                case "hide_reopen":
+                    Show();
+                    break;
+                case "minimize" when WindowState == WindowState.Minimized:
+                    WindowState = WindowState.Normal;
+                    break;
             }
-            Close();
+            if (!Verifying)
+                await ShowStartupOptionsRecoveries();
         };
         ApplyTheme();
         BuildNavigation();

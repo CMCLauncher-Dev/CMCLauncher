@@ -796,7 +796,8 @@ public sealed partial class MainWindow
         await Navigate("settings");
         await Task.Delay(50);
         await Navigate("about");
-        await Task.Delay(260);
+        for (var attempt = 0; attempt < 80 && navigationTweens.Count != 0; attempt++)
+            await Task.Delay(25);
         if (
             !navigationGroups["more"].View.IsVisible
             || navigationGroups.Where(p => p.Key != "more").Any(p => p.Value.View.IsVisible)

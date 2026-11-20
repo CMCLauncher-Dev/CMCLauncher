@@ -93,7 +93,8 @@ public sealed partial class MainWindow
                 ? new Thickness(11 * menuScale, 2 * menuScale, 8 * menuScale, 2 * menuScale)
                 : new Thickness(10 * menuScale, 3 * menuScale, 8 * menuScale, 3 * menuScale);
             visual.Label.FontSize = 14 * fontScale;
-            visual.Icon.Width = visual.Icon.Height = 16 * fontScale;
+            visual.Icon.Width = 16 * fontScale;
+            visual.Icon.Height = (key == "root:more" ? 5 : 16) * fontScale;
         }
         RefreshTaskNavigation();
     }
@@ -332,6 +333,7 @@ public sealed partial class MainWindow
             CornerRadius = new CornerRadius(4),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Center,
             Padding = child ? new Thickness(11, 2, 8, 2) : new Thickness(10, 3, 8, 3),
             MinHeight = child ? 27 : 30,
             Height = child ? 28 : 32,

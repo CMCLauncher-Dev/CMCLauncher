@@ -40,7 +40,6 @@ public sealed class LauncherSession : ObservableState, IDisposable
     public HttpClient ImageHttp => blueprintHttp;
     public OperationState? Active { get; private set; }
     public bool Busy => task != null;
-    public bool ExitWatchdogRunning { get; private set; }
     public bool GameRunning => game is { HasExited: false };
     public bool Launching { get; private set; }
     public Instance? Selected
@@ -76,7 +75,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
         get => progress;
         private set => Set(ref progress, value);
     }
-    public event Action? RestartRequested;
+    public event Action? GameExited;
 
     public LauncherSession(
         Action<Action> dispatch,
@@ -201,7 +200,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
         using var cancellation = new CancellationTokenSource();
         task = cancellation;
         Changed(nameof(Busy));
-        var item = new OperationState(Ui(name));
+        var item = new OperationState(Ui(name)) { Stage = Ui("Processing…"), State = Ui("Running") };
         Active = item;
         Operations.Insert(0, item);
         while (Operations.Count > 30)
@@ -325,14 +324,13 @@ public sealed class LauncherSession : ObservableState, IDisposable
             .Equals("dotnet", StringComparison.OrdinalIgnoreCase)
             ? typeof(Program).Assembly.Location
             : null;
+        Action? acknowledgeExit = null;
         try
         {
-            CMCLauncher.Platform.GameExitWatchdog.Start(game, host, assembly);
-            ExitWatchdogRunning = true;
+            acknowledgeExit = CMCLauncher.Platform.GameExitWatchdog.Start(game, host, assembly);
         }
         catch (Exception ex)
         {
-            ExitWatchdogRunning = false;
             Log("WARN", "Could not start the independent game-exit monitor: " + ex.Message);
         }
 
@@ -356,7 +354,15 @@ public sealed class LauncherSession : ObservableState, IDisposable
                     game = null;
                 launched.Dispose();
                 Changed(nameof(GameRunning));
-                RestartRequested?.Invoke();
+                try
+                {
+                    acknowledgeExit?.Invoke();
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    Log("WARN", "Game-exit acknowledgment failed: " + ex.Message);
+                }
+                GameExited?.Invoke();
             });
         });
         Changed(nameof(GameRunning));

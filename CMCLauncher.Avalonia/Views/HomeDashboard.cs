@@ -284,6 +284,8 @@ public sealed partial class MainWindow
         button.Content = T(glyph, 14);
         button.Width = button.Height = button.MinWidth = button.MinHeight = 32;
         button.Padding = new Thickness(0);
+        button.HorizontalContentAlignment = HorizontalAlignment.Center;
+        button.VerticalContentAlignment = VerticalAlignment.Center;
         button.VerticalAlignment = VerticalAlignment.Bottom;
         ToolTip.SetTip(button, Ui(title));
         global::Avalonia.Automation.AutomationProperties.SetName(button, Ui(title));

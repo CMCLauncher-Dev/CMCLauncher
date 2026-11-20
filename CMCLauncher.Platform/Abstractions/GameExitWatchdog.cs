@@ -7,10 +7,11 @@ public static class GameExitWatchdog
 {
     const string Switch = "--watch-game-exit";
 
-    public static void Start(Process game, string executable, string? assembly = null)
+    public static Action Start(Process game, string executable, string? assembly = null)
     {
         using var owner = Process.GetCurrentProcess();
-        var info = new ProcessStartInfo(executable)
+        var acknowledgment = Path.Combine(Path.GetTempPath(), $"cmcl-game-exit-{Guid.NewGuid():N}.ack");
+        var info = new ProcessStartInfo(Environment.ProcessPath ?? executable)
         {
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -29,11 +30,13 @@ public static class GameExitWatchdog
                 executable,
                 assembly ?? "",
                 AppContext.BaseDirectory,
+                acknowledgment,
             }
         )
             info.ArgumentList.Add(value);
         using var watcher =
             Process.Start(info) ?? throw new IOException("Could not start the game-exit monitor.");
+        return () => File.WriteAllText(acknowledgment, "");
     }
 
     // A separate process still observes game exit if the UI hangs or is closed during play.
@@ -41,7 +44,7 @@ public static class GameExitWatchdog
     {
         if (args.Length == 0 || args[0] != Switch)
             return false;
-        if (args.Length != 8)
+        if (args.Length != 9)
             throw new ArgumentException("Invalid game watchdog arguments.");
         var ownerId = int.Parse(args[1], CultureInfo.InvariantCulture);
         var ownerStart = long.Parse(args[2], CultureInfo.InvariantCulture);
@@ -50,8 +53,22 @@ public static class GameExitWatchdog
         while (Matches(gameId, gameStart))
             Thread.Sleep(250);
         var deadline = Stopwatch.StartNew();
-        while (Matches(ownerId, ownerStart) && deadline.Elapsed < TimeSpan.FromSeconds(10))
+        while (deadline.Elapsed < TimeSpan.FromSeconds(10))
+        {
+            if (File.Exists(args[8]))
+            {
+                File.Delete(args[8]);
+                return true;
+            }
+            if (!Matches(ownerId, ownerStart))
+                break;
             Thread.Sleep(250);
+        }
+        if (File.Exists(args[8]))
+        {
+            File.Delete(args[8]);
+            return true;
+        }
         if (Matches(ownerId, ownerStart))
         {
             using var owner = Process.GetProcessById(ownerId);

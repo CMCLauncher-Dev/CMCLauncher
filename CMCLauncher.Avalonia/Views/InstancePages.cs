@@ -11,7 +11,7 @@ public sealed partial class MainWindow
 {
     Task<Control> InstancesPage()
     {
-        var search = Input("", "Search version name, description or Minecraft version");
+        var search = Input("", "Search version name, description, or Minecraft version");
         var loader = Choice(
             new[] { "All versions", "Favorites", "vanilla", "fabric", "quilt", "forge", "neoforge" }
         );
@@ -107,8 +107,6 @@ public sealed partial class MainWindow
                             Draw();
                         }
                     );
-                    favorite.Width = favorite.MinWidth = 30;
-                    favorite.Height = favorite.MinHeight = 28;
                     var flyout = new Flyout();
                     var more = HomeTool("⋯", "More", () => Task.CompletedTask);
                     var menu = Stack(
@@ -148,7 +146,9 @@ public sealed partial class MainWindow
                         Spacing = 6,
                         Children = { favorite, more },
                         HorizontalAlignment = HorizontalAlignment.Right,
+                        VerticalAlignment = VerticalAlignment.Center,
                     };
+                    favorite.VerticalAlignment = more.VerticalAlignment = VerticalAlignment.Center;
                     var tile = view.SelectedIndex == 1;
                     var artwork = InstanceArtwork(item, tile ? 64 : 40);
                     var row = tile
@@ -639,8 +639,8 @@ public sealed partial class MainWindow
                 )
             );
             if (manager.CanMigrate(record))
-                buttons.Children.Add(
-                    Btn(
+            {
+                var migrate = Btn(
                         "Migrate directory",
                         async () =>
                         {
@@ -669,8 +669,10 @@ public sealed partial class MainWindow
                             );
                             await DirectoriesPage();
                         }
-                    )
-                );
+                    );
+                migrate.Margin = buttons.Children[0].Margin;
+                buttons.Children.Add(migrate);
+            }
             body.Children.Add(Card(Stack(T(record.Path, 14, true), buttons)));
         }
         pageContent.Content = body;
