@@ -9,6 +9,9 @@
     <AssemblyName>CMCLauncher.Core</AssemblyName>
     <RootNamespace>CMCLauncher</RootNamespace>
     <Version>1.0.5</Version>
+    <MicrosoftClientConfigurationFile
+      Condition="'$(MicrosoftClientConfigurationFile)' == ''"
+    >$(MSBuildProjectDirectory)/../.config/clientid.local.json</MicrosoftClientConfigurationFile>
     <CurseForgeConfigurationFile
       Condition="'$(CurseForgeConfigurationFile)' == ''"
     >$(MSBuildProjectDirectory)/../.config/curseforge.local.json</CurseForgeConfigurationFile>
@@ -29,9 +32,9 @@
       LogicalName="CMCLauncher.BundledHistory"
     />
     <EmbeddedResource
-      Include="../.config/clientid.local.json"
+      Include="$(MicrosoftClientConfigurationFile)"
       LogicalName="CMCLauncher.MicrosoftClient"
-      Condition="Exists('../.config/clientid.local.json')"
+      Condition="Exists('$(MicrosoftClientConfigurationFile)')"
     />
     <EmbeddedResource
       Include="$(CurseForgeConfigurationFile)"

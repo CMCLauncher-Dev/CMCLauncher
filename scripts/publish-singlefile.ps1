@@ -3,7 +3,8 @@ param(
     [string]$OutputDir = "dist/cmc-launcher-single",
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$CurseForgeConfigurationFile = ""
+    [string]$CurseForgeConfigurationFile = "",
+    [string]$MicrosoftClientConfigurationFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +22,12 @@ if (![string]::IsNullOrWhiteSpace($CurseForgeConfigurationFile))
 {
     $configurationPath = if ([IO.Path]::IsPathRooted($CurseForgeConfigurationFile)) { $CurseForgeConfigurationFile } else { Join-Path $repoRoot $CurseForgeConfigurationFile }
     $common += "-p:CurseForgeConfigurationFile=$configurationPath"
+}
+
+if (![string]::IsNullOrWhiteSpace($MicrosoftClientConfigurationFile))
+{
+    $configurationPath = if ([IO.Path]::IsPathRooted($MicrosoftClientConfigurationFile)) { $MicrosoftClientConfigurationFile } else { Join-Path $repoRoot $MicrosoftClientConfigurationFile }
+    $common += "-p:MicrosoftClientConfigurationFile=$configurationPath"
 }
 
 Write-Host "=== Stage 1: Build project (generates .pri/.xbf) ===" -ForegroundColor Cyan
