@@ -123,7 +123,7 @@ def arch(publish, work, output, version):
     base, _, prerelease = version.partition("-")
     pkgver = base + prerelease.replace("-", ".")
     dependencies = (
-        "glibc", "gcc-libs", "zlib", "icu", "openssl-3", "ca-certificates", "fontconfig", "noto-fonts",
+        "glibc", "gcc-libs", "zlib", "icu", "openssl-3", "ca-certificates", "fontconfig", "noto-fonts", "noto-fonts-cjk",
         "libx11", "libxrandr", "libxi", "libxcursor", "libxrender", "libice", "libsm",
     )
     write(root / ".PKGINFO", f"""pkgname = cmclauncher
@@ -137,8 +137,7 @@ size = {size}
 arch = x86_64
 license = AGPL-3.0-only
 """ + "".join(f"depend = {name}\n" for name in dependencies)
-        + "optdepend = libsecret: desktop keyring\n"
-        + "optdepend = noto-fonts-cjk: CJK interface fonts\n")
+        + "optdepend = libsecret: desktop keyring\n")
     ownership = ("--uid", "0", "--gid", "0", "--uname", "root", "--gname", "root")
     files = (".PKGINFO", "opt", "usr")
     run("bsdtar", "-czf", root / ".MTREE", "--format=mtree",

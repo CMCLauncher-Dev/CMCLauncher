@@ -274,11 +274,11 @@ jobs:
             cat /tmp/cmcl-installed-ui/failure.txt 2>/dev/null || true
             exit 1
           }
-          test -f /tmp/cmcl-installed-ui/passed.txt
           if test -f /tmp/cmcl-installed-ui/failure.txt; then
             cat /tmp/cmcl-installed-ui/failure.txt
             exit 1
           fi
+          test -f /tmp/cmcl-installed-ui/passed.txt
       - name: Verify removal preserves user data
         shell: bash
         env:
