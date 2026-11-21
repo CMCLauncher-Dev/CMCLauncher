@@ -5,6 +5,9 @@ namespace CMCLauncher;
 // 存档导入、导出先写临时位置，取消或失败时由 finally 清理。
 public static class WorldArchive
 {
+    // 单次导入的条目数量上限，防止海量极小条目的压缩包拖垮解压。
+    const int MaxEntries = 29000;
+
     // 支持 ZIP 直接放存档文件，也支持外面多包一层同名文件夹。
     public static async Task Import(
         string zipFile,
@@ -22,10 +25,17 @@ public static class WorldArchive
         {
             Directory.CreateDirectory(staging);
             long expanded = 0;
+            // 已落地的规范化相对路径（含文件与目录），重复条目拒绝而非静默覆盖。
+            var laid = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using var archive = ZipFile.OpenRead(zipFile);
+            // 遍历前先快速拒绝海量条目，避免逐条枚举的开销。
+            if (archive.Entries.Count > MaxEntries)
+                throw new Exception($"存档 ZIP 条目数量超过限制（{MaxEntries}）。");
             foreach (var entry in archive.Entries)
             {
                 ct.ThrowIfCancellationRequested();
+                if (laid.Count + 1 > MaxEntries)
+                    throw new Exception($"存档 ZIP 条目数量超过限制（{MaxEntries}）。");
                 // 限制解压总大小，防止解压炸弹。
                 expanded += entry.Length;
                 if (expanded > 2L * 1024 * 1024 * 1024)
@@ -45,6 +55,9 @@ public static class WorldArchive
                     relative = string.Join('/', parts.Skip(1));
                 if (relative.Length == 0)
                     continue;
+                // 规范化后的同名条目（文件/目录冲突或大小写冲突）去重报错。
+                if (!laid.Add(relative))
+                    throw new Exception($"存档 ZIP 包含重复路径：{relative}。");
                 var target = Store.SafePath(staging, relative);
                 if (entry.FullName.EndsWith('/'))
                     Directory.CreateDirectory(target);

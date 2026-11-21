@@ -589,6 +589,76 @@ internal static class Program
                     .Any(),
             "bad world archive left partial files"
         );
+        var dupWorld = Path.Combine(root, "dup-world.zip");
+        using (var zip = ZipFile.Open(dupWorld, ZipArchiveMode.Create))
+        {
+            using (var writer = new StreamWriter(zip.CreateEntry("level.dat").Open()))
+                writer.Write("first");
+            using (var writer = new StreamWriter(zip.CreateEntry("level.dat").Open()))
+                writer.Write("second");
+        }
+        await Reject(
+            () =>
+                WorldArchive.Import(
+                    dupWorld,
+                    Path.Combine(root, "dup-world"),
+                    "dup-world",
+                    CancellationToken.None
+                ),
+            "world archive duplicate file entries silently overwrote"
+        );
+        var clashWorld = Path.Combine(root, "clash-world.zip");
+        using (var zip = ZipFile.Open(clashWorld, ZipArchiveMode.Create))
+        {
+            using (var writer = new StreamWriter(zip.CreateEntry("region/").Open()))
+                writer.Write("");
+            using (var writer = new StreamWriter(zip.CreateEntry("region").Open()))
+                writer.Write("file");
+        }
+        await Reject(
+            () =>
+                WorldArchive.Import(
+                    clashWorld,
+                    Path.Combine(root, "clash-world"),
+                    "clash-world",
+                    CancellationToken.None
+                ),
+            "world archive allowed directory/file path collision"
+        );
+        var caseWorld = Path.Combine(root, "case-world.zip");
+        using (var zip = ZipFile.Open(caseWorld, ZipArchiveMode.Create))
+        {
+            using (var writer = new StreamWriter(zip.CreateEntry("level.dat").Open()))
+                writer.Write("lower");
+            using (var writer = new StreamWriter(zip.CreateEntry("Level.dat").Open()))
+                writer.Write("upper");
+        }
+        await Reject(
+            () =>
+                WorldArchive.Import(
+                    caseWorld,
+                    Path.Combine(root, "case-world"),
+                    "case-world",
+                    CancellationToken.None
+                ),
+            "world archive allowed case-insensitive duplicate paths"
+        );
+        var manyWorld = Path.Combine(root, "many-world.zip");
+        using (var zip = ZipFile.Open(manyWorld, ZipArchiveMode.Create))
+        {
+            for (var i = 0; i < 29001; i++)
+                zip.CreateEntry("e" + i);
+        }
+        await Reject(
+            () =>
+                WorldArchive.Import(
+                    manyWorld,
+                    Path.Combine(root, "many-world"),
+                    "many-world",
+                    CancellationToken.None
+                ),
+            "world archive accepted an excessive number of entries"
+        );
         Pass("game-version Java matching and safe world archive import/export");
         Check(GameMemory.Calculate(8192, 6144) == 4710, "8 GB memory budget");
         Check(GameMemory.Calculate(16384, 4096) == 3072, "available memory limits heap");
