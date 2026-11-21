@@ -221,6 +221,7 @@ public sealed partial class LauncherCore : IDisposable
         readonly Dictionary<string, (bool Reachable, DateTime Expires)> proxyReachability = new(
             StringComparer.OrdinalIgnoreCase
         );
+        const int MaxProbeEntries = 64;
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -240,9 +241,15 @@ public sealed partial class LauncherCore : IDisposable
                     proxyReachability.TryGetValue(key, out var cached)
                     && cached.Expires > DateTime.UtcNow
                 )
+                {
                     reachable = cached.Reachable;
+                }
                 else
                 {
+                    // 命中的是过期条目，顺手移除旧键，避免缓存只增不减。
+                    if (proxyReachability.TryGetValue(key, out _))
+                        proxyReachability.Remove(key);
+                    TrimReachability();
                     using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                     timeout.CancelAfter(TimeSpan.FromSeconds(1));
                     try
@@ -251,11 +258,12 @@ public sealed partial class LauncherCore : IDisposable
                         await socket.ConnectAsync(endpoint.Host, endpoint.Port, timeout.Token);
                         reachable = true;
                     }
-                    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                    // 外部取消需要向上传播；探测超时或传输层的各类异常均按不可达回退直连。
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
                     {
-                        reachable = false;
+                        throw;
                     }
-                    catch (System.Net.Sockets.SocketException)
+                    catch (Exception)
                     {
                         reachable = false;
                     }
@@ -276,12 +284,25 @@ public sealed partial class LauncherCore : IDisposable
             return await (reachable ? proxied : direct).SendAsync(request, ct);
         }
 
+        // 在 probeLock 保护下调用：先剔除过期条目，仍超限则清空全部缓存，保证有界。
+        void TrimReachability()
+        {
+            foreach (var stale in proxyReachability
+                .Where(kv => kv.Value.Expires <= DateTime.UtcNow)
+                .Select(kv => kv.Key)
+                .ToArray())
+                proxyReachability.Remove(stale);
+            if (proxyReachability.Count >= MaxProbeEntries)
+                proxyReachability.Clear();
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
                 proxied.Dispose();
                 direct.Dispose();
+                probeLock.Dispose();
             }
             base.Dispose(disposing);
         }

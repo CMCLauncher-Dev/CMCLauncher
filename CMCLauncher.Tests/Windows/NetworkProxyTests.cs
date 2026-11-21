@@ -1,12 +1,13 @@
 using System.Net;
+using System.Text;
 using CMCLauncher;
 
 static class NetworkProxyTests
 {
-    static void Check(bool value)
+    static void Check(bool value, string message = "Advanced proxy regression")
     {
         if (!value)
-            throw new Exception("Advanced proxy regression");
+            throw new Exception(message);
     }
 
     static void Reject(Action action)
@@ -20,6 +21,35 @@ static class NetworkProxyTests
             return;
         }
         throw new Exception("Unsafe proxy configuration accepted");
+    }
+
+    static HttpMessageHandler? ReachableProxyHandler(HttpClient client)
+    {
+        HttpMessageHandler? current = null;
+        for (
+            var type = typeof(HttpClient);
+            type != null;
+            type = type.BaseType
+        )
+        {
+            var field = type.GetField(
+                "_handler",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance
+            );
+            if (field is null)
+                continue;
+            current = (HttpMessageHandler?)field.GetValue(client);
+            break;
+        }
+        if (current == null)
+            throw new Exception("HttpClient handler chain is not reachable");
+        while (current != null)
+        {
+            if (current.GetType().Name == "ReachableProxyHandler")
+                return current;
+            current = (current as System.Net.Http.DelegatingHandler)?.InnerHandler;
+        }
+        return null;
     }
 
     public static async Task Run(string root)
@@ -81,6 +111,120 @@ static class NetworkProxyTests
         catch (HttpRequestException ex)
         {
             Check(ex.Message.Contains("fallback is disabled"));
+        }
+
+        // Issue #40 回归：非 Socket 异常（255 字符主机名触发 ArgumentOutOfRangeException）
+        // 按“不可达 → 直连回退”处理，而不是穿透探测逻辑打断请求。
+        var longHost = new string('a', 255);
+        NetworkProxy.Address("http://" + longHost + ":9");
+        using var nonSocketOrigin = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        nonSocketOrigin.Start();
+        var nonSocketPort = ((IPEndPoint)nonSocketOrigin.LocalEndpoint).Port;
+        async Task ServeNonSocket()
+        {
+            using var client = await nonSocketOrigin.AcceptTcpClientAsync();
+            using var stream = client.GetStream();
+            var buffer = new byte[4096];
+            await stream.ReadAsync(buffer, 0, buffer.Length);
+            await stream.WriteAsync(
+                Encoding.ASCII.GetBytes(
+                    "HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\ndirect"
+                )
+            );
+        }
+
+        var nonSocketStore = new Store(Path.Combine(root, "proxy-non-socket"));
+        nonSocketStore.Config.Settings.ProxyMode = "custom";
+        nonSocketStore.Config.Settings.Proxy = "http://" + longHost + ":9";
+        nonSocketStore.Config.Settings.ProxyDirectFallback = true;
+        try
+        {
+            using var nonSocketCore = new LauncherCore(nonSocketStore);
+            using var nonSocketTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var serveNonSocketDirect = ServeNonSocket();
+            using var nonSocketResponse = await nonSocketCore.Http.GetAsync(
+                "http://127.0.0.1:" + nonSocketPort,
+                nonSocketTimeout.Token
+            );
+            await serveNonSocketDirect;
+            Check(
+                await nonSocketResponse.Content.ReadAsStringAsync() == "direct",
+                "non-socket probe exceptions fall back to direct"
+            );
+            var probeHandler = ReachableProxyHandler(nonSocketCore.Http)
+                ?? throw new Exception("ReachableProxyHandler not present");
+            var cacheField =
+                probeHandler
+                    .GetType()
+                    .GetField(
+                        "proxyReachability",
+                        System.Reflection.BindingFlags.NonPublic
+                            | System.Reflection.BindingFlags.Instance
+                    )
+                ?? throw new Exception("proxyReachability field missing");
+            var cache =
+                (Dictionary<string, (bool Reachable, DateTime Expires)>)cacheField.GetValue(
+                    probeHandler
+                )!;
+            var probeKey = cache.Keys.Single();
+            foreach (var key in cache.Keys.ToArray())
+                cache[key] = (false, DateTime.UtcNow.AddSeconds(-1));
+            var serveRefresh = ServeNonSocket();
+            using (var refreshResponse = await nonSocketCore.Http.GetAsync(
+                "http://127.0.0.1:" + nonSocketPort,
+                nonSocketTimeout.Token
+            ))
+            {
+                await serveRefresh;
+                Check(
+                    cache.Count == 1 && cache.ContainsKey(probeKey),
+                    "stale reachability entries are pruned before probing"
+                );
+            }
+            for (var i = 0; i < 70; i++)
+                cache["http://overflow-" + i + ".test:9/"] = (
+                    false,
+                    DateTime.UtcNow.AddSeconds(60)
+                );
+            cache[probeKey] = (false, DateTime.UtcNow.AddSeconds(-1));
+            var serveOverflow = ServeNonSocket();
+            using (var overflowResponse = await nonSocketCore.Http.GetAsync(
+                "http://127.0.0.1:" + nonSocketPort,
+                nonSocketTimeout.Token
+            ))
+            {
+                await serveOverflow;
+                Check(
+                    cache.Count == 1 && !cache[probeKey].Reachable,
+                    "reachability cache is cleared when it exceeds its cap"
+                );
+            }
+            var probeLockField =
+                probeHandler
+                    .GetType()
+                    .GetField(
+                        "probeLock",
+                        System.Reflection.BindingFlags.NonPublic
+                            | System.Reflection.BindingFlags.Instance
+                    )
+                ?? throw new Exception("probeLock field missing");
+            var probeLock =
+                (System.Threading.SemaphoreSlim)probeLockField.GetValue(probeHandler)!;
+            probeHandler.Dispose();
+            var disposed = false;
+            try
+            {
+                probeLock.Wait(0);
+            }
+            catch (ObjectDisposedException)
+            {
+                disposed = true;
+            }
+            Check(disposed, "probeLock is disposed with the probe handler");
+        }
+        finally
+        {
+            nonSocketOrigin.Stop();
         }
     }
 }
