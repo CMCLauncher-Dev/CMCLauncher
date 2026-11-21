@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
@@ -29,12 +31,18 @@ public sealed partial class MainWindow : Window
     readonly StackPanel navigation = new() { Spacing = 3 };
     readonly Grid pageHeader = new() { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
     readonly TextBlock pageTitle = new() { FontSize = 26, FontWeight = FontWeight.SemiBold };
+    readonly TranslateTransform toastOffset = new();
+    static readonly TimeSpan toastFadeDuration = TimeSpan.FromMilliseconds(650);
     readonly Border toast = new()
     {
         CornerRadius = new CornerRadius(24),
         Padding = new Thickness(16, 8),
         IsVisible = false,
+        IsHitTestVisible = false,
         HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Bottom,
+        Margin = new Thickness(24),
+        MaxWidth = 440,
     };
     readonly Border sidebar;
     CancellationTokenSource? navigationRequest;
@@ -157,7 +165,7 @@ public sealed partial class MainWindow : Window
         shell.Children.Add(sidebar);
         var body = new Grid
         {
-            RowDefinitions = new RowDefinitions("Auto,*,Auto"),
+            RowDefinitions = new RowDefinitions("Auto,*"),
             Margin = new Thickness(28, 22),
         };
         pageHeader.Children.Add(pageTitle);
@@ -171,10 +179,11 @@ public sealed partial class MainWindow : Window
         drawer.Content = scroll;
         Grid.SetRow(drawer, 1);
         body.Children.Add(drawer);
-        Grid.SetRow(toast, 2);
-        body.Children.Add(toast);
         Grid.SetColumn(body, 1);
         shell.Children.Add(body);
+        toast.RenderTransform = toastOffset;
+        Grid.SetColumnSpan(toast, 2);
+        shell.Children.Add(toast);
         scaling.Child = shell;
         Content = scaling;
         session.PropertyChanged += (_, e) =>
@@ -899,9 +908,32 @@ public sealed partial class MainWindow : Window
     async void ShowToast(string text)
     {
         var revision = ++toastRevision;
+        toast.Transitions = null;
+        toastOffset.Transitions = null;
+        toast.Opacity = 1;
+        toastOffset.Y = 28;
         toast.Child = T(text);
         toast.IsVisible = true;
-        await Task.Delay(4000);
+        toastOffset.Transitions = new Transitions
+        {
+            new DoubleTransition
+            {
+                Property = TranslateTransform.YProperty,
+                Duration = TimeSpan.FromMilliseconds(240),
+                Easing = new CubicEaseOut(),
+            },
+        };
+        toastOffset.Y = 0;
+
+        await Task.Delay(3400);
+        if (revision != toastRevision)
+            return;
+        toast.Transitions = new Transitions
+        {
+            new DoubleTransition { Property = OpacityProperty, Duration = toastFadeDuration },
+        };
+        toast.Opacity = 0;
+        await Task.Delay(toastFadeDuration);
         if (revision == toastRevision)
             toast.IsVisible = false;
     }

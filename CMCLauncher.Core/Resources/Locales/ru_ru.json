@@ -2,6 +2,7 @@
   "code": "ru_ru",
   "displayName": "Русский",
   "strings": {
+    "Shadow depth (%)": "Интенсивность тени (%)",
     "Memory optimization complete": "Оптимизация памяти завершена",
     "Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.": "Доступно на {0:N0} МиБ больше. Сейчас доступно: {1:N0} МиБ.",
     "Memory optimization finished. System operations completed: {0}.": "Оптимизация завершена. Выполнено системных операций: {0}.",

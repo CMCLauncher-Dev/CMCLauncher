@@ -18,7 +18,12 @@ public sealed partial class MainWindow
             check(
                 PageBody.Children.FirstOrDefault() is Border { Tag: "toolbox-small-tools" } utilities
                     && Descendants(utilities).OfType<Button>()
-                        .Any(button => button.Content?.ToString() == Ui("Memory optimization")),
+                        .Any(button =>
+                            Equals(button.Tag, "toolbox-optimize-memory")
+                            && Grid.GetColumn(button) == 1
+                            && Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(button)
+                                == Ui("Memory optimization")
+                        ),
                 "memory optimization appears in the top small tools card"
             );
         check(
@@ -30,11 +35,11 @@ public sealed partial class MainWindow
         await Capture(Path.Combine(directory, "toolbox.png"));
         var open = Descendants(PageBody)
             .OfType<Button>()
-            .Where(b => b.Content?.ToString() == Ui("Open"))
+            .Where(b => b.Tag is string tag && tag.StartsWith("toolbox-open:", StringComparison.Ordinal))
             .ToArray();
-        check(open.Length == 5, "each tool card has an open button");
+        check(open.Length == 5, "each tool card is a single navigation button");
         (
-            (IInvokeProvider)new ButtonAutomationPeer(open[1]).GetPattern(PatternInterface.Invoke)
+            (IInvokeProvider)new ButtonAutomationPeer(open.Single(b => Equals(b.Tag, "toolbox-open:terracotta"))).GetPattern(PatternInterface.Invoke)
         ).Invoke();
         for (var i = 0; i < 100 && page != "terracotta"; i++)
             await Task.Delay(30);

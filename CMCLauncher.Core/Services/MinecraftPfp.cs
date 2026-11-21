@@ -4,6 +4,8 @@ namespace CMCLauncher;
 // than interpolating so HD skins and exported avatars retain their pixel edges.
 public static class MinecraftPfp
 {
+    public const int DefaultShadowDepth = 30;
+
     // 从皮肤像素数据渲染头像（BGRA 格式）。
     // 支持方形头像（仅头部）与肖像模式（头+身体+手臂），
     // 可选叠加层、背景色/渐变、阴影与细手臂（slim）模型。
@@ -19,7 +21,8 @@ public static class MinecraftPfp
         bool shadow = true,
         bool slim = false,
         byte[]? gradientEnd = null,
-        double gradientAngle = 90
+        double gradientAngle = 90,
+        int shadowDepth = DefaultShadowDepth
     )
     {
         if (
@@ -35,9 +38,10 @@ public static class MinecraftPfp
         if (
             size is not (128 or 256 or 512 or 1024)
             || padding is < 0 or > 40
-            || background != null && background.Length != 3
-            || gradientEnd != null && (gradientEnd.Length != 3 || background == null)
+            || background != null && background.Length is not (3 or 4)
+            || gradientEnd != null && (gradientEnd.Length is not (3 or 4) || background == null)
             || !double.IsFinite(gradientAngle)
+            || shadowDepth is < 0 or > 100
         )
             throw new ArgumentOutOfRangeException(nameof(size));
         if (portrait)
@@ -52,7 +56,8 @@ public static class MinecraftPfp
                 shadow,
                 slim,
                 gradientEnd,
-                gradientAngle
+                gradientAngle,
+                shadowDepth
             );
         var result = new byte[size * size * 4];
         FillBackground(result, size, background, gradientEnd, gradientAngle);
@@ -79,6 +84,11 @@ public static class MinecraftPfp
         return result;
     }
 
+    // Ordered dithering spreads 8-bit rounding across neighboring pixels so
+    // slow gradients do not produce full-width bands. Share the threshold across RGB.
+    static ReadOnlySpan<byte> GradientThresholds =>
+        [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
     // 填充背景：纯色（end 为 null）或沿指定角度的双色渐变。
     static void FillBackground(byte[] pixels, int size, byte[]? start, byte[]? end, double angle)
     {
@@ -87,6 +97,8 @@ public static class MinecraftPfp
         var dx = Math.Cos(angle * Math.PI / 180);
         var dy = Math.Sin(angle * Math.PI / 180);
         var extent = Math.Abs(dx) + Math.Abs(dy);
+        var startAlpha = start.Length == 4 ? start[3] : 255;
+        var endAlpha = end == null ? startAlpha : end.Length == 4 ? end[3] : 255;
         for (var y = 0; y < size; y++)
         for (var x = 0; x < size; x++)
         {
@@ -101,9 +113,13 @@ public static class MinecraftPfp
                         1
                     );
             var p = (y * size + x) * 4;
+            var threshold = (GradientThresholds[(y & 3) * 4 + (x & 3)] + .5) / 16;
             for (var c = 0; c < 3; c++)
-                pixels[p + c] = (byte)Math.Round(start[c] * (1 - t) + (end?[c] ?? start[c]) * t);
-            pixels[p + 3] = 255;
+            {
+                var value = start[c] + ((end?[c] ?? start[c]) - start[c]) * t;
+                pixels[p + c] = (byte)Math.Floor(value + threshold);
+            }
+            pixels[p + 3] = (byte)Math.Round(startAlpha + (endAlpha - startAlpha) * t);
         }
     }
 
@@ -120,19 +136,16 @@ public static class MinecraftPfp
         bool shadow,
         bool slim,
         byte[]? gradientEnd,
-        double gradientAngle
+        double gradientAngle,
+        int shadowDepth
     )
     {
         var person = new byte[size * size * 4];
-        var unit = size * .6 * (1 - padding / 100.0) / 8;
-        var head = (int)Math.Round(unit * 8);
-        var top = (int)(size * .14);
-        var bodyTop = top + head + (int)(unit * .7);
-        var arm = slim ? 3 : 4;
-        var torsoWidth = (int)Math.Round(unit * 4);
-        var armWidth = (int)Math.Round(unit * arm / 2);
-        var torsoX = (size - torsoWidth) / 2;
-        var bodyHeight = (int)Math.Round(unit * 6);
+        // Use a logical pixel grid for the angled portrait. Scaling the grid
+        // preserves the silhouette and keeps the bust anchored to the bottom.
+        var unit = size / 20.0 * (1 + (12 - padding) / 100.0);
+        int X(int column) => (int)Math.Round(size / 2.0 + (column - 10) * unit);
+        int Y(int row) => (int)Math.Round(size + (row - 20) * unit);
         var atlas = width / 64;
 
         // 从皮肤图集的源矩形（sx,sy,sw,sh）绘制到目标矩形（dx,dy,dw,dh），
@@ -142,14 +155,19 @@ public static class MinecraftPfp
             int sy,
             int sw,
             int sh,
-            int dx,
-            int dy,
-            int dw,
-            int dh,
+            int x0,
+            int y0,
+            int logicalWidth,
+            int logicalHeight,
             bool outer = false,
-            bool flip = false
+            bool flip = false,
+            int shade = 100
         )
         {
+            var dx = X(x0);
+            var dy = Y(y0);
+            var dw = X(x0 + logicalWidth) - dx;
+            var dh = Y(y0 + logicalHeight) - dy;
             for (var y = Math.Max(0, dy); y < Math.Min(size, dy + dh); y++)
             for (var x = Math.Max(0, dx); x < Math.Min(size, dx + dw); x++)
             {
@@ -164,53 +182,55 @@ public static class MinecraftPfp
                     continue;
                 for (var c = 0; c < 3; c++)
                     person[dest + c] = (byte)(
-                        (skin[source + c] * alpha + person[dest + c] * (255 - alpha) + 127) / 255
+                        (skin[source + c] * shade / 100 * alpha + person[dest + c] * (255 - alpha) + 127) / 255
                     );
                 person[dest + 3] = 255;
             }
         }
 
-        Draw(20, 20, 8, 12, torsoX, bodyTop, torsoWidth, bodyHeight);
-        Draw(44, 20, arm, 12, torsoX - armWidth, bodyTop, armWidth, bodyHeight);
-        if (height == width)
-            Draw(36, 52, arm, 12, torsoX + torsoWidth, bodyTop, armWidth, bodyHeight);
-        else
-            Draw(44, 20, arm, 12, torsoX + torsoWidth, bodyTop, armWidth, bodyHeight, flip: true);
-        if (overlay && height == width)
+        var modern = height == width;
+        var sleeveOverlay = overlay && modern;
+        // The far sleeve sits behind the chest, while the near sleeve overlaps
+        // it. Composite each outer layer with its own base before drawing the next part.
+        Draw(modern ? 36 : 44, modern ? 52 : 20, 3, 7, 12, 13, 3, 7, flip: !modern, shade: 90);
+        if (sleeveOverlay)
+            Draw(52, 52, 3, 7, 12, 13, 3, 7, true, shade: 90);
+
+        Draw(21, 20, 6, 1, 7, 11, 6, 1, shade: 90);
+        Draw(20, 21, 8, 8, 6, 12, 8, 8);
+        if (sleeveOverlay)
         {
-            Draw(20, 36, 8, 12, torsoX, bodyTop, torsoWidth, bodyHeight, true);
-            Draw(44, 36, arm, 12, torsoX - armWidth, bodyTop, armWidth, bodyHeight, true);
-            Draw(52, 52, arm, 12, torsoX + torsoWidth, bodyTop, armWidth, bodyHeight, true);
+            Draw(21, 36, 6, 1, 7, 11, 6, 1, true, shade: 90);
+            Draw(20, 37, 8, 8, 6, 12, 8, 8, true);
         }
-        Draw(
-            10,
-            15,
-            4,
-            1,
-            (int)(size / 2.0 - unit),
-            top + head - 1,
-            (int)(unit * 2),
-            (int)(unit * .8) + 2
-        );
-        Draw(8, 8, 8, 8, (size - head) / 2, top, head, head);
+
+        var sleeveWidth = slim ? 2 : 3;
+        Draw(44, 20, 3, 7, 8 - sleeveWidth, 13, sleeveWidth, 7, shade: 94);
+        if (sleeveOverlay)
+            Draw(44, 36, 3, 7, 8 - sleeveWidth, 13, sleeveWidth, 7, true, shade: 94);
+
+        Draw(5, 9, 3, 7, 5, 4, 3, 7, shade: 82);
+        Draw(8, 9, 7, 7, 8, 4, 7, 7);
         if (overlay)
-            Draw(40, 8, 8, 8, (size - head) / 2, top, head, head, true);
+        {
+            Draw(37, 9, 3, 7, 5, 4, 3, 7, true, shade: 82);
+            Draw(40, 9, 7, 7, 8, 4, 7, 7, true);
+        }
 
         var result = new byte[person.Length];
         FillBackground(result, size, background, gradientEnd, gradientAngle);
-        if (shadow)
+        if (shadow && shadowDepth > 0)
         {
             var mask = new int[size * size];
-            var offset = Math.Max(1, size / 70);
+            var offset = Math.Max(1, size / 48);
             for (var y = offset; y < size; y++)
             for (var x = 0; x < size; x++)
                 mask[y * size + x] = person[((y - offset) * size + x) * 4 + 3];
             // Three separable box passes approximate a soft shadow in linear time.
-            var radius = Math.Max(1, size / 65);
+            var radius = Math.Max(1, size / 52);
+            var horizontal = new int[mask.Length];
             for (var pass = 0; pass < 3; pass++)
             {
-                var horizontal = new int[mask.Length];
-                var blurred = new int[mask.Length];
                 for (var y = 0; y < size; y++)
                 {
                     var sum = 0;
@@ -234,20 +254,21 @@ public static class MinecraftPfp
                         if (y - radius - 1 >= 0)
                             sum -= horizontal[(y - radius - 1) * size + x];
                         if (y >= 0)
-                            blurred[y * size + x] = sum / (radius * 2 + 1);
+                            mask[y * size + x] = sum / (radius * 2 + 1);
                     }
                 }
-                mask = blurred;
             }
             for (var i = 0; i < mask.Length; i++)
             {
-                var alpha = mask[i] * 150 / 255;
+                var alpha = mask[i] * shadowDepth / 100;
                 var p = i * 4;
-                if (background != null)
-                    for (var c = 0; c < 3; c++)
-                        result[p + c] = (byte)(result[p + c] * (255 - alpha) / 255);
-                else
-                    result[p + 3] = (byte)alpha;
+                if (alpha == 0)
+                    continue;
+                var backgroundWeight = result[p + 3] * (255 - alpha);
+                var totalWeight = alpha * 255 + backgroundWeight;
+                for (var c = 0; c < 3; c++)
+                    result[p + c] = (byte)(result[p + c] * backgroundWeight / totalWeight);
+                result[p + 3] = (byte)((totalWeight + 127) / 255);
             }
         }
         for (var i = 0; i < result.Length; i += 4)

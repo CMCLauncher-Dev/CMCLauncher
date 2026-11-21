@@ -2,6 +2,7 @@
     "code":  "lo_ls",
     "displayName":  "萌猫语 (LOLSpeak)",
     "strings":  {
+      "Shadow depth (%)": "ຄວາມເຂັ້ມຂອງເງົາ (%)",
       "Memory optimization complete": "ປັບປຸງໜ່ວຍຄວາມຈຳສຳເລັດ",
       "Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.": "ໜ່ວຍຄວາມຈຳທີ່ໃຊ້ໄດ້ເພີ່ມຂຶ້ນ {0:N0} MiB. ຕອນນີ້ໃຊ້ໄດ້ {1:N0} MiB.",
       "Memory optimization finished. System operations completed: {0}.": "ປັບປຸງໜ່ວຍຄວາມຈຳສຳເລັດ. ສຳເລັດການດຳເນີນງານລະບົບ {0} ລາຍການ.",

@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -61,6 +60,14 @@ public sealed partial class MainWindow
         var hat = new CheckBox { Content = Ui("Include outer skin layer"), IsChecked = true };
         var headOnly = new CheckBox { Content = Ui("Head only"), IsChecked = false };
         var shadow = new CheckBox { Content = Ui("Soft shadow"), IsChecked = true };
+        var shadowDepth = new Slider
+        {
+            Header = Ui("Shadow depth (%)"),
+            Minimum = 0,
+            Maximum = 100,
+            StepFrequency = 1,
+            Value = CMCLauncher.MinecraftPfp.DefaultShadowDepth,
+        };
         var slim = new CheckBox { Content = Ui("Slim arms (Alex model)"), IsChecked = false };
         var padding = new Slider
         {
@@ -78,18 +85,35 @@ public sealed partial class MainWindow
             SelectedIndex = 3,
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
-        var custom = new TextBox
+        Button ColorButton(string title, Windows.UI.Color initial, out ColorPicker picker)
         {
-            Header = Ui("Background color (#RRGGBB)"),
-            Text = "#00B4A6",
-            Visibility = Visibility.Visible,
-        };
+            picker = new ColorPicker
+            {
+                Color = initial,
+                IsAlphaEnabled = true,
+                IsAlphaSliderVisible = true,
+                IsAlphaTextInputVisible = true,
+                IsColorChannelTextInputVisible = true,
+                IsHexInputVisible = true,
+                IsMoreButtonVisible = false,
+            };
+            var swatch = new SolidColorBrush(initial);
+            picker.ColorChanged += (_, args) => swatch.Color = args.NewColor;
+            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            content.Children.Add(new Border { Background = swatch, Width = 20, Height = 16, CornerRadius = new CornerRadius(3) });
+            content.Children.Add(Text(title));
+            var button = new Button
+            {
+                Content = content,
+                Flyout = new Flyout { Content = picker, Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.Bottom },
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, Ui(title));
+            return button;
+        }
+
+        var custom = ColorButton("Background color", Windows.UI.Color.FromArgb(255, 0, 180, 166), out var startPicker);
         var gradient = new CheckBox { Content = Ui("Gradient background"), Tag = "pfp-gradient" };
-        var gradientColor = new TextBox
-        {
-            Header = Ui("Gradient end color (#RRGGBB)"),
-            Text = "#005C64",
-        };
+        var gradientColor = ColorButton("Gradient end color", Windows.UI.Color.FromArgb(255, 0, 92, 100), out var endPicker);
         var gradientAngle = new Slider
         {
             Header = Ui("Gradient angle (°)"),
@@ -127,6 +151,7 @@ public sealed partial class MainWindow
         {
             var current = ++revision;
             png = null;
+            shadowDepth.IsEnabled = shadow.IsChecked == true;
             export.IsEnabled = false;
             custom.Visibility =
                 backgrounds.SelectedIndex == 3 ? Visibility.Visible : Visibility.Collapsed;
@@ -144,40 +169,11 @@ public sealed partial class MainWindow
                     2 => [32, 32, 32],
                     _ => null,
                 };
+                static byte[] Bgra(Windows.UI.Color color) => [color.B, color.G, color.R, color.A];
                 if (backgrounds.SelectedIndex == 3)
-                {
-                    var hex = custom.Text.Trim();
-                    if (
-                        hex.Length != 7
-                        || hex[0] != '#'
-                        || !int.TryParse(
-                            hex[1..],
-                            NumberStyles.HexNumber,
-                            CultureInfo.InvariantCulture,
-                            out var rgb
-                        )
-                    )
-                        throw new InvalidDataException(Ui("Enter a color in #RRGGBB format."));
-                    background = [(byte)rgb, (byte)(rgb >> 8), (byte)(rgb >> 16)];
-                }
+                    background = Bgra(startPicker.Color);
                 var size = new[] { 128, 256, 512, 1024 }[Math.Max(0, sizes.SelectedIndex)];
-                byte[]? endColor = null;
-                if (gradient.IsChecked == true && background != null)
-                {
-                    var hex = gradientColor.Text.Trim();
-                    if (
-                        hex.Length != 7
-                        || hex[0] != '#'
-                        || !int.TryParse(
-                            hex[1..],
-                            NumberStyles.HexNumber,
-                            CultureInfo.InvariantCulture,
-                            out var rgb
-                        )
-                    )
-                        throw new InvalidDataException(Ui("Enter a color in #RRGGBB format."));
-                    endColor = [(byte)rgb, (byte)(rgb >> 8), (byte)(rgb >> 16)];
-                }
+                var endColor = gradient.IsChecked == true && background != null ? Bgra(endPicker.Color) : null;
                 var angle = gradientAngle.Value;
                 var source = skin;
                 var sourceWidth = width;
@@ -185,6 +181,7 @@ public sealed partial class MainWindow
                 var overlay = hat.IsChecked == true;
                 var portrait = headOnly.IsChecked != true;
                 var addShadow = shadow.IsChecked == true;
+                var depth = (int)shadowDepth.Value;
                 var slimArms = slim.IsChecked == true;
                 var border = (int)padding.Value;
                 await Task.Delay(60);
@@ -203,7 +200,8 @@ public sealed partial class MainWindow
                         addShadow,
                         slimArms,
                         endColor,
-                        angle
+                        angle,
+                        depth
                     )
                 );
                 if (generation != renderVersion || current != revision)
@@ -398,6 +396,7 @@ public sealed partial class MainWindow
         controls.Children.Add(hat);
         controls.Children.Add(headOnly);
         controls.Children.Add(shadow);
+        controls.Children.Add(shadowDepth);
         controls.Children.Add(slim);
         controls.Children.Add(padding);
         controls.Children.Add(backgrounds);
@@ -452,7 +451,17 @@ public sealed partial class MainWindow
         slim.Checked += async (_, _) => await Refresh();
         slim.Unchecked += async (_, _) => await Refresh();
         padding.ValueChanged += async (_, _) => await Refresh();
-        custom.TextChanged += async (_, _) => await Refresh();
+        var settingsRevision = 0;
+        async Task RefreshRenderSettings()
+        {
+            var selection = ++settingsRevision;
+            await Task.Delay(80);
+            if (selection == settingsRevision && generation == renderVersion)
+                await Refresh();
+        }
+        startPicker.ColorChanged += async (_, _) => await RefreshRenderSettings();
+        endPicker.ColorChanged += async (_, _) => await RefreshRenderSettings();
+        shadowDepth.ValueChanged += async (_, _) => await RefreshRenderSettings();
         gradient.Checked += async (_, _) =>
         {
             if (backgrounds.SelectedIndex == 0)
@@ -460,7 +469,6 @@ public sealed partial class MainWindow
             await Refresh();
         };
         gradient.Unchecked += async (_, _) => await Refresh();
-        gradientColor.TextChanged += async (_, _) => await Refresh();
         gradientAngle.ValueChanged += async (_, _) => await Refresh();
         if (skin != null)
             await Refresh();

@@ -2,6 +2,7 @@
   "code": "es_es",
   "displayName": "Español",
   "strings": {
+    "Shadow depth (%)": "Intensidad de la sombra (%)",
     "Memory optimization complete": "Optimización de memoria finalizada",
     "Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.": "La memoria disponible aumentó en {0:N0} MiB. Disponible ahora: {1:N0} MiB.",
     "Memory optimization finished. System operations completed: {0}.": "Optimización finalizada. Operaciones del sistema completadas: {0}.",

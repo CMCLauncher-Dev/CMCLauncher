@@ -27,6 +27,7 @@ public sealed partial class MainWindow
             Tag = "pfp-preview",
             Stretch = Stretch.Uniform,
         };
+        RenderOptions.SetBitmapInterpolationMode(preview, BitmapInterpolationMode.None);
         var size = Choice(new[] { 128, 256, 512, 1024 }, 512);
         var padding = new Slider
         {
@@ -39,6 +40,14 @@ public sealed partial class MainWindow
         var headOnly = new CheckBox { Content = Ui("Head only") };
         var overlay = new CheckBox { Content = Ui("Include outer skin layer"), IsChecked = true };
         var shadow = new CheckBox { Content = Ui("Soft shadow"), IsChecked = true };
+        var shadowDepth = new Slider
+        {
+            Minimum = 0,
+            Maximum = 100,
+            TickFrequency = 1,
+            IsSnapToTickEnabled = true,
+            Value = MinecraftPfp.DefaultShadowDepth,
+        };
         var slim = new CheckBox { Content = Ui("Slim arms (Alex model)") };
         var background = Choice(
             new[] { "Transparent", "Light", "Dark", "Custom color" },
@@ -46,8 +55,31 @@ public sealed partial class MainWindow
         );
         background.Tag = "pfp-background";
         var gradient = new CheckBox { Content = Ui("Gradient background"), Tag = "pfp-gradient" };
-        var start = Input("#00B4A6");
-        var end = Input("#005C64");
+        Button ColorButton(string title, Color initial, out ColorView picker)
+        {
+            picker = new ColorView
+            {
+                Color = initial,
+                ColorModel = ColorModel.Rgba,
+                IsAlphaEnabled = true,
+                IsAlphaVisible = true,
+                IsComponentTextInputVisible = true,
+            };
+            var swatch = new SolidColorBrush(initial);
+            picker.ColorChanged += (_, args) => swatch.Color = args.NewColor;
+            var button = new Button
+            {
+                Content = Row(
+                    new Border { Background = swatch, Width = 20, Height = 16, CornerRadius = new CornerRadius(3) },
+                    T(title)
+                ),
+                Flyout = new Flyout { Content = picker },
+            };
+            global::Avalonia.Automation.AutomationProperties.SetName(button, Ui(title));
+            return button;
+        }
+        var customField = ColorButton("Background color", Color.FromRgb(0, 180, 166), out var startPicker);
+        var gradientColor = ColorButton("Gradient end color", Color.FromRgb(0, 92, 100), out var endPicker);
         var angle = new Slider
         {
             Minimum = 0,
@@ -56,9 +88,8 @@ public sealed partial class MainWindow
             TickFrequency = 1,
             IsSnapToTickEnabled = true,
         };
-        var customField = Field("Background color (#RRGGBB)", start);
         var gradientOptions = Stack(
-            Field("Gradient end color (#RRGGBB)", end),
+            gradientColor,
             Field("Gradient angle (°)", angle)
         );
         gradientOptions.Tag = "pfp-gradient-options";
@@ -67,40 +98,27 @@ public sealed partial class MainWindow
         {
             var revision = ++renderRevision;
             exportBytes = null;
+            shadowDepth.IsEnabled = shadow.IsChecked == true;
             export.IsEnabled = false;
             customField.IsVisible = background.SelectedIndex == 3;
             gradientOptions.IsVisible = gradient.IsChecked == true && background.SelectedIndex != 0;
             if (pixels == null)
                 return;
-            byte[]? first = null,
-                second = null;
-            if (background.SelectedIndex != 0)
+            static byte[] Bgra(Color color) => [color.B, color.G, color.R, color.A];
+            byte[]? first = background.SelectedIndex switch
             {
-                var hex = background.SelectedIndex switch
-                {
-                    1 => "#F5F5F5",
-                    2 => "#202020",
-                    _ => start.Text,
-                };
-                if (hex?.Length != 7 || hex[0] != '#' || !Color.TryParse(hex, out var color))
-                    throw new IOException(Ui("Enter a color in #RRGGBB format."));
-                first = [color.B, color.G, color.R];
-            }
-            if (gradient.IsChecked == true && background.SelectedIndex != 0)
-            {
-                if (
-                    end.Text?.Length != 7
-                    || end.Text[0] != '#'
-                    || !Color.TryParse(end.Text, out var color)
-                )
-                    throw new IOException(Ui("Enter a color in #RRGGBB format."));
-                second = [color.B, color.G, color.R];
-            }
+                1 => [245, 245, 245],
+                2 => [32, 32, 32],
+                3 => Bgra(startPicker.Color),
+                _ => null,
+            };
+            var second = gradient.IsChecked == true && first != null ? Bgra(endPicker.Color) : null;
             var dimension = (int)(size.SelectedItem ?? 512);
             var portrait = headOnly.IsChecked != true;
             var layer = overlay.IsChecked == true;
             var inset = (int)padding.Value;
             var shadows = shadow.IsChecked == true;
+            var depth = (int)shadowDepth.Value;
             var isSlim = slim.IsChecked == true;
             var degrees = angle.Value;
             var source = pixels;
@@ -119,7 +137,8 @@ public sealed partial class MainWindow
                     shadows,
                     isSlim,
                     second,
-                    degrees
+                    degrees,
+                    depth
                 )
             );
             if (revision != renderRevision)
@@ -266,6 +285,7 @@ public sealed partial class MainWindow
             overlay,
             headOnly,
             shadow,
+            Field("Shadow depth (%)", shadowDepth),
             slim,
             Field("Padding (%)", padding),
             Field("Background", background),
@@ -326,13 +346,23 @@ public sealed partial class MainWindow
             combo.SelectionChanged += async (_, _) => await RefreshSafely();
         foreach (var check in new[] { overlay, headOnly, shadow, slim, gradient })
             check.IsCheckedChanged += async (_, _) => await RefreshSafely();
-        foreach (var input in new[] { start, end })
-            input.TextChanged += async (_, _) => await RefreshSafely();
+        var settingsRevision = 0;
+        async Task RefreshRenderSettings()
+        {
+            var selection = ++settingsRevision;
+            await Task.Delay(80);
+            if (selection == settingsRevision)
+                await RefreshSafely();
+        }
+        startPicker.ColorChanged += async (_, _) => await RefreshRenderSettings();
+        endPicker.ColorChanged += async (_, _) => await RefreshRenderSettings();
         padding.ValueChanged += async (_, _) => await RefreshSafely();
         angle.ValueChanged += async (_, _) => await RefreshSafely();
+        shadowDepth.ValueChanged += async (_, _) => await RefreshRenderSettings();
         preview.DetachedFromVisualTree += (_, _) =>
         {
             renderRevision++;
+            settingsRevision++;
             preview.Source = null;
             rendered?.Dispose();
             rendered = null;

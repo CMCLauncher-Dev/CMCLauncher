@@ -2,6 +2,7 @@
   "code": "ja_jp",
   "displayName": "日本語",
   "strings": {
+    "Shadow depth (%)": "影の濃さ (%)",
     "Memory optimization complete": "メモリの最適化が完了しました",
     "Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.": "利用可能なメモリが {0:N0} MiB 増加しました。現在の空き容量: {1:N0} MiB。",
     "Memory optimization finished. System operations completed: {0}.": "メモリの最適化が完了しました。実行したシステム操作: {0} 件。",

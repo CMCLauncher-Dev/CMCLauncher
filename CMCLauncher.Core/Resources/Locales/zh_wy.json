@@ -2,6 +2,7 @@
   "code": "zh_wy",
   "displayName": "文言文",
   "strings": {
+    "Shadow depth (%)": "影深 (%)",
     "Memory optimization complete": "記憶體已整理",
     "Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.": "可用記憶體增 {0:N0} MiB，今餘 {1:N0} MiB。",
     "Memory optimization finished. System operations completed: {0}.": "記憶體已整理，成系統操作 {0} 項。",

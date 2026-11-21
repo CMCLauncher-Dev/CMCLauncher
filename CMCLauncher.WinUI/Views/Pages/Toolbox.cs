@@ -36,63 +36,95 @@ public sealed partial class MainWindow
         Header("Toolbox", "Utilities");
         if (LauncherPlatform.Current.SupportsMemoryOptimization)
         {
-            var utilities = new StackPanel { Spacing = 8 };
-            utilities.Children.Add(Text("Small tools", 16, true));
-            utilities.Children.Add(Action("Memory optimization", (_, _) => OptimizeMemoryNow()));
-            var card = CompactCard(utilities);
+            var utilities = new Grid { ColumnSpacing = 12 };
+            utilities.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            utilities.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var heading = Text("Small tools", 16, true);
+            heading.VerticalAlignment = VerticalAlignment.Center;
+            utilities.Children.Add(heading);
+
+            var optimize = Action("Memory optimization", (_, _) => OptimizeMemoryNow());
+            optimize.Tag = "toolbox-optimize-memory";
+            optimize.VerticalAlignment = VerticalAlignment.Center;
+            var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            label.Children.Add(new FontIcon { Glyph = "\uE72C", FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
+            label.Children.Add(Text("Memory optimization"));
+            optimize.Content = label;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(optimize, Ui("Memory optimization"));
+            Grid.SetColumn(optimize, 1);
+            utilities.Children.Add(optimize);
+
+            var card = CreateCard(utilities, new Thickness(16, 8, 12, 8), 8);
             card.Tag = "toolbox-small-tools";
             PageBody.Children.Add(card);
         }
-        var cards = new Grid { ColumnSpacing = 12, RowSpacing = 12, VerticalAlignment = VerticalAlignment.Top };
-        for (var i = 0; i < 3; i++)
-            cards.ColumnDefinitions.Add(
-                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
-            );
-        foreach (
-            var (title, description, route) in new[]
-            {
-                ("frpc", "Manage port forwarding connections.", "frpc"),
-                ("Terracotta", "Create or join a Minecraft LAN room.", "terracotta"),
-                (
-                    "MinecraftPFP",
-                    "Create a profile picture from a Minecraft skin and export it as PNG.",
-                    "minecraft-pfp"
-                ),
-                ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator"),
-                ("Command generator", "Build Minecraft Java Edition commands with a live preview.", "command-generator"),
-            }
-        )
+        var cards = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
+        foreach (var (title, description, route, glyph) in new[]
         {
-            var content = new Grid { RowSpacing = 6 };
-            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            content.RowDefinitions.Add(
-                new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }
-            );
-            content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            content.Children.Add(Text(title, 16, true));
-            var summary = Text(description);
-            Grid.SetRow(summary, 1);
-            content.Children.Add(summary);
-            var open = Action(
-                "Open",
-                (_, _) =>
-                {
-                    page = route;
-                    expandedNavigation = "more";
-                    Render();
-                },
-                true
-            );
-            Grid.SetRow(open, 2);
-            open.HorizontalAlignment = HorizontalAlignment.Left;
-            content.Children.Add(open);
-            var card = CompactCard(content);
-            var index = cards.Children.Count;
-            if (index % 3 == 0) cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Grid.SetColumn(card, index % 3);
-            Grid.SetRow(card, index / 3);
-            cards.Children.Add(card);
+            ("frpc", "Manage port forwarding connections.", "frpc", "\uE968"),
+            ("Terracotta", "Create or join a Minecraft LAN room.", "terracotta", "\uE716"),
+            ("MinecraftPFP", "Create a profile picture from a Minecraft skin and export it as PNG.", "minecraft-pfp", "\uE91B"),
+            ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator", "\uE7B8"),
+            ("Command generator", "Build Minecraft Java Edition commands with a live preview.", "command-generator", "\uE756"),
+        })
+        {
+            var content = new Grid { ColumnSpacing = 12 };
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            content.Children.Add(new FontIcon { Glyph = glyph, FontSize = 20, Foreground = Brush(PrimaryColor) });
+
+            var text = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(Text(title, 16, true));
+            text.Children.Add(Text(description, 13));
+            Grid.SetColumn(text, 1);
+            content.Children.Add(text);
+
+            var arrow = new FontIcon { Glyph = "\uE76C", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(arrow, 2);
+            content.Children.Add(arrow);
+
+            var open = Action(title, (_, _) =>
+            {
+                page = route;
+                expandedNavigation = "more";
+                Render();
+            });
+            open.Tag = "toolbox-open:" + route;
+            open.Content = content;
+            open.Padding = new Thickness(16, 14, 16, 14);
+            open.MinHeight = 96;
+            open.HorizontalAlignment = HorizontalAlignment.Stretch;
+            open.VerticalAlignment = VerticalAlignment.Stretch;
+            open.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+            open.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            open.BorderThickness = new Thickness(0);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(open, Ui(title));
+            cards.Children.Add(CreateCard(open, new Thickness(0), 8));
         }
+
+        var columns = 0;
+        void ArrangeCards(double width)
+        {
+            var count = width < 480 ? 1 : width < 820 ? 2 : 3;
+            if (columns == count)
+                return;
+            columns = count;
+            cards.ColumnDefinitions.Clear();
+            cards.RowDefinitions.Clear();
+            for (var i = 0; i < columns; i++)
+                cards.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (var i = 0; i < cards.Children.Count; i++)
+            {
+                if (i % columns == 0)
+                    cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var card = (FrameworkElement)cards.Children[i];
+                Grid.SetColumn(card, i % columns);
+                Grid.SetRow(card, i / columns);
+            }
+        }
+        ArrangeCards(double.PositiveInfinity);
+        cards.SizeChanged += (_, e) => ArrangeCards(e.NewSize.Width);
         PageBody.Children.Add(cards);
     }
 

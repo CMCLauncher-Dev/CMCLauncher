@@ -1,5 +1,8 @@
 using System.Diagnostics;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 
 namespace CMCLauncher.Avalonia.Views;
@@ -8,58 +11,100 @@ public sealed partial class MainWindow
 {
     Control ToolboxPage()
     {
-        var cards = new Grid
+        var cards = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
+        foreach (var (title, description, target, glyph) in new[]
         {
-            ColumnDefinitions = new ColumnDefinitions("*,*,*"),
-            ColumnSpacing = 12,
-            RowSpacing = 12,
-            VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top,
-        };
-        foreach (
-            var (title, description, target) in new[]
-            {
-                ("frpc", "Manage port forwarding connections.", "frpc"),
-                ("Terracotta", "Create or join a Minecraft LAN room.", "terracotta"),
-                (
-                    "MinecraftPFP",
-                    "Create a profile picture from a Minecraft skin and export it as PNG.",
-                    "pfp"
-                ),
-                ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator"),
-                ("Command generator", "Build Minecraft Java Edition commands with a live preview.", "command-generator"),
-            }
-        )
+            ("frpc", "Manage port forwarding connections.", "frpc", "M4,5 H20 V15 H4 Z M8,20 H16 M12,15 V20"),
+            ("Terracotta", "Create or join a Minecraft LAN room.", "terracotta", "M12,3 L21,8 V16 L12,21 L3,16 V8 Z M3,8 L12,13 L21,8 M12,13 V21"),
+            ("MinecraftPFP", "Create a profile picture from a Minecraft skin and export it as PNG.", "pfp", "M3,4 H21 V20 H3 Z M4,17 L9,12 L13,16 L16,13 L20,17 M7,8 H9"),
+            ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator", "M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M9,12 H16 M9,16 H16"),
+            ("Command generator", "Build Minecraft Java Edition commands with a live preview.", "command-generator", "M3,5 H21 V19 H3 Z M7,9 L10,12 L7,15 M12,15 H17"),
+        })
         {
             var content = new Grid
             {
-                RowDefinitions = new RowDefinitions("Auto,*,Auto"),
-                RowSpacing = 6,
+                ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
+                ColumnSpacing = 12,
             };
-            content.Children.Add(T(title, 16, true));
-            var summary = T(description);
-            Grid.SetRow(summary, 1);
-            content.Children.Add(summary);
-            var open = Btn("Open", () => Navigate(target), true);
-            open.HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Left;
-            Grid.SetRow(open, 2);
-            content.Children.Add(open);
-            var card = Card(content);
-            card.Padding = new global::Avalonia.Thickness(11, 7);
-            var index = cards.Children.Count;
-            if (index % 3 == 0) cards.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Grid.SetColumn(card, index % 3);
-            Grid.SetRow(card, index / 3);
+            var icon = NavigationIcon(glyph);
+            icon.Width = icon.Height = 20;
+            icon.Stroke = Accent;
+            content.Children.Add(icon);
+
+            var text = Stack(T(title, 16, true), T(description, 13));
+            text.Spacing = 4;
+            text.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(text, 1);
+            content.Children.Add(text);
+
+            var arrow = NavigationIcon("M9,5 L16,12 L9,19");
+            arrow.Width = arrow.Height = 12;
+            Grid.SetColumn(arrow, 2);
+            content.Children.Add(arrow);
+
+            var open = Btn(title, () => Navigate(target));
+            open.Tag = "toolbox-open:" + target;
+            open.Content = content;
+            open.Padding = new Thickness(16, 14);
+            open.MinHeight = 96;
+            open.HorizontalAlignment = HorizontalAlignment.Stretch;
+            open.VerticalAlignment = VerticalAlignment.Stretch;
+            open.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+            open.Background = Brushes.Transparent;
+            open.BorderThickness = new Thickness(0);
+            global::Avalonia.Automation.AutomationProperties.SetName(open, Ui(title));
+            var card = Card(open);
+            card.Padding = new Thickness(0);
             cards.Children.Add(card);
         }
+
+        var columns = 0;
+        void ArrangeCards(double width)
+        {
+            var count = width < 480 ? 1 : width < 820 ? 2 : 3;
+            if (columns == count)
+                return;
+            columns = count;
+            cards.ColumnDefinitions.Clear();
+            cards.RowDefinitions.Clear();
+            for (var i = 0; i < columns; i++)
+                cards.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+            for (var i = 0; i < cards.Children.Count; i++)
+            {
+                if (i % columns == 0)
+                    cards.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+                Grid.SetColumn(cards.Children[i], i % columns);
+                Grid.SetRow(cards.Children[i], i / columns);
+            }
+        }
+        ArrangeCards(double.PositiveInfinity);
+        cards.SizeChanged += (_, e) => ArrangeCards(e.NewSize.Width);
+
         if (!LauncherPlatform.Current.SupportsMemoryOptimization)
             return cards;
 
-        var utilities = Card(Stack(
-            T("Small tools", 16, true),
-            Btn("Memory optimization", OptimizeMemoryNow)
-        ));
-        utilities.Padding = new global::Avalonia.Thickness(11, 7);
-        return Stack(utilities, cards);
+        var utilities = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
+        var heading = T("Small tools", 16, true);
+        heading.VerticalAlignment = VerticalAlignment.Center;
+        utilities.Children.Add(heading);
+
+        var optimize = Btn("Memory optimization", OptimizeMemoryNow);
+        optimize.Tag = "toolbox-optimize-memory";
+        optimize.VerticalAlignment = VerticalAlignment.Center;
+        var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var optimizeIcon = NavigationIcon("M19,10 A7,7 0 1 0 18,16 M19,5 V10 H14");
+        optimizeIcon.Width = optimizeIcon.Height = 14;
+        label.Children.Add(optimizeIcon);
+        label.Children.Add(T("Memory optimization"));
+        optimize.Content = label;
+        global::Avalonia.Automation.AutomationProperties.SetName(optimize, Ui("Memory optimization"));
+        Grid.SetColumn(optimize, 1);
+        utilities.Children.Add(optimize);
+
+        var utilitiesCard = Card(utilities);
+        utilitiesCard.Padding = new Thickness(16, 8, 12, 8);
+        utilitiesCard.CornerRadius = new CornerRadius(8);
+        return Stack(utilitiesCard, cards);
     }
 
     async Task OptimizeMemoryNow()

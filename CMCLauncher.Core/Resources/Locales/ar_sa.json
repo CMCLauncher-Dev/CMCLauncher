@@ -2,6 +2,7 @@
   "code": "ar_sa",
   "displayName": "العربية",
   "strings": {
+    "Shadow depth (%)": "كثافة الظل (%)",
     "Memory optimization complete": "اكتمل تحسين الذاكرة",
     "Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.": "زادت الذاكرة المتاحة بمقدار {0:N0} MiB. المتاح الآن: {1:N0} MiB.",
     "Memory optimization finished. System operations completed: {0}.": "اكتمل تحسين الذاكرة. عدد عمليات النظام المنفّذة: {0}.",

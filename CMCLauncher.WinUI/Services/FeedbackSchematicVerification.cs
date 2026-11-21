@@ -28,7 +28,7 @@ public sealed partial class MainWindow
             await RenderAsync();
             await Task.Delay(450);
             await Run(_ => Task.CompletedTask, "Toast fixture");
-            await Task.Delay(150);
+            await Task.Delay(300);
             ((FrameworkElement)Content).UpdateLayout();
             var root = (FrameworkElement)Content;
             var toastPosition = TaskToast

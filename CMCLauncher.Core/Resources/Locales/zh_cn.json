@@ -2,6 +2,7 @@
   "code": "zh_cn",
   "displayName": "简体中文",
   "strings": {
+    "Shadow depth (%)": "阴影深度 (%)",
     "Memory optimization complete": "内存优化完成",
     "Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.": "可用内存增加了 {0:N0} MiB，当前可用 {1:N0} MiB。",
     "Memory optimization finished. System operations completed: {0}.": "内存优化完成，已执行 {0} 项系统级操作。",

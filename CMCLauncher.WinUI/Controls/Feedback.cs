@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 
 namespace CMCLauncher.WinUI;
 
@@ -18,19 +19,79 @@ public sealed partial class MainWindow
     Func<PopconfirmRequest, Task<bool>>? popconfirmOverride;
     Flyout? activePopconfirm;
     DispatcherQueueTimer? toastTimer;
+    readonly TranslateTransform toastOffset = new();
+    Storyboard? toastAnimation;
 
     void InitializeFeedback()
     {
+        TaskToast.RenderTransform = toastOffset;
         toastTimer = DispatcherQueue.CreateTimer();
-        toastTimer.Interval = TimeSpan.FromSeconds(4);
+        toastTimer.Interval = TimeSpan.FromMilliseconds(3400);
         toastTimer.IsRepeating = false;
-        toastTimer.Tick += (_, _) => TaskToast.IsOpen = false;
-        TaskToast.Closed += (_, _) => toastTimer.Stop();
+        toastTimer.Tick += (_, _) =>
+        {
+            if (!systemUi.AnimationsEnabled)
+            {
+                TaskToast.IsOpen = false;
+                return;
+            }
+
+            AnimateToast(TaskToast, "Opacity", 1, 0, 650, new SineEase
+            {
+                EasingMode = EasingMode.EaseInOut,
+            }, () => TaskToast.IsOpen = false);
+        };
+        TaskToast.Closed += (_, _) =>
+        {
+            toastTimer.Stop();
+            StopToastAnimation();
+        };
+    }
+
+    void StopToastAnimation()
+    {
+        var previous = toastAnimation;
+        toastAnimation = null;
+        previous?.Stop();
+    }
+
+    void AnimateToast(
+        DependencyObject target,
+        string property,
+        double from,
+        double to,
+        int milliseconds,
+        EasingFunctionBase easing,
+        Action? finished = null
+    )
+    {
+        StopToastAnimation();
+        var animation = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = new Duration(TimeSpan.FromMilliseconds(milliseconds)),
+            EasingFunction = easing,
+        };
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, property);
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(animation);
+        toastAnimation = storyboard;
+        storyboard.Completed += (_, _) =>
+        {
+            if (toastAnimation != storyboard)
+                return;
+            finished?.Invoke();
+            StopToastAnimation();
+        };
+        storyboard.Begin();
     }
 
     internal void ShowToast(string message, InfoBarSeverity severity = InfoBarSeverity.Success)
     {
         toastTimer?.Stop();
+        StopToastAnimation();
         RefreshToastPalette();
         TaskToast.MaxWidth = Math.Max(
             0,
@@ -43,6 +104,11 @@ public sealed partial class MainWindow
         TaskToast.Severity = severity;
         TaskToast.Message = message;
         TaskToast.IsOpen = true;
+        if (systemUi.AnimationsEnabled)
+            AnimateToast(toastOffset, "Y", 28, 0, 240, new CubicEase
+            {
+                EasingMode = EasingMode.EaseOut,
+            });
         toastTimer?.Start();
     }
 
