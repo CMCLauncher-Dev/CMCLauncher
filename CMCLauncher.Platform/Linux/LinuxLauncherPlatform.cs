@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text;
 using CMCLauncher.Platform;
 
@@ -78,22 +79,68 @@ public sealed class LinuxLauncherPlatform : LauncherPlatform
         if (protect)
         {
             var id = Guid.NewGuid().ToString("N");
-            PlatformCommand.Execute(
-                "secret-tool",
+            RunSecretTool(
                 ["store", "--label=CMCLauncher", "application", "CMCLauncher", "id", id],
                 Convert.ToBase64String(data)
             );
             return Encoding.UTF8.GetBytes("secret-service:" + id);
         }
         var value = Encoding.UTF8.GetString(data);
-        if (!value.StartsWith("secret-service:") || !Guid.TryParseExact(value[15..], "N", out _))
+        const string prefix = "secret-service:";
+        if (!value.StartsWith(prefix, StringComparison.Ordinal) || !Guid.TryParseExact(value[prefix.Length..], "N", out _))
             throw new IOException("These credentials belong to another platform. Sign in again.");
-        return Convert.FromBase64String(
-            PlatformCommand.Execute(
-                "secret-tool",
-                ["lookup", "application", "CMCLauncher", "id", value[15..]]
-            )
-        );
+        var stored = RunSecretTool(["lookup", "application", "CMCLauncher", "id", value[prefix.Length..]], null);
+        if (stored.Length == 0)
+            throw new IOException("The saved Linux credential is missing. Sign in again.");
+        try
+        {
+            return Convert.FromBase64String(stored);
+        }
+        catch (FormatException)
+        {
+            throw new IOException("The saved Linux credential is invalid. Sign in again.");
+        }
+    }
+
+    static string RunSecretTool(string[] arguments, string? input)
+    {
+        var writing = input != null;
+        try
+        {
+            return PlatformCommand.Execute("secret-tool", arguments, input,
+                diagnostic => SecretToolFailure(diagnostic, writing));
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 2)
+        {
+            throw new IOException("secret-tool is missing. Install the Linux libsecret command-line tools.");
+        }
+        catch (TimeoutException)
+        {
+            throw new IOException(writing
+                ? "Saving the login to the Linux keyring timed out."
+                : "Reading the login from the Linux keyring timed out.");
+        }
+    }
+
+    internal static string SecretToolFailure(string diagnostic, bool writing)
+    {
+        bool Has(string message) => diagnostic.Contains(message, StringComparison.OrdinalIgnoreCase);
+
+        // Only emit fixed messages. A provider can include sensitive data in stderr.
+        if (Has("ServiceUnknown") || Has("was not provided by any .service files")
+            || Has("Cannot autolaunch D-Bus") || Has("could not connect")
+            || Has("couldn't connect") || Has("failed to connect") || Has("connection refused"))
+            return "The Linux Secret Service is unavailable in this desktop session.";
+        if (Has("IsLocked") || Has("is locked") || Has("collection locked") || Has("unlock"))
+            return "The Linux keyring could not be unlocked.";
+        if (Has("No such secret collection") || Has("default collection")
+            || Has("default alias") || Has("No such object path"))
+            return "The Linux Secret Service could not find the default keyring.";
+        if (!writing && string.IsNullOrWhiteSpace(diagnostic))
+            return "The saved Linux credential is missing. Sign in again.";
+        return writing
+            ? "Could not save the login to the Linux keyring."
+            : "Could not read the login from the Linux keyring.";
     }
 
     public override (long TotalMb, long AvailableMb)? PhysicalMemory()

@@ -22,7 +22,8 @@ public static class PlatformCommand
     public static string Execute(
         string executable,
         IEnumerable<string> arguments,
-        string? input = null
+        string? input = null,
+        Func<string, string>? describeFailure = null
     )
     {
         var info = new ProcessStartInfo(executable)
@@ -41,21 +42,33 @@ public static class PlatformCommand
             ?? throw new IOException("Could not start platform service.");
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
+        IOException? inputError = null;
         if (input != null)
         {
-            process.StandardInput.Write(input);
-            process.StandardInput.Close();
+            try
+            {
+                process.StandardInput.Write(input);
+                process.StandardInput.Close();
+            }
+            catch (IOException ex)
+            {
+                // A command can reject the operation and close stdin before reading it.
+                inputError = ex;
+            }
         }
         if (!process.WaitForExit(30000))
         {
             process.Kill(true);
             throw new TimeoutException("Platform service timed out.");
         }
+        var diagnostic = error.GetAwaiter().GetResult();
         if (process.ExitCode != 0)
             throw new IOException(
-                "Platform service failed. Check that the system credential store is installed and unlocked."
+                describeFailure?.Invoke(diagnostic)
+                    ?? "Platform service failed. Check that the system credential store is installed and unlocked."
             );
-        _ = error.GetAwaiter().GetResult();
+        if (inputError != null)
+            throw new IOException("Could not send data to the platform service.", inputError);
         return output.GetAwaiter().GetResult().TrimEnd('\r', '\n');
     }
 }

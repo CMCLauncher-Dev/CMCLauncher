@@ -19,6 +19,19 @@ try
             throw new Exception(message);
         Console.WriteLine("PASS " + message);
     }
+    Check(
+        LinuxLauncherPlatform.SecretToolFailure("No such secret collection at path: /", true)
+            == "The Linux Secret Service could not find the default keyring."
+        && LinuxLauncherPlatform.SecretToolFailure("org.freedesktop.DBus.Error.ServiceUnknown", true)
+            == "The Linux Secret Service is unavailable in this desktop session."
+        && LinuxLauncherPlatform.SecretToolFailure("The default collection is locked.", true)
+            == "The Linux keyring could not be unlocked."
+        && LinuxLauncherPlatform.SecretToolFailure("", false)
+            == "The saved Linux credential is missing. Sign in again."
+        && LinuxLauncherPlatform.SecretToolFailure("unknown error with private input", true)
+            == "Could not save the login to the Linux keyring.",
+        "Secret Service diagnostics distinguish common failures without echoing stderr"
+    );
     Device("card0", "0x1002", "0x73df", "42");
     Device("card1", "0x8086", "0x46a6", null);
     Device("card2", "0x10de", "0x2684", "101");
