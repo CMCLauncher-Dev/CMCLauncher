@@ -123,7 +123,7 @@ def arch(publish, work, output, version):
     base, _, prerelease = version.partition("-")
     pkgver = base + prerelease.replace("-", ".")
     dependencies = (
-        "glibc", "gcc-libs", "zlib", "icu", "openssl-3", "ca-certificates", "fontconfig",
+        "glibc", "gcc-libs", "zlib", "icu", "openssl-3", "ca-certificates", "fontconfig", "noto-fonts",
         "libx11", "libxrandr", "libxi", "libxcursor", "libxrender", "libice", "libsm",
     )
     write(root / ".PKGINFO", f"""pkgname = cmclauncher

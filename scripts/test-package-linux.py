@@ -45,6 +45,7 @@ class LinuxPackageTests(unittest.TestCase):
             self.assertIn("pkgver = 1.2.3beta.2-1", arch)
             self.assertIn("arch = x86_64", arch)
             self.assertIn("depend = openssl-3", arch)
+            self.assertIn("depend = noto-fonts", arch.splitlines())
             for name in ("deb", "rpm-root", "arch-root"):
                 tree = root / name
                 self.assertEqual((tree / "opt/cmclauncher/cmclauncher-distribution").read_text(), "package\n")
