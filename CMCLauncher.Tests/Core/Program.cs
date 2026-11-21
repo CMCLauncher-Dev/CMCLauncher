@@ -339,6 +339,19 @@ try
             && dependencyIssues[0].Args[0] == "Conflict",
         "Fabric dependency arrays accept any matching range and report incompatible ranges without crashing"
     );
+    var skinHeader = Convert.FromHexString("89504E470D0A1A0A0000000D494844520000004000000040080600000000000000");
+    var invalidSkin = (byte[])skinHeader.Clone();
+    invalidSkin[19] = 128;
+    Check(
+        SkinImport.IsStandardSkin(skinHeader) && !SkinImport.IsStandardSkin(invalidSkin),
+        "skin imports accept standard PNG dimensions and reject unsupported widths"
+    );
+    var previewLength = SkinImport.PreviewSize * SkinImport.PreviewSize * 4;
+    Check(
+        SkinImport.RenderPreview(new byte[64 * 64 * 4], 64, slim: true).Length == previewLength
+        && SkinImport.RenderPreview(new byte[64 * 32 * 4], 32, slim: false).Length == previewLength,
+        "skin dialog preview renders standard and legacy textures at a supported resolution"
+    );
     var skinRoot = Path.Combine(root, "skin-data");
     var skinId = Guid.NewGuid();
     Directory.CreateDirectory(Path.Combine(skinRoot, "skin-cache"));
@@ -361,6 +374,14 @@ try
         Check(
             await skins.Get("../../not-a-profile", cacheOnly: true) == null,
             "account skin cache rejects invalid UUID paths"
+        );
+        await skins.RememberAppliedSkin(skinId.ToString("D"), skinHeader);
+        Check(
+            (await skins.Get(skinId.ToString("N"), cacheOnly: true))?.SequenceEqual(skinHeader) == true
+                && (await File.ReadAllBytesAsync(
+                    Path.Combine(skinRoot, "skin-cache", skinId.ToString("N") + ".png")
+                )).SequenceEqual(skinHeader),
+            "applying a skin replaces both the session and disk avatar cache"
         );
     }
     var catalog = new ThemeCatalog(Path.Combine(root, "themes"));

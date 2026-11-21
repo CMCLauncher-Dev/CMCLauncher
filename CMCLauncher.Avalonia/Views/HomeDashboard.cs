@@ -798,7 +798,7 @@ public sealed partial class MainWindow
             (
                 "Change skin",
                 "M7,2 L4,3 L1,7 L4,10 L6,8 L6,22 L18,22 L18,8 L20,10 L23,7 L20,3 L17,2 C17,8 7,8 7,2 Z",
-                "https://www.minecraft.net/en-us/msaprofile/mygames/editskin"
+                null
             ),
             (
                 "Change cape",
@@ -834,6 +834,11 @@ public sealed partial class MainWindow
                 "",
                 async () =>
                 {
+                    if (index == 0 && account != null)
+                    {
+                        await EditPlayerSkin(account);
+                        return;
+                    }
                     if (entry.Url != null)
                     {
                         Open(entry.Url);

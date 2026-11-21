@@ -23,6 +23,50 @@ public sealed class MinecraftSkins(LauncherCore core, string root, Action<string
             .Value;
     }
 
+    public async Task<byte[]> FindByName(string username, CancellationToken ct)
+    {
+        var name = username.Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"\A[A-Za-z0-9_]{1,16}\z"))
+            throw new ArgumentException("Enter a Minecraft Java username.");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(25));
+        using var response = await core.Http.GetAsync(
+            "https://api.minecraftservices.com/minecraft/profile/lookup/name/" + Uri.EscapeDataString(name),
+            timeout.Token
+        );
+        if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.NoContent)
+            throw new InvalidOperationException("Minecraft Java player not found.");
+        response.EnsureSuccessStatusCode();
+        var profile = JsonNode.Parse(await response.Content.ReadAsStringAsync(timeout.Token));
+        if (!Guid.TryParse(profile.S("id"), out var id))
+            throw new InvalidOperationException("Minecraft Java player not found.");
+        return await Get(id.ToString("N")).WaitAsync(timeout.Token)
+            ?? throw new IOException("Could not load this player's skin. Try again or upload a PNG skin.");
+    }
+
+    public async Task RememberAppliedSkin(string uuid, byte[] png)
+    {
+        if (!Guid.TryParse(uuid, out var id))
+            return;
+        var key = id.ToString("N");
+        var updated = new Lazy<Task<byte[]?>>(() => Task.FromResult<byte[]?>(png));
+        requests.TryGetValue(key, out var previous);
+        requests[key] = updated;
+        requests[key + ":cache"] = updated;
+        try
+        {
+            if (previous?.IsValueCreated == true)
+                await previous.Value;
+            var directory = Path.Combine(root, "skin-cache");
+            Directory.CreateDirectory(directory);
+            await File.WriteAllBytesAsync(Path.Combine(directory, key + ".png"), png);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            log?.Invoke("Skin cache update failed: " + ex.Message);
+        }
+    }
+
     // 实际拉取皮肤：优先读本地缓存（一天内有效），否则经 Mojang sessionserver
     // 解析 textures 属性并校验皮肤 URL（仅允许 textures.minecraft.net、https、默认端口），
     // 下载限 1 MB 并写入缓存；失败时回退到旧缓存。
