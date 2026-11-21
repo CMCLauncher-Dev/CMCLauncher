@@ -83,8 +83,6 @@ public static class ContentInspectionCache
         try
         {
             var entry = await lazy.Value;
-            var cachedIcon = Icons.GetOrAdd(key, _ => ReadIcon(iconPath) ?? []);
-            var icon = cachedIcon.Length == 0 ? null : cachedIcon;
             var item = new ContentItem(
                 Path.GetFileName(file),
                 entry.Name,
@@ -94,7 +92,7 @@ public static class ContentInspectionCache
                 enabled,
                 entry.Recognized
             );
-            return new Result(item, icon);
+            return new Result(item, IconBytes(key, iconPath));
         }
         catch
         {
@@ -159,7 +157,7 @@ public static class ContentInspectionCache
                     await File.WriteAllBytesAsync(iconPath, bytes);
                 }
                 catch (IOException) { }
-                Icons.TryAdd(key, bytes);
+                Icons[key] = bytes;
             }
             return result;
         }
@@ -191,19 +189,35 @@ public static class ContentInspectionCache
         return hash;
     }
 
-    // 从磁盘读取图标字节，文件不存在或过大时返回 null。
-    static byte[]? ReadIcon(string path)
+    // 读取图标：优先命中内存缓存；未命中时从磁盘读取，成功才写入缓存。
+    // 瞬时 IO 失败（文件被占用、杀软扫描等）不写入缓存并返回 null，下次进入页面会重试，
+    // 避免空结果被常驻成负缓存，与元数据的 Pending.TryRemove 重试策略对齐。
+    static byte[]? IconBytes(string key, string iconPath)
     {
+        if (Icons.TryGetValue(key, out var cached))
+            return cached.Length == 0 ? null : cached;
         try
         {
-            return File.Exists(path) && new FileInfo(path).Length is > 0 and <= 8_388_608
-                ? File.ReadAllBytes(path)
-                : null;
+            var bytes = ReadIcon(iconPath);
+            if (bytes is { Length: > 0 })
+                Icons[key] = bytes;
+            return bytes;
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return null;
         }
+    }
+
+    // 从磁盘读取图标字节，文件不存在、为空或过大时返回 null。
+    // IO 异常不在这里吞掉，交由 IconBytes 判定为瞬时失败而不写缓存。
+    static byte[]? ReadIcon(string path)
+    {
+        if (!File.Exists(path))
+            return null;
+        return new FileInfo(path).Length is > 0 and <= 8_388_608
+            ? File.ReadAllBytes(path)
+            : null;
     }
 }
 

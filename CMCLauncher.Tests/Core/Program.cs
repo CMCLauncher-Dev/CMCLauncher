@@ -319,6 +319,44 @@ try
             && ContentInspectionCache.InspectionCount == beforeCache + 1,
         "portable content metadata cache survives memory reset and preserves enabled state"
     );
+    // 图标负缓存回归：瞬时读取失败后，磁盘上的图标恢复时应当再次读取，而不是被常驻空缓存挡住。
+    var iconJar = Path.Combine(root, "icon-mod.jar");
+    using (
+        var zip = System.IO.Compression.ZipFile.Open(
+            iconJar,
+            System.IO.Compression.ZipArchiveMode.Create
+        )
+    )
+    {
+        using (var writer = new StreamWriter(zip.CreateEntry("fabric.mod.json").Open()))
+            writer.Write(
+                "{\"schemaVersion\":1,\"id\":\"icon_fixture\",\"name\":\"Icon fixture\",\"version\":\"1.0\",\"icon\":\"icon.png\"}"
+            );
+        var icon = Convert.FromHexString("89504E470D0A1A0A0000000D494844520000004000000040080600000000000000");
+        using (var output = zip.CreateEntry("icon.png").Open())
+            output.Write(icon, 0, icon.Length);
+    }
+    ContentInspectionCache.ClearMemory();
+    var firstIcon = await ContentInspectionCache.GetAsync(iconJar, "mod", true, root);
+    var iconDirectory = Path.Combine(root, "content-metadata");
+    var iconFile = Directory.EnumerateFiles(iconDirectory, "*.icon").Single();
+    Check(
+        firstIcon.Icon is { Length: > 0 },
+        "mod icon bytes are extracted and available after inspection"
+    );
+    ContentInspectionCache.ClearMemory();
+    File.Delete(iconFile);
+    var emptyIcon = await ContentInspectionCache.GetAsync(iconJar, "mod", true, root);
+    Check(
+        emptyIcon.Icon == null,
+        "missing icon file surfaces a null icon without poisoning the resident cache"
+    );
+    await File.WriteAllBytesAsync(iconFile, firstIcon.Icon!);
+    var recoveredIcon = await ContentInspectionCache.GetAsync(iconJar, "mod", true, root);
+    Check(
+        recoveredIcon.Icon?.Length > 0,
+        "icon reads retry after transient failure instead of permanently caching the empty result"
+    );
     var dependencyGame = Path.Combine(root, "dependency-game");
     var dependencyMods = Directory.CreateDirectory(Path.Combine(dependencyGame, "mods"));
     void DependencyJar(string name, string metadata)
