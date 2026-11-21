@@ -32,6 +32,49 @@ try
             == "Could not save the login to the Linux keyring.",
         "Secret Service diagnostics distinguish common failures without echoing stderr"
     );
+    byte[] fakeCredential = [1, 2, 3, 4];
+    var encodedCredential = Convert.ToBase64String(fakeCredential);
+    string? walletEntry = null;
+    string FailedSecretTool(string[] args, string? input) =>
+        throw new IOException("Could not save the login to the Linux keyring.");
+    string Wallet(string[] args, string? input)
+    {
+        Check(
+            args.Length == 5 && args[2] == "--folder" && args[3] == "CMCLauncher"
+                && args[4] == "kdewallet" && Guid.TryParseExact(args[1], "N", out _),
+            "KDE Wallet receives an opaque entry ID and no credentials in its arguments"
+        );
+        if (args[0] == "--write-password")
+        {
+            if (input != encodedCredential)
+                throw new Exception("Credential was not sent through stdin.");
+            walletEntry = input;
+            return "";
+        }
+        return walletEntry ?? "";
+    }
+    var walletReference = LinuxLauncherPlatform.TransformCredential(
+        fakeCredential, true, true, FailedSecretTool, Wallet
+    );
+    Check(
+        System.Text.Encoding.UTF8.GetString(walletReference).StartsWith("kwallet:", StringComparison.Ordinal)
+            && LinuxLauncherPlatform.TransformCredential(walletReference, false, false, FailedSecretTool, Wallet)
+                .SequenceEqual(fakeCredential),
+        "KDE Wallet fallback writes, verifies and reads the saved credential"
+    );
+    var existingReference = System.Text.Encoding.UTF8.GetBytes("secret-service:" + Guid.NewGuid().ToString("N"));
+    Check(
+        LinuxLauncherPlatform.TransformCredential(existingReference, false, true, (_, _) => encodedCredential,
+            (_, _) => throw new Exception("Secret Service references must still use Secret Service.")
+        ).SequenceEqual(fakeCredential),
+        "existing Secret Service entries remain readable on KDE"
+    );
+    try
+    {
+        _ = LinuxLauncherPlatform.TransformCredential(fakeCredential, true, true, FailedSecretTool, (_, _) => "");
+        throw new Exception("A wallet write without a readable value was accepted.");
+    }
+    catch (IOException ex) when (ex.Message == "Could not verify the login saved in KDE Wallet.") { }
     Device("card0", "0x1002", "0x73df", "42");
     Device("card1", "0x8086", "0x46a6", null);
     Device("card2", "0x10de", "0x2684", "101");

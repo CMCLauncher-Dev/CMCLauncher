@@ -74,22 +74,73 @@ public sealed class LinuxLauncherPlatform : LauncherPlatform
             ct
         );
 
-    public override byte[] TransformCredential(byte[] data, bool protect)
+    public override byte[] TransformCredential(byte[] data, bool protect) =>
+        TransformCredential(
+            data,
+            protect,
+            (Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP") ?? "")
+                .Split(':').Contains("KDE", StringComparer.OrdinalIgnoreCase)
+                || string.Equals(Environment.GetEnvironmentVariable("KDE_FULL_SESSION"), "true", StringComparison.OrdinalIgnoreCase),
+            RunSecretTool,
+            RunKWallet
+        );
+
+    internal static byte[] TransformCredential(
+        byte[] data,
+        bool protect,
+        bool kdeSession,
+        Func<string[], string?, string> secretTool,
+        Func<string[], string?, string> kwallet
+    )
     {
+        const string secretServicePrefix = "secret-service:";
+        const string kwalletPrefix = "kwallet:";
+        string Wallet(string action, string id, string? input = null) =>
+            kwallet([action, id, "--folder", "CMCLauncher", "kdewallet"], input);
+
         if (protect)
         {
             var id = Guid.NewGuid().ToString("N");
-            RunSecretTool(
-                ["store", "--label=CMCLauncher", "application", "CMCLauncher", "id", id],
-                Convert.ToBase64String(data)
-            );
-            return Encoding.UTF8.GetBytes("secret-service:" + id);
+            var encoded = Convert.ToBase64String(data);
+            try
+            {
+                secretTool(["store", "--label=CMCLauncher", "application", "CMCLauncher", "id", id], encoded);
+                return Encoding.UTF8.GetBytes(secretServicePrefix + id);
+            }
+            catch (IOException secretServiceError) when (kdeSession)
+            {
+                try
+                {
+                    Wallet("--write-password", id, encoded);
+                }
+                catch (Win32Exception ex) when (ex.NativeErrorCode == 2)
+                {
+                    // Preserve the original Secret Service diagnosis if KWallet's helper is absent.
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(secretServiceError);
+                }
+                if (!string.Equals(Wallet("--read-password", id), encoded, StringComparison.Ordinal))
+                    throw new IOException("Could not verify the login saved in KDE Wallet.");
+                return Encoding.UTF8.GetBytes(kwalletPrefix + id);
+            }
         }
+
         var value = Encoding.UTF8.GetString(data);
-        const string prefix = "secret-service:";
+        var inKWallet = value.StartsWith(kwalletPrefix, StringComparison.Ordinal);
+        var prefix = inKWallet ? kwalletPrefix : secretServicePrefix;
         if (!value.StartsWith(prefix, StringComparison.Ordinal) || !Guid.TryParseExact(value[prefix.Length..], "N", out _))
             throw new IOException("These credentials belong to another platform. Sign in again.");
-        var stored = RunSecretTool(["lookup", "application", "CMCLauncher", "id", value[prefix.Length..]], null);
+        var reference = value[prefix.Length..];
+        string stored;
+        try
+        {
+            stored = inKWallet
+                ? Wallet("--read-password", reference)
+                : secretTool(["lookup", "application", "CMCLauncher", "id", reference], null);
+        }
+        catch (Win32Exception ex) when (inKWallet && ex.NativeErrorCode == 2)
+        {
+            throw new IOException("kwallet-query is missing. Install the KDE Wallet command-line tools.");
+        }
         if (stored.Length == 0)
             throw new IOException("The saved Linux credential is missing. Sign in again.");
         try
@@ -99,6 +150,19 @@ public sealed class LinuxLauncherPlatform : LauncherPlatform
         catch (FormatException)
         {
             throw new IOException("The saved Linux credential is invalid. Sign in again.");
+        }
+    }
+
+    static string RunKWallet(string[] arguments, string? input)
+    {
+        try
+        {
+            return PlatformCommand.Execute("kwallet-query", arguments, input,
+                _ => "KDE Wallet could not save or read the login. Check that kdewallet is available and unlocked.");
+        }
+        catch (TimeoutException)
+        {
+            throw new IOException("Access to KDE Wallet timed out.");
         }
     }
 
