@@ -376,8 +376,8 @@ public sealed partial class MainWindow
         // 始终从 mod 通用的 en_us 语言文件翻译到启动器界面语言。
         const string source = "en_us";
         var target = settings.LauncherLanguage;
-        var entries = await Task.Run(() => ModTranslation.ReadLang(path, source));
-        if (entries == null || entries.Count == 0)
+        var entries = await Task.Run(() => ModTranslation.ReadLanguages(path, source));
+        if (!entries.Values.Any(values => values.Count != 0))
         {
             await Confirm("Translate", Ui("No lang file found in this mod."));
             return;
@@ -393,35 +393,81 @@ public sealed partial class MainWindow
             );
             return;
         }
-        var modId =
-            ContentManager.ModIds(path).FirstOrDefault()
-            ?? Path.GetFileNameWithoutExtension(item.File.Replace(".disabled", ""));
+        if (!await ConfirmModTranslationNotice(!isLocalRuleTarget))
+            return;
         var completed = await session.Run(
             "Mod translation",
             async ct =>
             {
                 session.ReportStatus(Ui("Translating mod…"));
-                var translated = await ModTranslation.TranslateBatchAsync(
-                    session.Core.Http,
-                    entries,
-                    source,
-                    target,
-                    ct
-                );
-                ct.ThrowIfCancellationRequested();
-                ModTranslation.WriteResourcePack(
-                    root,
-                    path,
-                    modId,
-                    translated,
-                    source,
-                    target
+                await ModTranslation.TranslateMod(
+                    session.Core.Http, root, session.Store.StorageDirectory(instance),
+                    instance.GameVersion, path, entries, source, target, ct
                 );
                 await session.Store.Save();
             }
         );
         if (completed)
             await Confirm("Translate", Ui("Translation saved. Load the resource pack in-game."));
+    }
+
+    async Task<bool> ConfirmModTranslationNotice(bool sendsText)
+    {
+        var window = new Window
+        {
+            Title = Ui(ModTranslation.NoticeTitle),
+            Width = 520,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+        };
+        PrepareDialog(window);
+        var clock = new System.Diagnostics.Stopwatch();
+        var accept = new Button
+        {
+            Content = string.Format(Ui("I understand ({0}s)"), ModTranslation.NoticeSeconds),
+            IsEnabled = false,
+        };
+        var cancel = new Button { Content = Ui("Cancel") };
+        accept.Click += (_, _) =>
+        {
+            if (clock.Elapsed.TotalSeconds >= ModTranslation.NoticeSeconds)
+                window.Close(true);
+        };
+        cancel.Click += (_, _) => window.Close(false);
+        var body = new StackPanel { Spacing = 12, Children = { T(ModTranslation.CopyrightNotice) } };
+        if (sendsText)
+            body.Children.Add(T(ModTranslation.TranslationServiceNotice));
+        body.Children.Add(Row(accept, cancel));
+        window.Content = new Border { Padding = new Thickness(20), Child = body };
+        var timer = new global::Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(100),
+        };
+        window.Opened += (_, _) =>
+        {
+            clock.Start();
+            timer.Start();
+        };
+        timer.Tick += (_, _) =>
+        {
+            var remaining = ModTranslation.NoticeSeconds - (int)clock.Elapsed.TotalSeconds;
+            accept.IsEnabled = remaining <= 0;
+            accept.Content = remaining <= 0
+                ? Ui("I understand")
+                : string.Format(Ui("I understand ({0}s)"), remaining);
+            if (remaining <= 0)
+                timer.Stop();
+        };
+        try
+        {
+            return await window.ShowDialog<bool>(this)
+                && clock.Elapsed.TotalSeconds >= ModTranslation.NoticeSeconds;
+        }
+        finally
+        {
+            timer.Stop();
+        }
     }
 
     async Task CheckModUpdates(Instance instance)

@@ -16,6 +16,9 @@ public sealed partial class MainWindow
         WriteableBitmap? bitmap = null;
         byte[]? texture = null;
         int skinHeight = 0;
+        var yaw = .52f;
+        var pitch = .24f;
+        var pose = SkinPose.Standing;
         var preview = new Image { Width = 224, Height = 224, Stretch = Stretch.Uniform };
         var checkerboard = new Canvas { Width = 224, Height = 224, Background = new SolidColorBrush(Color.FromRgb(250, 250, 250)) };
         var gray = new SolidColorBrush(Color.FromRgb(217, 217, 217));
@@ -29,6 +32,15 @@ public sealed partial class MainWindow
             checkerboard.Children.Add(square);
         }
         var previewSlot = new Grid { Width = 224, Height = 224, Children = { checkerboard, preview } };
+        previewSlot.Background = Brushes.Transparent;
+        var poseButtons = new StackPanel { Spacing = 5, VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Center };
+        var previewRow = new StackPanel
+        {
+            Orientation = global::Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Center,
+            Spacing = 8,
+            Children = { previewSlot, poseButtons },
+        };
         var status = T("Import a skin to preview it.");
         var url = Input("", "https://…");
         var slim = new CheckBox { Content = Ui("Slim arms") };
@@ -53,7 +65,7 @@ public sealed partial class MainWindow
         {
             if (texture == null)
                 return;
-            var pixels = SkinImport.RenderPreview(texture, skinHeight, slim.IsChecked == true);
+            var pixels = SkinImport.RenderPreview(texture, skinHeight, slim.IsChecked == true, yaw, pitch, pose);
             var next = new WriteableBitmap(new PixelSize(SkinImport.PreviewSize, SkinImport.PreviewSize), new Vector(96, 96),
                 PixelFormats.Bgra8888, AlphaFormat.Unpremul);
             using (var frame = next.Lock())
@@ -65,6 +77,60 @@ public sealed partial class MainWindow
             bitmap = next;
         }
         slim.IsCheckedChanged += (_, _) => RenderPreview();
+
+        (SkinPose Pose, string Icon, string Label)[] poses =
+        [
+            (SkinPose.Standing, "🧍", "Standing pose"),
+            (SkinPose.Walking, "🚶", "Walking pose"),
+            (SkinPose.Running, "🏃", "Running pose"),
+            (SkinPose.Waving, "👋", "Waving pose"),
+        ];
+        foreach (var entry in poses)
+        {
+            var button = new global::Avalonia.Controls.Primitives.ToggleButton
+            {
+                Content = entry.Icon, Width = 32, Height = 32, MinWidth = 0,
+                Padding = new Thickness(0), IsChecked = pose == entry.Pose,
+                Tag = entry.Pose,
+            };
+            ToolTip.SetTip(button, Ui(entry.Label));
+            global::Avalonia.Automation.AutomationProperties.SetName(button, Ui(entry.Label));
+            button.Click += (_, _) =>
+            {
+                pose = entry.Pose;
+                foreach (global::Avalonia.Controls.Primitives.ToggleButton other in poseButtons.Children.OfType<global::Avalonia.Controls.Primitives.ToggleButton>())
+                    other.IsChecked = other.Tag is SkinPose value && value == pose;
+                RenderPreview();
+            };
+            poseButtons.Children.Add(button);
+        }
+
+        Point? dragOrigin = null;
+        previewSlot.PointerPressed += (_, e) =>
+        {
+            if (texture == null || !e.GetCurrentPoint(previewSlot).Properties.IsLeftButtonPressed)
+                return;
+            dragOrigin = e.GetPosition(previewSlot);
+            e.Pointer.Capture(previewSlot);
+            e.Handled = true;
+        };
+        previewSlot.PointerMoved += (_, e) =>
+        {
+            if (dragOrigin is not { } previous)
+                return;
+            var next = e.GetPosition(previewSlot);
+            dragOrigin = next;
+            yaw = (yaw - (float)(next.X - previous.X) * .014f) % MathF.Tau;
+            pitch = Math.Clamp(pitch + (float)(next.Y - previous.Y) * .012f, -1.1f, 1.1f);
+            RenderPreview();
+            e.Handled = true;
+        };
+        previewSlot.PointerReleased += (_, e) =>
+        {
+            dragOrigin = null;
+            e.Pointer.Capture(null);
+        };
+        previewSlot.PointerCaptureLost += (_, _) => dragOrigin = null;
 
         async Task Import(Func<Task<byte[]?>> read)
         {
@@ -136,7 +202,7 @@ public sealed partial class MainWindow
             Child = new ScrollViewer
             {
                 MaxHeight = 580,
-                Content = Stack(previewSlot, status, fileButton, Field("Skin image URL", url),
+                Content = Stack(previewRow, status, fileButton, Field("Skin image URL", url),
                     urlButton, Field("Minecraft Java username", playerName), playerButton, slim, Row(apply, cancel)),
             },
         };

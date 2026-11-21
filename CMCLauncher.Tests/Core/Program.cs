@@ -352,6 +352,67 @@ try
         && SkinImport.RenderPreview(new byte[64 * 32 * 4], 32, slim: false).Length == previewLength,
         "skin dialog preview renders standard and legacy textures at a supported resolution"
     );
+    var languageJar = Path.Combine(root, "mod-lang.jar");
+    using (var archive = System.IO.Compression.ZipFile.Open(languageJar, System.IO.Compression.ZipArchiveMode.Create))
+    {
+        void Put(string path, string value)
+        {
+            using var writer = new StreamWriter(archive.CreateEntry(path).Open());
+            writer.Write(value);
+        }
+        Put("assets/first/lang/en_us.json", """{"item.first.test":"Hello %1$s"}""");
+        Put("assets/first/lang/zh_cn.json", """{"item.first.test":"你好 %1$s"}""");
+        Put("assets/second/lang/en_US.lang", "block.second.test=Second");
+        Put("assets/second/lang/zh_CN.lang", "block.second.test=第二项");
+        Put("assets/../lang/en_us.json", """{"unsafe":"skip"}""");
+    }
+    var languageEntries = ModTranslation.ReadLanguages(languageJar, "en_us");
+    using (var translationHttp = new HttpClient())
+        await ModTranslation.TranslateMod(translationHttp, root, root, "1.21.11",
+            languageJar, languageEntries, "en_us", "zh_cn", CancellationToken.None);
+    var translatedPack = Path.Combine(root, "resourcepacks", "cmc-mod-translation");
+    Check(
+        languageEntries.Count == 2
+        && JsonNode.Parse(File.ReadAllText(Path.Combine(translatedPack, "assets", "first", "lang", "zh_cn.json")))
+            ?["item.first.test"]?.GetValue<string>() == "你好 %1$s"
+        && JsonNode.Parse(File.ReadAllText(Path.Combine(translatedPack, "assets", "second", "lang", "zh_cn.json")))
+            ?["block.second.test"]?.GetValue<string>() == "第二项"
+        && JsonNode.Parse(File.ReadAllText(Path.Combine(translatedPack, "pack.mcmeta")))
+            ?["pack"]?["min_format"]?[0]?.GetValue<int>() == 75,
+        "mod translation preserves asset namespaces, bundled translations and modern resource pack metadata"
+    );
+    ModTranslation.WriteResourcePack(root, root, "1.8.9", languageEntries, "zh_cn");
+    Check(
+        File.ReadAllText(Path.Combine(translatedPack, "assets", "second", "lang", "zh_CN.lang"))
+            .Contains("block.second.test=Second", StringComparison.Ordinal),
+        "legacy mod translations use the legacy language file format and casing"
+    );
+    var whiteSkin = new byte[64 * 64 * 4];
+    for (var i = 0; i < whiteSkin.Length; i += 4)
+        whiteSkin[i] = whiteSkin[i + 1] = whiteSkin[i + 2] = 255;
+    var skinModel = SkinImport.RenderPreview(whiteSkin, 64, slim: false);
+    Check(
+        skinModel[3] == 0
+        && Enumerable.Range(0, skinModel.Length / 4)
+            .Where(pixel => skinModel[pixel * 4 + 3] == 255)
+            .Select(pixel => skinModel[pixel * 4]).Distinct().Count() == 3
+        && Enumerable.Range(0, SkinImport.PreviewSize).Any(x =>
+            skinModel[((SkinImport.PreviewSize * 4 / 5) * SkinImport.PreviewSize + x) * 4 + 3] == 255),
+        "3D skin preview draws lit front, side and top surfaces with a full-body silhouette"
+    );
+    var backSkin = new byte[64 * 64 * 4];
+    for (var y = 8; y < 16; y++)
+    for (var x = 24; x < 32; x++)
+        backSkin[(y * 64 + x) * 4 + 2] = 255;
+    var fromFront = SkinImport.RenderPreview(backSkin, 64, slim: false, yaw: 0);
+    var fromBack = SkinImport.RenderPreview(backSkin, 64, slim: false, yaw: MathF.PI);
+    Check(
+        Enumerable.Range(0, fromFront.Length / 4).All(pixel => fromFront[pixel * 4 + 2] == 0)
+        && Enumerable.Range(0, fromBack.Length / 4).Any(pixel => fromBack[pixel * 4 + 2] > 0)
+        && Enum.GetValues<SkinPose>().Where(pose => pose != SkinPose.Standing).All(pose =>
+            !SkinImport.RenderPreview(whiteSkin, 64, slim: false, pose: pose).SequenceEqual(skinModel)),
+        "rotating a skin reveals back UVs and each action changes the rendered pose"
+    );
     var skinRoot = Path.Combine(root, "skin-data");
     var skinId = Guid.NewGuid();
     Directory.CreateDirectory(Path.Combine(skinRoot, "skin-cache"));

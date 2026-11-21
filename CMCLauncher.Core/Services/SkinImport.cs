@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 
 namespace CMCLauncher;
 
+public enum SkinPose { Standing, Walking, Running, Waving }
+
 public static class SkinImport
 {
     const int MaximumBytes = 1024 * 1024;
@@ -13,8 +15,11 @@ public static class SkinImport
 
     public const int PreviewSize = 256;
 
-    public static byte[] RenderPreview(byte[] texture, int height, bool slim) =>
-        MinecraftPfp.Render(texture, 64, height, PreviewSize, true, 8, null, true, false, slim, null, 0);
+    public static byte[] RenderPreview(
+        byte[] texture, int height, bool slim, float yaw = .52f, float pitch = .24f,
+        SkinPose pose = SkinPose.Standing
+    ) =>
+        SkinPreviewRenderer.Render(texture, height, slim, PreviewSize, yaw, pitch, pose);
 
     public static bool IsStandardSkin(ReadOnlySpan<byte> png) =>
         png.Length is >= 33 and <= MaximumBytes

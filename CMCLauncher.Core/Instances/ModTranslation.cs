@@ -10,6 +10,13 @@ namespace CMCLauncher;
 // 资源包覆盖文件（assets/<modid>/lang/<locale>.json），不修改原始 mod JAR。
 public static class ModTranslation
 {
+    public const int NoticeSeconds = 8;
+    public const string NoticeTitle = "Mod translation and copyright";
+    public const string CopyrightNotice =
+        "Mod text may be protected by copyright. The translation is saved to a local resource pack. Before sharing or publishing it, check the original mod license and obtain permission if needed.";
+    public const string TranslationServiceNotice =
+        "Untranslated entries are sent to MyMemory for translation. Choose Cancel if you do not want to send them.";
+
     // 本项目 LauncherLanguage 代码（en_us/zh_cn/...）到翻译服务代码的映射。
     public static string ServiceLanguage(string code) =>
         code.ToLowerInvariant() switch
@@ -103,65 +110,44 @@ public static class ModTranslation
         return text;
     }
 
-    // 从 JAR 包读取一个 mod 的 lang 文件（JSON 或旧式 .lang）。返回 (翻译键→原文)。
-    public static Dictionary<string, string>? ReadLang(string file, string locale)
+    public static Dictionary<string, Dictionary<string, string>> ReadLanguages(string file, string locale)
     {
-        try
+        var languages = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        using var zip = ZipFile.OpenRead(file);
+        foreach (var entry in zip.Entries.OrderBy(entry => entry.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
         {
-            using var zip = ZipFile.OpenRead(file);
-            var expected = "assets/" + locale.ToLowerInvariant() + "/lang/";
-            var entry = zip
-                .Entries.FirstOrDefault(e =>
-                    e.FullName.StartsWith(expected, StringComparison.OrdinalIgnoreCase)
-                    && (e.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
-                        || e.FullName.EndsWith(".lang", StringComparison.OrdinalIgnoreCase))
-                );
-            if (entry == null || entry.Length > 2 * 1024 * 1024)
-                return null;
+            var parts = entry.FullName.Split('/');
+            if (parts.Length != 4 || parts[0] != "assets" || parts[2] != "lang"
+                || !Regex.IsMatch(parts[1], @"\A[a-z0-9_.-]+\z") || parts[1] is "." or ".."
+                || !parts[3].Equals(locale + ".json", StringComparison.OrdinalIgnoreCase)
+                    && !parts[3].Equals(locale + ".lang", StringComparison.OrdinalIgnoreCase)
+                || entry.Length > 2 * 1024 * 1024)
+                continue;
+            if (!languages.TryGetValue(parts[1], out var values))
+                languages.Add(parts[1], values = new(StringComparer.Ordinal));
             using var reader = new StreamReader(entry.Open());
-            var text = reader.ReadToEnd();
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
-            if (entry.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            if (parts[3].EndsWith(".json", StringComparison.OrdinalIgnoreCase))
             {
-                if (JsonNode.Parse(text) is not JsonObject obj)
-                    return result;
-                foreach (var pair in obj)
-                    if (pair.Value is JsonValue v)
-                        result[pair.Key] = v.ToString();
+                if (JsonNode.Parse(reader.ReadToEnd()) is JsonObject obj)
+                    foreach (var pair in obj)
+                        if (pair.Value is JsonValue value && value.TryGetValue<string>(out var text))
+                            values[pair.Key] = text;
             }
             else
             {
-                foreach (var line in text.Split('\n'))
+                while (reader.ReadLine() is { } line)
                 {
-                    if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("#"))
+                    if (line.TrimStart().StartsWith('#'))
                         continue;
-                    var eq = line.IndexOf('=');
-                    if (eq > 0)
-                        result[line[..eq].Trim()] = line[(eq + 1)..].Trim();
+                    var equals = line.IndexOf('=');
+                    if (equals > 0)
+                        values[line[..equals].Trim()] = line[(equals + 1)..];
                 }
             }
-            return result;
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or System.Text.Json.JsonException)
-        {
-            return null;
-        }
+        return languages;
     }
 
-    // 把 mod 内已有的 <target> 语言语言文件合并进来（优先保留 mod 自带翻译）。
-    public static Dictionary<string, string> MergeExisting(
-        Dictionary<string, string> source,
-        string file,
-        string target
-    )
-    {
-        if (ReadLang(file, target) is { } existing)
-            foreach (var pair in existing)
-                source[pair.Key] = pair.Value;
-        return source;
-    }
-
-    // 用 MyMemory 免费 API 翻译一段文本。
     public static async Task<string> TranslateAsync(
         HttpClient http,
         string text,
@@ -214,87 +200,169 @@ public static class ModTranslation
         IProgress<(int Done, int Total)>? progress = null
     )
     {
-        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        var result = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.Ordinal);
         if (string.Equals(source, target, StringComparison.OrdinalIgnoreCase))
         {
             foreach (var pair in entries)
                 result[pair.Key] = pair.Value;
             progress?.Report((entries.Count, entries.Count));
-            return result;
+            return new Dictionary<string, string>(result, StringComparer.Ordinal);
         }
         using var gate = new SemaphoreSlim(2);
+        var completed = 0;
         var tasks = entries.Select(async pair =>
         {
             await gate.WaitAsync(ct);
             try
             {
-                result[pair.Key] = await TranslateAsync(http, pair.Value, source, target, ct);
+                result[pair.Key] = await TranslateLangValue(http, pair.Value, source, target, ct);
             }
             finally
             {
                 gate.Release();
-                progress?.Report((0, entries.Count));
+                progress?.Report((Interlocked.Increment(ref completed), entries.Count));
             }
         }).ToArray();
         await Task.WhenAll(tasks);
-        return result;
+        return new Dictionary<string, string>(result, StringComparer.Ordinal);
     }
 
-    // 在实例 resourcepacks 目录生成（或更新）语言覆盖资源包，返回打包后的目标语言文件路径。
-    public static string? WriteResourcePack(
-        string game,
-        string modFile,
-        string modId,
-        Dictionary<string, string> translated,
-        string source,
-        string target
+    static async Task<string> TranslateLangValue(
+        HttpClient http, string text, string source, string target, CancellationToken ct
     )
     {
-        if (translated.Count == 0)
-            return null;
-        var bundle = Store.SafePath(
-            game,
-            "resourcepacks/cmc-mod-translation/" + modId + "/" + target + ".json"
-        );
-        Directory.CreateDirectory(Path.GetDirectoryName(bundle)!);
-        var json = new JsonObject();
-        foreach (var pair in translated)
-            json[pair.Key] = pair.Value;
-        var content = json.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-        var tmp = bundle + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        File.WriteAllText(tmp, content, System.Text.Encoding.UTF8);
-        File.Move(tmp, bundle, true);
-        WritePackMeta(game);
-        return bundle;
+        var markers = new List<(string Token, string Value)>();
+        var prefix = "CMCPLACEHOLDER" + Guid.NewGuid().ToString("N")[..8];
+        var masked = Regex.Replace(text,
+            @"%%|%(?:\d+\$)?[-#+ 0,(<]*\d*(?:\.\d+)?[A-Za-z]|\{[^{}\r\n]+\}|§.|<[^<>\r\n]+>|\r\n|\r|\n",
+            match =>
+            {
+                var token = prefix + markers.Count.ToString(CultureInfo.InvariantCulture) + "Z";
+                markers.Add((token, match.Value));
+                return token;
+            });
+        var translated = await TranslateAsync(http, masked, source, target, ct);
+        foreach (var (token, value) in markers)
+        {
+            var first = translated.IndexOf(token, StringComparison.OrdinalIgnoreCase);
+            if (first < 0 || translated.IndexOf(token, first + token.Length, StringComparison.OrdinalIgnoreCase) >= 0)
+                return text;
+            translated = translated.Replace(token, value, StringComparison.OrdinalIgnoreCase);
+        }
+        return translated;
     }
 
-    // 生成资源包包说明（pack.mcmeta），使游戏能把它当作普通资源包加载。
-    static void WritePackMeta(string game)
+    public static async Task TranslateMod(
+        HttpClient http, string game, string storage, string gameVersion, string modFile,
+        Dictionary<string, Dictionary<string, string>> sourceEntries, string source, string target,
+        CancellationToken ct
+    )
     {
-        var root = Store.SafePath(game, "resourcepacks/cmc-mod-translation");
-        var meta = Path.Combine(root, "pack.mcmeta");
-        if (File.Exists(meta))
+        var existing = ReadLanguages(modFile, target);
+        var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var (nameSpace, entries) in sourceEntries)
+        {
+            if (entries.Count == 0)
+                continue;
+            var known = existing.GetValueOrDefault(nameSpace);
+            var pending = entries.Where(pair => known?.ContainsKey(pair.Key) != true)
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+            var translated = await TranslateBatchAsync(http, pending, source, target, ct);
+            if (known != null)
+                foreach (var pair in known)
+                    translated[pair.Key] = pair.Value;
+            result.Add(nameSpace, translated);
+        }
+        ct.ThrowIfCancellationRequested();
+        WriteResourcePack(game, storage, gameVersion, result, target);
+    }
+
+    public static void WriteResourcePack(
+        string game, string storage, string gameVersion,
+        Dictionary<string, Dictionary<string, string>> translations, string target
+    )
+    {
+        if (translations.Count == 0)
             return;
-        Directory.CreateDirectory(root);
-        var json = """{"pack":{"pack_format":15,"description":"CMCLauncher mod translations"}}""";
-        var tmp = meta + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        File.WriteAllText(tmp, json, System.Text.Encoding.UTF8);
-        File.Move(tmp, meta, true);
+        if (!Regex.IsMatch(target, @"\A[a-zA-Z]{2,3}_[a-zA-Z]{2,3}\z"))
+            throw new ArgumentException("Invalid resource pack language.");
+        var (major, minor) = ResourcePackFormat(storage, gameVersion);
+        var legacy = major < 4;
+        var locale = target.ToLowerInvariant();
+        if (major <= 2)
+            locale = locale[..(locale.IndexOf('_') + 1)] + locale[(locale.IndexOf('_') + 1)..].ToUpperInvariant();
+        const string root = "resourcepacks/cmc-mod-translation";
+        foreach (var (nameSpace, values) in translations)
+        {
+            if (!Regex.IsMatch(nameSpace, @"\A[a-z0-9_.-]+\z") || nameSpace is "." or "..")
+                throw new ArgumentException("Invalid resource pack namespace.");
+            var suffix = legacy ? ".lang" : ".json";
+            var content = legacy
+                ? string.Join("\n", values.Where(pair => !pair.Key.Any(char.IsControl) && !pair.Key.Contains('='))
+                    .Select(pair => pair.Key + "=" + pair.Value.Replace("\r", "").Replace("\n", " "))) + "\n"
+                : new JsonObject(values.Select(pair =>
+                    KeyValuePair.Create<string, JsonNode?>(pair.Key, JsonValue.Create(pair.Value)))).ToJsonString();
+            WriteAtomic(Store.SafePath(game, $"{root}/assets/{nameSpace}/lang/{locale}{suffix}"), content);
+        }
+        var pack = new JsonObject { ["description"] = "CMCLauncher mod translations" };
+        if (major >= 65)
+        {
+            pack["min_format"] = new JsonArray(major, minor);
+            pack["max_format"] = new JsonArray(major, minor);
+        }
+        else
+            pack["pack_format"] = major;
+        WriteAtomic(Store.SafePath(game, root + "/pack.mcmeta"), new JsonObject { ["pack"] = pack }.ToJsonString());
     }
 
-    // 清空该 mod 的缓存翻译（关闭翻译时避免残留覆盖）。
-    public static void Clear(string game, string modId, string target)
+    static void WriteAtomic(string path, string content)
     {
-        var bundle = Store.SafePath(
-            game,
-            "resourcepacks/cmc-mod-translation/" + modId + "/" + target + ".json"
-        );
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            if (File.Exists(bundle))
-                File.Delete(bundle);
+            File.WriteAllText(temporary, content);
+            File.Move(temporary, path, overwrite: true);
         }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
+        finally
+        {
+            if (File.Exists(temporary))
+                File.Delete(temporary);
+        }
+    }
+
+    static (int Major, int Minor) ResourcePackFormat(string storage, string gameVersion)
+    {
+        var jar = Store.SafePath(storage, $"versions/{gameVersion}/{gameVersion}.jar");
+        if (File.Exists(jar))
+        {
+            using var zip = ZipFile.OpenRead(jar);
+            if (zip.GetEntry("version.json") is { Length: <= 65536 } metadata)
+            {
+                using var stream = metadata.Open();
+                var version = JsonNode.Parse(stream)?["pack_version"];
+                var format = version?["resource"];
+                if (format is JsonArray { Count: 2 } array)
+                    return (array[0]!.GetValue<int>(), array[1]!.GetValue<int>());
+                if (format is JsonValue number && number.TryGetValue<int>(out var major))
+                    return (major, 0);
+                if (format is JsonObject obj && obj["major"] is JsonValue majorValue
+                    && majorValue.TryGetValue<int>(out major))
+                    return (major, obj["minor"]?.GetValue<int>() ?? 0);
+            }
+        }
+        if (!Version.TryParse(gameVersion, out var release) || release.Major != 1)
+            throw new InvalidOperationException("Install the Minecraft version before generating its translation pack.");
+        var patch = Math.Max(0, release.Build);
+        return (release.Minor switch
+        {
+            < 9 => 1, 9 or 10 => 2, 11 or 12 => 3, 13 or 14 => 4, 15 => 5,
+            16 => patch <= 1 ? 5 : 6, 17 => 7, 18 => 8,
+            19 => patch <= 2 ? 9 : patch == 3 ? 12 : 13,
+            20 => patch <= 1 ? 15 : patch == 2 ? 18 : patch <= 4 ? 22 : 32,
+            21 => patch <= 1 ? 34 : patch <= 3 ? 42 : patch == 4 ? 46
+                : patch == 5 ? 55 : patch == 6 ? 63 : patch <= 8 ? 64 : patch <= 10 ? 69 : 75,
+            _ => throw new InvalidOperationException("Install the Minecraft version before generating its translation pack."),
+        }, 0);
     }
 }

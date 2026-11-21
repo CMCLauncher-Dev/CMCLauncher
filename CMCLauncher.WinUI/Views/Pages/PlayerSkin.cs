@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics.Imaging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -17,7 +18,9 @@ public sealed partial class MainWindow
         byte[]? candidate = null;
         byte[]? texture = null;
         int skinHeight = 0;
-        var previewRevision = 0;
+        var yaw = .52f;
+        var pitch = .24f;
+        var pose = SkinPose.Standing;
         var preview = new Image { Width = 224, Height = 224, Stretch = Stretch.Uniform };
         var checkerboard = new Canvas { Width = 224, Height = 224, Background = Brush("#FAFAFA") };
         var gray = Brush("#D9D9D9");
@@ -31,6 +34,15 @@ public sealed partial class MainWindow
             checkerboard.Children.Add(square);
         }
         var previewSlot = new Grid { Width = 224, Height = 224, Children = { checkerboard, preview } };
+        previewSlot.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        var poseButtons = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
+        var previewRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Spacing = 8,
+            Children = { previewSlot, poseButtons },
+        };
         var status = Text("Import a skin to preview it.");
         var url = new TextBox { Header = Ui("Skin image URL"), PlaceholderText = "https://…" };
         var slim = new CheckBox { Content = Ui("Slim arms") };
@@ -51,37 +63,87 @@ public sealed partial class MainWindow
                 Content = new StackPanel
                 {
                     Spacing = 10,
-                    Children = { previewSlot, status, fileButton, url, urlButton, playerName, playerButton, slim },
+                    Children = { previewRow, status, fileButton, url, urlButton, playerName, playerButton, slim },
                 },
             },
         };
 
-        async Task RenderPreview()
+        void RenderPreview()
         {
             if (texture == null)
                 return;
-            var revision = ++previewRevision;
-            var pixels = SkinImport.RenderPreview(texture, skinHeight, slim.IsChecked == true);
-            using var image = new InMemoryRandomAccessStream();
-            var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, image);
-            encoder.SetPixelData(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Straight, SkinImport.PreviewSize, SkinImport.PreviewSize, 96, 96, pixels);
-            await encoder.FlushAsync();
-            image.Seek(0);
-            var bitmap = new BitmapImage();
-            await bitmap.SetSourceAsync(image);
-            if (!lifetime.IsCancellationRequested && revision == previewRevision)
+            var pixels = SkinImport.RenderPreview(texture, skinHeight, slim.IsChecked == true, yaw, pitch, pose);
+            // WriteableBitmap expects premultiplied BGRA pixels.
+            for (var i = 0; i < pixels.Length; i += 4)
             {
-                preview.Source = bitmap;
-                checkerboard.Visibility = Visibility.Collapsed;
+                var alpha = pixels[i + 3];
+                for (var channel = 0; channel < 3; channel++)
+                    pixels[i + channel] = (byte)((pixels[i + channel] * alpha + 127) / 255);
             }
+            var bitmap = preview.Source as WriteableBitmap
+                ?? new WriteableBitmap(SkinImport.PreviewSize, SkinImport.PreviewSize);
+            using (var output = bitmap.PixelBuffer.AsStream())
+                output.Write(pixels, 0, pixels.Length);
+            bitmap.Invalidate();
+            preview.Source = bitmap;
+            checkerboard.Visibility = Visibility.Collapsed;
         }
-        async void ModelChanged(object sender, RoutedEventArgs args)
+        slim.Checked += (_, _) => RenderPreview();
+        slim.Unchecked += (_, _) => RenderPreview();
+
+        (SkinPose Pose, string Icon, string Label)[] poses =
+        [
+            (SkinPose.Standing, "🧍", "Standing pose"),
+            (SkinPose.Walking, "🚶", "Walking pose"),
+            (SkinPose.Running, "🏃", "Running pose"),
+            (SkinPose.Waving, "👋", "Waving pose"),
+        ];
+        foreach (var entry in poses)
         {
-            try { await RenderPreview(); }
-            catch (Exception ex) { status.Text = Ui(ex.Message); }
+            var button = new Microsoft.UI.Xaml.Controls.Primitives.ToggleButton
+            {
+                Content = entry.Icon, Width = 32, Height = 32, MinWidth = 0,
+                Padding = new Thickness(0), IsChecked = pose == entry.Pose,
+                Tag = entry.Pose,
+            };
+            ToolTipService.SetToolTip(button, Ui(entry.Label));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, Ui(entry.Label));
+            button.Click += (_, _) =>
+            {
+                pose = entry.Pose;
+                foreach (Microsoft.UI.Xaml.Controls.Primitives.ToggleButton other in poseButtons.Children.OfType<Microsoft.UI.Xaml.Controls.Primitives.ToggleButton>())
+                    other.IsChecked = other.Tag is SkinPose value && value == pose;
+                RenderPreview();
+            };
+            poseButtons.Children.Add(button);
         }
-        slim.Checked += ModelChanged;
-        slim.Unchecked += ModelChanged;
+
+        Windows.Foundation.Point? dragOrigin = null;
+        previewSlot.PointerPressed += (_, e) =>
+        {
+            if (texture == null || !e.GetCurrentPoint(previewSlot).Properties.IsLeftButtonPressed)
+                return;
+            dragOrigin = e.GetCurrentPoint(previewSlot).Position;
+            previewSlot.CapturePointer(e.Pointer);
+            e.Handled = true;
+        };
+        previewSlot.PointerMoved += (_, e) =>
+        {
+            if (dragOrigin is not { } previous)
+                return;
+            var next = e.GetCurrentPoint(previewSlot).Position;
+            dragOrigin = next;
+            yaw = (yaw - (float)(next.X - previous.X) * .014f) % MathF.Tau;
+            pitch = Math.Clamp(pitch + (float)(next.Y - previous.Y) * .012f, -1.1f, 1.1f);
+            RenderPreview();
+            e.Handled = true;
+        };
+        previewSlot.PointerReleased += (_, e) =>
+        {
+            dragOrigin = null;
+            previewSlot.ReleasePointerCapture(e.Pointer);
+        };
+        previewSlot.PointerCaptureLost += (_, _) => dragOrigin = null;
 
         async Task Import(Func<Task<byte[]?>> read)
         {
@@ -112,7 +174,7 @@ public sealed partial class MainWindow
                     slim.IsEnabled = skinHeight == 64;
                     if (!slim.IsEnabled)
                         slim.IsChecked = false;
-                    await RenderPreview();
+                    RenderPreview();
                     candidate = bytes;
                 }
                 status.Text = Ui(candidate == null ? "Import a skin to preview it." : "Skin ready to apply.");

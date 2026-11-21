@@ -96,6 +96,10 @@ Release archives include .NET and the Windows App SDK runtime, so you do not nee
 
 Interface translations load from JSON files beside the executable: bundled packs in `locales/Default/` (replaced on every update) and your own edits in `locales/`. Additional valid language packs appear in the language selector. See [language packs](docs/LOCALIZATION.md) for the schema, reload behavior and translation guide.
 
+### Translate in-game mod text
+
+Enable **Mod translation** in Settings and set the launcher interface to the target language. In the mod list for the instance, choose **Translate** for a mod. The launcher reads English language entries from the JAR, sends missing translations to the translation service, and saves the results to `resourcepacks/cmc-mod-translation`. Enable that resource pack in Minecraft.
+
 ## Support and limitations
 
 ### Frp Client

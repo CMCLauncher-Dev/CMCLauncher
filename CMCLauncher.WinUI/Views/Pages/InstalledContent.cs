@@ -469,9 +469,9 @@ public sealed partial class MainWindow
                                     item.File
                                 );
                                 var entries = await Task.Run(() =>
-                                    ModTranslation.ReadLang(modPath, source)
+                                    ModTranslation.ReadLanguages(modPath, source)
                                 );
-                                if (entries == null || entries.Count == 0)
+                                if (!entries.Values.Any(values => values.Count != 0))
                                 {
                                     await ConfirmPop(
                                         anchor,
@@ -496,31 +496,16 @@ public sealed partial class MainWindow
                                     );
                                     return;
                                 }
-                                var modId =
-                                    ContentManager.ModIds(modPath).FirstOrDefault()
-                                    ?? Path.GetFileNameWithoutExtension(item.File.Replace(".disabled", ""));
+                                if (!await ConfirmModTranslationNotice(!isLocalRuleTarget))
+                                    return;
                                 await Run(
                                     async ct =>
                                     {
                                         Report("Translating mod…");
-                                        var translated = await ModTranslation.TranslateBatchAsync(
-                                            core.Http,
-                                            entries,
-                                            source,
-                                            target,
-                                            ct
+                                        await ModTranslation.TranslateMod(
+                                            core.Http, gameDir, store.StorageDirectory(instance),
+                                            instance.GameVersion, modPath, entries, source, target, ct
                                         );
-                                        ct.ThrowIfCancellationRequested();
-                                        var targetPath = ModTranslation.WriteResourcePack(
-                                            gameDir,
-                                            modPath,
-                                            modId,
-                                            translated,
-                                            source,
-                                            target
-                                        );
-                                        if (targetPath != null)
-                                            await store.Save();
                                     },
                                     name: "Mod translation"
                                 );
@@ -594,6 +579,52 @@ public sealed partial class MainWindow
                 if (version == renderVersion)
                     loading.Text = Ui("Could not load content: ") + ex.Message;
             }
+        }
+    }
+
+    async Task<bool> ConfirmModTranslationNotice(bool sendsText)
+    {
+        var body = new StackPanel { Spacing = 10, Children = { Text(ModTranslation.CopyrightNotice) } };
+        if (sendsText)
+            body.Children.Add(Text(ModTranslation.TranslationServiceNotice));
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            RequestedTheme = lightTheme ? ElementTheme.Light : ElementTheme.Dark,
+            Title = Ui(ModTranslation.NoticeTitle),
+            Content = body,
+            PrimaryButtonText = UiFormat("I understand ({0}s)", ModTranslation.NoticeSeconds),
+            CloseButtonText = Ui("Cancel"),
+            IsPrimaryButtonEnabled = false,
+            DefaultButton = ContentDialogButton.None,
+        };
+        var clock = new Stopwatch();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        dialog.Opened += (_, _) =>
+        {
+            clock.Start();
+            timer.Start();
+        };
+        timer.Tick += (_, _) =>
+        {
+            var remaining = ModTranslation.NoticeSeconds - (int)clock.Elapsed.TotalSeconds;
+            dialog.IsPrimaryButtonEnabled = remaining <= 0;
+            dialog.PrimaryButtonText = remaining <= 0
+                ? Ui("I understand")
+                : UiFormat("I understand ({0}s)", remaining);
+            if (remaining <= 0)
+                timer.Stop();
+        };
+        dialog.PrimaryButtonClick += (_, eventArgs) =>
+            eventArgs.Cancel = clock.Elapsed.TotalSeconds < ModTranslation.NoticeSeconds;
+        try
+        {
+            return await dialog.ShowAsync() == ContentDialogResult.Primary
+                && clock.Elapsed.TotalSeconds >= ModTranslation.NoticeSeconds;
+        }
+        finally
+        {
+            timer.Stop();
         }
     }
 }
