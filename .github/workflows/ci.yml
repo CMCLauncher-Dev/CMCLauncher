@@ -125,7 +125,7 @@ jobs:
           path: .artifacts/avalonia-ui/
 
   linux-packages:
-    name: Linux DEB, RPM and AppImage
+    name: Linux DEB, RPM, Arch and AppImage
     needs: avalonia
     runs-on: ubuntu-22.04
     timeout-minutes: 25
@@ -143,7 +143,7 @@ jobs:
           skip-decompress: true
       - name: Install packaging tools
         run: |
-          sudo env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT="${{ runner.environment }}" sh scripts/ci-apt-install.sh fonts-noto-cjk fonts-noto-core rpm desktop-file-utils squashfs-tools libicu70 libssl3 libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6 xvfb xauth
+          sudo env GITHUB_ACTIONS=true RUNNER_ENVIRONMENT="${{ runner.environment }}" sh scripts/ci-apt-install.sh fonts-noto-cjk fonts-noto-core rpm libarchive-tools desktop-file-utils squashfs-tools libicu70 libssl3 libfontconfig1 libx11-6 libxrandr2 libxi6 libxcursor1 libxrender1 libice6 libsm6 xvfb xauth
       - name: Extract verified publish directory
         run: |
           mkdir -p .artifacts/linux-publish
@@ -184,6 +184,11 @@ jobs:
           include-hidden-files: true
           archive: false
           if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          path: .artifacts/linux-packages/CMCLauncher-Avalonia-linux-x64.pkg.tar.zst
+          archive: false
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -221,6 +226,9 @@ jobs:
           - distro: rocky-9
             image: rockylinux:9
             family: rpm
+          - distro: archlinux
+            image: archlinux:base
+            family: pkg.tar.zst
     steps:
       - name: Install test prerequisites
         shell: bash
@@ -231,6 +239,8 @@ jobs:
           if [ "$PACKAGE_FAMILY" = deb ]; then
             apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=2 -o APT::Update::Error-Mode=any update
             apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=2 install -y libstdc++6 ca-certificates xvfb xauth
+          elif [ "$PACKAGE_FAMILY" = pkg.tar.zst ]; then
+            pacman -Syu --noconfirm --needed ca-certificates xorg-server-xvfb xorg-xauth tar gzip
           else
             dnf install -y libstdc++ ca-certificates xorg-x11-server-Xvfb xorg-x11-xauth tar gzip
           fi
@@ -247,6 +257,9 @@ jobs:
         run: |
           if [ "$PACKAGE_FAMILY" = deb ]; then
             apt-get -o Acquire::ForceIPv4=true -o Acquire::Retries=2 install -y "$PWD/packages/CMCLauncher-Avalonia-linux-x64.deb"
+          elif [ "$PACKAGE_FAMILY" = pkg.tar.zst ]; then
+            pacman -Qip "$PWD/packages/CMCLauncher-Avalonia-linux-x64.pkg.tar.zst"
+            pacman -U --noconfirm "$PWD/packages/CMCLauncher-Avalonia-linux-x64.pkg.tar.zst"
           else
             dnf install -y "$PWD/packages/CMCLauncher-Avalonia-linux-x64.rpm"
           fi
@@ -274,6 +287,8 @@ jobs:
         run: |
           if [ "$PACKAGE_FAMILY" = deb ]; then
             apt-get remove -y cmclauncher
+          elif [ "$PACKAGE_FAMILY" = pkg.tar.zst ]; then
+            pacman -R --noconfirm cmclauncher
           else
             dnf remove -y cmclauncher
           fi

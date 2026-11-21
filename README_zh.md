@@ -36,6 +36,8 @@
 | Linux | Avalonia | ⚠️实验性 | 实验性更新，直到稳定 | Debian 系、Arch 系、Red Hat 系发行版，x64 |
 | macOS | Avalonia | ⚠️早期阶段，**缺乏测试** | 低优先级维护 | Intel（x64）、Apple M 系列（ARM64） |
 
+Arch Linux x86_64 可用 `sudo pacman -U ./CMCLauncher-Avalonia-*-linux-x64.pkg.tar.zst` 安装对应发行包。
+
 Linux 和 macOS 构建供测试使用。macOS 构建 **尚未签名或公证**。测试前请备份实例。
 
 平台要求与已知限制请参阅 [Linux 打包说明](docs/LINUX_PACKAGES.md)和 [Avalonia 前端说明](CMCLauncher.Avalonia/README.md)。

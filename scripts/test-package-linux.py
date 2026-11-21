@@ -32,6 +32,7 @@ class LinuxPackageTests(unittest.TestCase):
             with patch.object(packaging, "run", side_effect=command):
                 packaging.deb(publish, root, output, "1.2.3-beta.2")
                 packaging.rpm(publish, root, output, "1.2.3-beta.2")
+                packaging.arch(publish, root, output, "1.2.3-beta.2")
             control = (root / "deb/DEBIAN/control").read_text()
             self.assertIn("Version: 1.2.3~beta.2", control)
             self.assertIn("Architecture: amd64", control)
@@ -40,7 +41,11 @@ class LinuxPackageTests(unittest.TestCase):
             self.assertIn("Version: 1.2.3", rpm)
             self.assertIn("Release: 0.beta.2", rpm)
             self.assertIn("AutoReqProv: no", rpm)
-            for name in ("deb", "rpm-root"):
+            arch = (root / "arch-root/.PKGINFO").read_text()
+            self.assertIn("pkgver = 1.2.3beta.2-1", arch)
+            self.assertIn("arch = x86_64", arch)
+            self.assertIn("depend = openssl-3", arch)
+            for name in ("deb", "rpm-root", "arch-root"):
                 tree = root / name
                 self.assertEqual((tree / "opt/cmclauncher/cmclauncher-distribution").read_text(), "package\n")
                 launcher = tree / "usr/bin/cmclauncher"

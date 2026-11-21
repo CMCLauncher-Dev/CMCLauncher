@@ -36,6 +36,8 @@ Minecraft Java Edition 向けの Windows ネイティブランチャーです。
 | Linux | Avalonia | ⚠️ 実験段階 | 安定するまで実験的な更新を継続 | Debian 系、Arch 系、Red Hat 系ディストリビューション、x64 |
 | macOS | Avalonia | ⚠️ 開発初期段階。**テスト不足** | 保守の優先度は低め | Intel（x64）、Apple M シリーズ（ARM64） |
 
+Arch Linux x86_64 では、対応するリリースパッケージを `sudo pacman -U ./CMCLauncher-Avalonia-*-linux-x64.pkg.tar.zst` でインストールできます。
+
 Linux と macOS のビルドはテスト用です。macOS ビルドは **署名・公証されていません**。テスト前にインスタンスをバックアップしてください。
 
 動作要件と既知の制限については、[Linux パッケージガイド](docs/LINUX_PACKAGES.md)と [Avalonia フロントエンドの説明](CMCLauncher.Avalonia/README.md)を参照してください。

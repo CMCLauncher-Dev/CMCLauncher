@@ -16,13 +16,14 @@ static class ThemeCatalogTests
             catalog.Presets.Count == 8
                 && catalog.Presets[0].Id == "craft"
                 && catalog.Presets[0].IsBuiltIn,
-            "Only Fresh green is embedded when external files are absent"
+            "Eight built-in themes are available when external files are absent"
         );
         Check(
             catalog.Resolve("craft", "LightBg", true, "#000000") == "#F6F8F7"
                 && catalog.Resolve("craft", "DarkBg", false, "#000000") == "#1B1C1B",
             "Embedded JSON preserves the existing light and dark palettes"
         );
+        var builtInIds = catalog.Presets.Select(preset => preset.Id).ToHashSet(StringComparer.Ordinal);
         Directory.CreateDirectory(root);
         var external = Path.Combine(root, "ocean.json");
         await File.WriteAllTextAsync(
@@ -80,9 +81,9 @@ static class ThemeCatalogTests
         );
         catalog.Reload();
         Check(
-            catalog.Presets.All(p => p.Id == "craft")
+            builtInIds.SetEquals(catalog.Presets.Select(preset => preset.Id))
                 && catalog.Resolve("native", "LightBg", true, "#010203") == "#010203",
-            "JSON cannot replace CMCLauncher.Platform/Windows/custom presets or use mismatched IDs"
+            "JSON cannot register reserved native/custom IDs or a mismatched file ID"
         );
         await File.WriteAllTextAsync(
             external,

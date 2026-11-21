@@ -36,6 +36,8 @@ English, Simplified Chinese, Japanese, Russian, French, Spanish and Arabic inter
 | Linux | Avalonia | ⚠️ Experimental | Experimental updates until stable | Debian-based, Arch-based and Red Hat-based distributions, x64 |
 | macOS | Avalonia | ⚠️ Early stage; **insufficient testing** | Low-priority maintenance | Intel (x64) and Apple M-series (ARM64) |
 
+On Arch Linux x86_64, install the release package with `sudo pacman -U ./CMCLauncher-Avalonia-*-linux-x64.pkg.tar.zst`.
+
 Linux and macOS builds are for testing. macOS builds are **not signed or notarized**. Back up your instances before testing.
 
 See the [Linux package guide](docs/LINUX_PACKAGES.md) and [Avalonia frontend notes](CMCLauncher.Avalonia/README.md) for platform requirements and known limitations.

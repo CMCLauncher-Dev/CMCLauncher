@@ -1,4 +1,4 @@
-"""Build DEB, RPM and AppImage distributions from a verified linux-x64 publish."""
+"""Build DEB, RPM, Arch and AppImage distributions from a verified linux-x64 publish."""
 
 import argparse
 import hashlib
@@ -116,6 +116,38 @@ cp -a {root}/. %{{buildroot}}/
     run("rpm", "-qip", path)
 
 
+def arch(publish, work, output, version):
+    root = work / "arch-root"
+    native_tree(publish, root)
+    size = sum(file.stat().st_size for file in root.rglob("*") if file.is_file())
+    base, _, prerelease = version.partition("-")
+    pkgver = base + prerelease.replace("-", ".")
+    dependencies = (
+        "glibc", "gcc-libs", "zlib", "icu", "openssl-3", "ca-certificates", "fontconfig",
+        "libx11", "libxrandr", "libxi", "libxcursor", "libxrender", "libice", "libsm",
+    )
+    write(root / ".PKGINFO", f"""pkgname = cmclauncher
+pkgbase = cmclauncher
+pkgver = {pkgver}-1
+pkgdesc = Minecraft launcher
+url = https://github.com/CMCLauncher-Dev/CMCLauncher
+builddate = {int(os.environ.get("SOURCE_DATE_EPOCH", "0"))}
+packager = CMCLauncher Development
+size = {size}
+arch = x86_64
+license = AGPL-3.0-only
+""" + "".join(f"depend = {name}\n" for name in dependencies)
+        + "optdepend = libsecret: desktop keyring\n"
+        + "optdepend = noto-fonts-cjk: CJK interface fonts\n")
+    ownership = ("--uid", "0", "--gid", "0", "--uname", "root", "--gname", "root")
+    files = (".PKGINFO", "opt", "usr")
+    run("bsdtar", "-czf", root / ".MTREE", "--format=mtree",
+        "--options=mtree:!all,mtree:type,mtree:uid,mtree:gid,mtree:mode,mtree:time,mtree:size,mtree:sha256,mtree:link",
+        *ownership, "-C", root, *files)
+    path = output / "CMCLauncher-Avalonia-linux-x64.pkg.tar.zst"
+    run("bsdtar", "--zstd", "-cf", path, *ownership, "-C", root, ".PKGINFO", ".MTREE", "opt", "usr")
+
+
 def bundle_libraries(appdir):
     """Resolve native dependencies on the Ubuntu 22.04 builder; never bundle glibc."""
     library_root = appdir / "usr/lib"
@@ -214,4 +246,5 @@ if __name__ == "__main__":
         run(os.sys.executable, REPO / "scripts/package-desktop.py", "--publish", publish, "--output", work / "validated.tar.gz", "--rid", "linux-x64")
         deb(publish, work, output, args.version)
         rpm(publish, work, output, args.version)
+        arch(publish, work, output, args.version)
         appimage(publish, work, output)
