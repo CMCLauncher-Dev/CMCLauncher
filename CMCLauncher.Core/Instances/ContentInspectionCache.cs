@@ -183,7 +183,7 @@ public static class ContentInspectionCache
             128 * 1024,
             FileOptions.Asynchronous | FileOptions.SequentialScan
         );
-        var hash = Convert.ToHexString(await SHA256.HashDataAsync(stream)).ToLowerInvariant();
+        var hash = Convert.ToHexString(await StreamHash.ComputeAsync(SHA256.Create(), stream)).ToLowerInvariant();
         Fingerprints[file] = (length, modified, hash);
         Tighten();
         return hash;

@@ -145,7 +145,8 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         string? stage = null;
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
+            if (disposed)
+                throw new ObjectDisposedException(GetType().FullName);
             if (Connected)
                 throw new IOException("Stop Terracotta before updating it.");
             var release = ParseRelease(
@@ -189,16 +190,18 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
                 using var input = File.OpenRead(file);
                 hashes.Add(
                     folder + "/" + Path.GetRelativePath(files, file).Replace('\\', '/'),
-                    Convert.ToHexString(await SHA256.HashDataAsync(input, ct))
+                    Convert.ToHexString(await StreamHash.ComputeAsync(SHA256.Create(), input, ct))
                 );
             }
             var relativeExe =
                 folder + "/" + Path.GetRelativePath(files, executable).Replace('\\', '/');
+#if NET7_0_OR_GREATER
             if (!OperatingSystem.IsWindows())
                 File.SetUnixFileMode(
                     executable,
                     UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
                 );
+#endif
             ct.ThrowIfCancellationRequested();
             var destination = Store.SafePath(Root, folder);
             Directory.Move(files, destination);
@@ -234,7 +237,8 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         await operations.WaitAsync(ct);
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
+            if (disposed)
+                throw new ObjectDisposedException(GetType().FullName);
             if (Connected)
                 throw new IOException("Stop Terracotta before removing the component.");
             if (!Directory.Exists(Root))
@@ -280,7 +284,7 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
             using var input = File.OpenRead(Store.SafePath(Root, relative));
             if (
                 !Convert
-                    .ToHexString(await SHA256.HashDataAsync(input, ct))
+                    .ToHexString(await StreamHash.ComputeAsync(SHA256.Create(), input, ct))
                     .Equals(hash, StringComparison.OrdinalIgnoreCase)
             )
                 throw new IOException(
@@ -315,7 +319,8 @@ public sealed class TerracottaManager(Store store, LauncherCore core) : IDisposa
         string? session = null;
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
+            if (disposed)
+                throw new ObjectDisposedException(GetType().FullName);
             if (Connected)
                 return;
             var installation = await Verify(ct);

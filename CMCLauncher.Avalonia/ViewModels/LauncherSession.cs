@@ -193,7 +193,11 @@ public sealed class LauncherSession : ObservableState, IDisposable
         });
     }
 
-    public async Task<bool> Run(string name, Func<CancellationToken, Task> operation)
+    public async Task<bool> Run(
+        string name,
+        Func<CancellationToken, Task> operation,
+        bool showSuccessToast = true
+    )
     {
         if (Busy)
             throw new InvalidOperationException(Ui("A task is already running."));
@@ -213,10 +217,11 @@ public sealed class LauncherSession : ObservableState, IDisposable
             item.State = Ui("Success");
             item.Stage = item.State;
             item.Progress = 100;
-            Toast = item.Title + " · " + item.State;
+            if (showSuccessToast)
+                Toast = item.Title + " · " + item.State;
             return true;
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (cancellation.IsCancellationRequested || ex is MemoryOptimizationDeclinedException)
         {
             item.State = Ui("Cancelled");
             item.Stage = item.State;

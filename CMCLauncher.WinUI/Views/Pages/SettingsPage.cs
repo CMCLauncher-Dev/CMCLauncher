@@ -710,7 +710,26 @@ public sealed class SettingsPage : CMCPage
             ),
             gamePriority
         );
-        Section("Memory and Java", automaticMemory, memoryPanel, customJvmArgs, jvmHint);
+        var memoryControls = new List<UIElement> { automaticMemory, memoryPanel };
+        var platform = LauncherPlatform.Current;
+        if (platform.SupportsMemoryOptimization)
+        {
+            var optimizeMemory = new ToggleSwitch
+            {
+                Header = Ui("Optimize memory before launching"),
+                IsOn = settings.OptimizeMemoryBeforeLaunch,
+            };
+            optimizeMemory.Toggled += async (_, _) =>
+            {
+                settings.OptimizeMemoryBeforeLaunch = optimizeMemory.IsOn;
+                await PersistSettings();
+            };
+            memoryControls.Add(optimizeMemory);
+            memoryControls.Add(Text("Memory optimization may briefly slow down other open apps.", 12));
+        }
+        memoryControls.Add(customJvmArgs);
+        memoryControls.Add(jvmHint);
+        Section("Memory and Java", memoryControls.ToArray());
         Section(
             "Mod translation",
             modTranslate,

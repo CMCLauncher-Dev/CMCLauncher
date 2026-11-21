@@ -94,6 +94,7 @@ public sealed partial class MainWindow
             OnContent = Ui("Automatic [context 467]"),
             OffContent = Ui("Manual"),
         };
+        LocalizeToggle(autoMemory);
         var memoryPanel = Stack(T("Memory / MiB"), memoryLegend, memoryTrack, memory);
         var memoryAnimation = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         var animationClock = new System.Diagnostics.Stopwatch();
@@ -219,6 +220,7 @@ public sealed partial class MainWindow
             OnContent = Ui("context.settingspage.on"),
             OffContent = Ui("Off"),
         };
+        LocalizeToggle(ssl);
         var jvm = Input(settings.CustomJvmArgs, "-Dexample=1 -XX:+UseG1GC");
         var gameLanguage = Choice(
             new[] { "auto", "zh_cn", "zh_tw", "en_us", "ja_jp", "preserve" },
@@ -236,6 +238,7 @@ public sealed partial class MainWindow
             OnContent = Ui("context.settingspage.on"),
             OffContent = Ui("Off"),
         };
+        LocalizeToggle(gpu);
         var maximize = Choice(
             new[] { "Windowed", "Maximized" },
             settings.StartMaximized ? "Maximized" : "Windowed"
@@ -244,16 +247,6 @@ public sealed partial class MainWindow
             new[] { "keep", "close", "hide_close", "hide_reopen", "minimize" },
             settings.LauncherVisibility
         );
-        var checkUpdates = new CheckBox
-        {
-            Content = Ui("Check for updates on startup"),
-            IsChecked = settings.CheckLauncherUpdates,
-        };
-        var beta = new CheckBox
-        {
-            Content = Ui("Receive Beta releases"),
-            IsChecked = settings.ReceiveBetaUpdates,
-        };
         var mirror = Input(settings.DownloadMirror);
         var introduction = new ToggleSwitch
         {
@@ -262,6 +255,7 @@ public sealed partial class MainWindow
             OnContent = Ui("context.settingspage.on"),
             OffContent = Ui("Off"),
         };
+        LocalizeToggle(introduction);
         var modTranslate = new ToggleSwitch
         {
             Content = Ui("Translate installed mods"),
@@ -269,6 +263,7 @@ public sealed partial class MainWindow
             OnContent = Ui("context.settingspage.on"),
             OffContent = Ui("Off"),
         };
+        LocalizeToggle(modTranslate);
         string NetworkSettings() =>
             JsonSerializer.Serialize(
                 new
@@ -354,8 +349,6 @@ public sealed partial class MainWindow
                 settings.PreferHighPerformanceGpu = gpu.IsChecked == true;
                 settings.StartMaximized = maximize.SelectedItem?.ToString() == "Maximized";
                 settings.LauncherVisibility = visibility.SelectedItem?.ToString() ?? "keep";
-                settings.CheckLauncherUpdates = checkUpdates.IsChecked == true;
-                settings.ReceiveBetaUpdates = beta.IsChecked == true;
                 var mirrorValue = (mirror.Text ?? "").Trim().TrimEnd('/');
                 if (
                     mirrorValue.Length == 0
@@ -415,8 +408,6 @@ public sealed partial class MainWindow
             {
                 autoMemory,
                 gpu,
-                checkUpdates,
-                beta,
                 introduction,
             }
         )
@@ -506,6 +497,25 @@ public sealed partial class MainWindow
         );
         Control Section(string title, params Control[] controls) =>
             Card(Stack(new[] { T(title, 18, true) }.Cast<Control>().Concat(controls).ToArray()));
+        var memoryControls = new List<Control> { autoMemory, memoryPanel };
+        var platform = LauncherPlatform.Current;
+        if (platform.SupportsMemoryOptimization)
+        {
+            var optimizeMemory = new ToggleSwitch
+            {
+                Content = Ui("Optimize memory before launching"),
+                IsChecked = settings.OptimizeMemoryBeforeLaunch,
+            };
+            LocalizeToggle(optimizeMemory);
+            optimizeMemory.IsCheckedChanged += async (_, _) =>
+            {
+                settings.OptimizeMemoryBeforeLaunch = optimizeMemory.IsChecked == true;
+                await PersistSettings();
+            };
+            memoryControls.Add(optimizeMemory);
+            memoryControls.Add(T("Memory optimization may briefly slow down other open apps.", 12));
+        }
+        memoryControls.Add(Field("Custom JVM arguments", jvm));
         return Stack(
             Section(
                 "Language and interface",
@@ -521,7 +531,7 @@ public sealed partial class MainWindow
                 gpu,
                 Field("Process priority", priority)
             ),
-            Section("Memory and Java", autoMemory, memoryPanel, Field("Custom JVM arguments", jvm)),
+            Section("Memory and Java", memoryControls.ToArray()),
             Section(
                 "Mod translation",
                 modTranslate,
@@ -561,15 +571,40 @@ public sealed partial class MainWindow
                     ),
                 }
             ),
-            Section(
-                "Launcher updates",
-                checkUpdates,
-                beta,
-                Btn("Check for updates", () => CheckDesktopUpdates(true))
-            ),
+            LauncherUpdateSettings(),
             ThirdPartyApplicationsCard(),
             T(Ui("Current version:") + " " + LauncherUpdates.CurrentVersion, 12)
         );
+    }
+
+    Control LauncherUpdateSettings()
+    {
+        var settings = session.Store.Config.Settings;
+        var checkUpdates = new CheckBox
+        {
+            Content = Ui("Check for updates on startup"),
+            IsChecked = settings.CheckLauncherUpdates,
+        };
+        var beta = new CheckBox
+        {
+            Content = Ui("Receive Beta releases"),
+            IsChecked = settings.ReceiveBetaUpdates,
+        };
+        async Task Save()
+        {
+            settings.CheckLauncherUpdates = checkUpdates.IsChecked == true;
+            settings.ReceiveBetaUpdates = beta.IsChecked == true;
+            try { await session.Save(); }
+            catch (Exception ex) { await Error(ex); }
+        }
+        checkUpdates.IsCheckedChanged += async (_, _) => await Save();
+        beta.IsCheckedChanged += async (_, _) => await Save();
+        return Card(Stack(
+            T("Launcher updates", 18, true),
+            checkUpdates,
+            beta,
+            Btn("Check for updates", () => CheckDesktopUpdates(true))
+        ));
     }
 
     Control ThirdPartyApplicationsCard()
@@ -584,21 +619,29 @@ public sealed partial class MainWindow
     Control AppearancePage()
     {
         var settings = session.Store.Config.Settings;
-        var theme = Choice(new[] { "system", "light", "dark" }, settings.Theme);
+        session.Themes.Reload();
+        var theme = Choice(new[] { "light", "dark", "system" }, settings.Theme);
+        theme.ItemTemplate = new global::Avalonia.Controls.Templates.FuncDataTemplate<string>(
+            (value, _) => T(value == "system" ? "System" : value == "light" ? "Light" : "Dark")
+        );
         var presets = new[]
         {
-            new ThemePreset("native", "WinUI native", true),
-            new ThemePreset("custom", "Custom", false),
+            new ThemePreset("native", "WinUI3 native", true),
         }
             .Concat(session.Themes.Presets)
+            .Append(new ThemePreset("custom", "Custom", false))
             .ToArray();
-        var preset = Choice(presets, presets.FirstOrDefault(p => p.Id == settings.ColorPreset));
+        var preset = Choice(
+            presets, presets.FirstOrDefault(p => p.Id == settings.ColorPreset)
+                ?? presets.FirstOrDefault(p => p.Id == "craft")
+        );
         var showScrollBars = new ToggleSwitch
         {
             Content = Ui("Show scrollbars"),
             Tag = "show-scrollbars",
             IsChecked = settings.ShowScrollBars,
         };
+        LocalizeToggle(showScrollBars);
         showScrollBars.IsCheckedChanged += async (_, _) =>
         {
             settings.ShowScrollBars = showScrollBars.IsChecked == true;
@@ -613,8 +656,6 @@ public sealed partial class MainWindow
         var saved = Choice(settings.CustomAppearancePresets);
         async Task Apply()
         {
-            settings.Theme = theme.SelectedItem?.ToString() ?? "system";
-            settings.ColorPreset = (preset.SelectedItem as ThemePreset)?.Id ?? "craft";
             settings.UiScale = (double)(scale.Value ?? 100) / 100;
             settings.UiButtonScale = (double)(buttons.Value ?? 100) / 100;
             settings.UiMenuScale = (double)(menus.Value ?? 100) / 100;
@@ -624,49 +665,102 @@ public sealed partial class MainWindow
             ApplyTheme();
             await Navigate("appearance");
         }
-        var colors = Stack();
-        foreach (
-            var (label, dictionary) in new[]
-            {
-                ("Light colors", settings.CustomLightColors),
-                ("Dark colors", settings.CustomDarkColors),
-            }
-        )
+        var colorMode = Choice(new[] { "light", "dark" }, Light ? "light" : "dark");
+        var swatches = Stack();
+        var colors = Stack(Field("Edit colors", colorMode), swatches);
+        colors.IsVisible = settings.ColorPreset == "custom";
+        void DrawColors()
         {
-            var panel = Stack();
-            foreach (
-                var key in new[]
-                {
-                    "background",
-                    "sidebar",
-                    "surface",
-                    "text",
-                    "muted",
-                    "border",
-                    "accent",
-                }
-            )
+            swatches.Children.Clear();
+            var dictionary = colorMode.SelectedIndex == 0
+                ? settings.CustomLightColors
+                : settings.CustomDarkColors;
+            var light = colorMode.SelectedIndex == 0;
+            foreach (var (key, label, lightDefault, darkDefault) in new[]
             {
-                var input = Input(dictionary.GetValueOrDefault(key, ""), "#RRGGBB");
-                panel.Children.Add(Field(key, input));
-                input.LostFocus += (_, _) =>
+                ("background", "Background", "#F6F7F9", "#17191F"),
+                ("sidebar", "Sidebar", "#EEF0F4", "#1C1D25"),
+                ("surface", "Surface", "#FFFFFF", "#242730"),
+                ("text", "Text", "#202124", "#F0F0F0"),
+                ("muted", "Secondary text", "#555866", "#B7B9C2"),
+                ("border", "Border", "#E6E8F0", "#3A3B4B"),
+                ("accent", "Accent", "#416D37", "#536DBD"),
+            })
+            {
+                var fallback = light ? lightDefault : darkDefault;
+                var swatch = new global::Avalonia.Controls.Border
                 {
-                    if (global::Avalonia.Media.Color.TryParse(input.Text, out _))
-                        dictionary[key] = input.Text!;
-                    else if (string.IsNullOrWhiteSpace(input.Text))
-                        dictionary.Remove(key);
+                    Width = 30,
+                    Height = 16,
+                    CornerRadius = new global::Avalonia.CornerRadius(2),
                 };
+                global::Avalonia.Media.Color SelectedColor() =>
+                    global::Avalonia.Media.Color.TryParse(dictionary.GetValueOrDefault(key), out var color)
+                        ? color
+                        : global::Avalonia.Media.Color.Parse(fallback);
+                swatch.Background = new global::Avalonia.Media.SolidColorBrush(SelectedColor());
+                var button = Btn(label, async () =>
+                {
+                    var picker = new ColorView
+                    {
+                        Color = SelectedColor(),
+                        IsAlphaEnabled = false,
+                    };
+                    if (!await Dialog(label, picker, true))
+                        return;
+                    var color = picker.Color;
+                    dictionary[key] = $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+                    swatch.Background = new global::Avalonia.Media.SolidColorBrush(color);
+                    await SavePalette();
+                });
+                button.Content = swatch;
+                button.MinWidth = 44;
+                button.MinHeight = 28;
+                button.Padding = new global::Avalonia.Thickness(4);
+                ToolTip.SetTip(button, Ui(label));
+                global::Avalonia.Automation.AutomationProperties.SetName(button, Ui(label));
+                var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+                var caption = T(label);
+                caption.VerticalAlignment = VerticalAlignment.Center;
+                row.Children.Add(caption);
+                Grid.SetColumn(button, 1);
+                row.Children.Add(button);
+                swatches.Children.Add(row);
             }
-            colors.Children.Add(new Expander { Header = Ui(label), Content = panel });
         }
+        async Task SavePalette()
+        {
+            ApplyTheme();
+            try { await session.Save(); }
+            catch (Exception ex) { await Error(ex); }
+        }
+        DrawColors();
+        colorMode.SelectionChanged += (_, _) => DrawColors();
+        theme.SelectionChanged += async (_, _) =>
+        {
+            if (theme.SelectedItem is string value)
+            {
+                settings.Theme = value;
+                await SavePalette();
+            }
+        };
+        preset.SelectionChanged += async (_, _) =>
+        {
+            if (preset.SelectedItem is ThemePreset value)
+            {
+                settings.ColorPreset = value.Id;
+                colors.IsVisible = value.Id == "custom";
+                await SavePalette();
+            }
+        };
         return Stack(
             Card(Stack(Field("Appearance", theme), Field("Preset", preset), colors)),
             Card(
                 Stack(
                     showScrollBars,
-                    Field("UI scale / %", scale),
-                    Field("Button scale / %", buttons),
-                    Field("Menu scale / %", menus),
+                    Field("Control size / %", scale),
+                    Field("Button size / %", buttons),
+                    Field("Menu size / %", menus),
                     Field("Font family", font),
                     Field("Font size", fontSize),
                     Btn("Apply", Apply, true)
@@ -1106,6 +1200,7 @@ public sealed partial class MainWindow
             VerticalAlignment = VerticalAlignment.Center,
             Tag = "debug-logging",
         };
+        LocalizeToggle(debug);
         ToolTip.SetTip(debug, Ui("DEBUG mode"));
         global::Avalonia.Automation.AutomationProperties.SetName(debug, Ui("DEBUG mode"));
         debug.IsCheckedChanged += async (_, _) =>

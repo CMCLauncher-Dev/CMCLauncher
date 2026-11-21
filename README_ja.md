@@ -33,8 +33,11 @@ Minecraft Java Edition 向けの Windows ネイティブランチャーです。
 | プラットフォーム | UI | 互換性 | 更新・保守状況 | 対応システム / ハードウェア |
 | --- | --- | --- | --- | --- |
 | Windows | WinUI 3 | ✅ 対応 | 継続的に保守 | Windows 10（2004 以降）/ 11、x64 |
+| Windows 8.1 | Avalonia | ⚠️ 実験的 | 互換ビルド | x64 |
 | Linux | Avalonia | ⚠️ 実験段階 | 安定するまで実験的な更新を継続 | Debian 系、Arch 系、Red Hat 系ディストリビューション、x64 |
 | macOS | Avalonia | ⚠️ 開発初期段階。**テスト不足** | 保守の優先度は低め | Intel（x64）、Apple M シリーズ（ARM64） |
+
+Windows 8.1 では `CMCLauncher-Avalonia-*-win-x64.zip` をすべて展開し、`CMCLauncher.Avalonia.exe` を起動してください。サポートが終了した .NET 6 を同梱しており、Windows 8.1 上での動作は未検証です。
 
 Arch Linux x86_64 では、対応するリリースパッケージを `sudo pacman -U ./CMCLauncher-Avalonia-*-linux-x64.pkg.tar.zst` でインストールできます。
 

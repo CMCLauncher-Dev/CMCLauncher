@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
         OpenPaneLength = 440,
     };
     readonly StackPanel navigation = new() { Spacing = 3 };
+    readonly Grid pageHeader = new() { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
     readonly TextBlock pageTitle = new() { FontSize = 26, FontWeight = FontWeight.SemiBold };
     readonly Border toast = new()
     {
@@ -159,7 +160,8 @@ public sealed partial class MainWindow : Window
             RowDefinitions = new RowDefinitions("Auto,*,Auto"),
             Margin = new Thickness(28, 22),
         };
-        body.Children.Add(pageTitle);
+        pageHeader.Children.Add(pageTitle);
+        body.Children.Add(pageHeader);
         var scroll = new ScrollViewer
         {
             Content = pageContent,
@@ -392,6 +394,14 @@ public sealed partial class MainWindow : Window
         route = target;
         session.Terracotta.Active = target == "terracotta";
         SyncNavigation(expandForRoute: true);
+        if (pageHeader.Children.Count > 1)
+            pageHeader.Children.RemoveAt(1);
+        if (target == "home")
+        {
+            var customize = HomeCustomizeAction();
+            Grid.SetColumn(customize, 1);
+            pageHeader.Children.Add(customize);
+        }
         pageTitle.Text = Ui(
             target switch
             {
@@ -399,8 +409,8 @@ public sealed partial class MainWindow : Window
                 "instances" => "Instances",
                 "downloads" => "Download game",
                 "blueprints" => "Blueprints",
-                "settings" => "Settings",
-                "appearance" => "Appearance",
+                "settings" => "Launcher settings",
+                "appearance" => "Personalization",
                 "java" => "Java",
                 "accounts" => "Accounts",
                 "logs" => "Runtime logs",
@@ -626,6 +636,12 @@ public sealed partial class MainWindow : Window
         return Stack(label, input);
     }
 
+    void LocalizeToggle(ToggleSwitch toggle)
+    {
+        toggle.OnContent = Ui("Enabled");
+        toggle.OffContent = Ui("Off");
+    }
+
     ComboBox Choice<T>(IEnumerable<T> values, T? selected = default)
     {
         var combo = new ComboBox
@@ -638,7 +654,7 @@ public sealed partial class MainWindow : Window
                     this.T(
                         value switch
                         {
-                            ThemePreset theme => theme.DisplayName,
+                            ThemePreset theme => Ui(theme.DisplayName),
                             CustomAppearancePreset preset => preset.Name,
                             CommunityCategory category => category.DisplayName ?? category.Name,
                             JavaInstallation java => java.Version + " · " + java.Vendor,

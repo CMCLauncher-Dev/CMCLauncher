@@ -17,9 +17,30 @@ public class LauncherPlatform : CMCLauncher.Platform.PlatformEnvironment
             );
     }
 
+    public virtual bool SupportsMemoryOptimization => false;
+
+    public virtual MemoryOptimizationResult OptimizeMemory(CancellationToken ct) => default;
+
     // 把 GPU 偏好设置应用到指定可执行文件（默认空实现，由平台宿主覆盖）。
     public virtual Task ApplyGpuPreference(Store store, string executable) => Task.CompletedTask;
 
     // 恢复所有 GPU 偏好设置（默认空实现，由平台宿主覆盖）。
     public virtual Task RestoreGpuPreferences(Store store) => Task.CompletedTask;
+}
+
+public readonly record struct MemoryOptimizationResult(
+    int SystemOperationsCompleted,
+    long? AvailableBeforeMb,
+    long? AvailableAfterMb,
+    string? CompletedOperations = null
+)
+{
+    public long? AvailableGainMb => AvailableBeforeMb is long before && AvailableAfterMb is long after
+        ? Math.Max(0, after - before)
+        : null;
+}
+
+public sealed class MemoryOptimizationDeclinedException : OperationCanceledException
+{
+    public MemoryOptimizationDeclinedException() : base("Administrator permission was declined.") { }
 }

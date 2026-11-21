@@ -25,6 +25,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: windows-latest
+            rid: win-x64
           - os: ubuntu-22.04
             rid: linux-x64
           - os: macos-latest
@@ -73,10 +75,17 @@ jobs:
             if ($Matches['channel'] -in @('beta', 'alpha')) { $version += '-' + $Matches['channel'] + $Matches['revision'] }
             $versionArguments = @("-p:Version=$version", "-p:InformationalVersion=$version")
           }
+          if ($IsWindows) { $versionArguments += '-p:Windows81=true' }
           dotnet publish CMCLauncher.Avalonia/CMCLauncher.Avalonia.csproj -c Release -r ${{ matrix.rid }} --self-contained true -o .artifacts/avalonia-publish -p:CurseForgeConfigurationFile="$env:RUNNER_TEMP/curseforge-api.json" "-p:MicrosoftClientConfigurationFile=$env:RUNNER_TEMP/microsoft-client.json" @versionArguments
       - name: Verify macOS runtime activation
         if: runner.os == 'macOS'
         run: .artifacts/avalonia-publish/CMCLauncher.Avalonia --verify-platform-runtime '${{ matrix.rid }}'
+      - name: Verify Windows compatibility runtime activation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath .artifacts/avalonia-publish/CMCLauncher.Avalonia.exe -ArgumentList '--verify-platform-runtime win-x64' -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Runtime activation failed ($($process.ExitCode))" }
       - name: Remove temporary desktop credentials
         if: always()
         shell: pwsh
@@ -104,7 +113,8 @@ jobs:
         shell: pwsh
         run: |
           $rid = '${{ matrix.rid }}'
-          $package = ".artifacts/CMCLauncher-Avalonia-$rid.tar.gz"
+          $extension = if ($IsWindows) { "zip" } else { "tar.gz" }
+          $package = ".artifacts/CMCLauncher-Avalonia-$rid.$extension"
           python scripts/package-desktop.py --publish .artifacts/avalonia-publish --output $package --rid $rid
           if ($LASTEXITCODE) { throw 'Packaging failed' }
           "path=$package" >> $env:GITHUB_OUTPUT

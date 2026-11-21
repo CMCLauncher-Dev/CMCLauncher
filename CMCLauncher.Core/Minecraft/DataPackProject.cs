@@ -241,7 +241,9 @@ public static partial class DataPackGenerator
     )
     {
         var files = Preview(options);
-        ArgumentException.ThrowIfNullOrWhiteSpace(parentDirectory);
+        ArgumentNullException.ThrowIfNull(parentDirectory);
+        if (string.IsNullOrWhiteSpace(parentDirectory))
+            throw new ArgumentException("Value cannot be empty or whitespace.", nameof(parentDirectory));
         cancellationToken.ThrowIfCancellationRequested();
         var parent = Path.GetFullPath(parentDirectory);
         var destination = Path.Combine(parent, options.Name);
@@ -278,7 +280,9 @@ public static partial class DataPackGenerator
     )
     {
         var files = Preview(options);
-        ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+        ArgumentNullException.ThrowIfNull(destination);
+        if (string.IsNullOrWhiteSpace(destination))
+            throw new ArgumentException("Value cannot be empty or whitespace.", nameof(destination));
         if (
             !string.Equals(
                 Path.GetExtension(destination),

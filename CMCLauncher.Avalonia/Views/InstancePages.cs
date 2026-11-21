@@ -472,17 +472,34 @@ public sealed partial class MainWindow
                 )
             )
         );
-        body.Children.Add(
-            Card(
-                Stack(
-                    T("Version management", 16, true),
-                    Row(
-                        Btn("Export modpack", () => ExportPackPage(instance)),
-                        DangerButton("Delete version", () => DeleteInstance(instance))
-                    )
-                )
-            )
-        );
+        var management = Stack(T("Version management", 16, true));
+        if (LauncherPlatform.Current.SupportsMemoryOptimization)
+        {
+            var options = new[] { "Follow launcher settings", "context.settingspage.on", "Off" };
+            var memoryOptimization = Choice(
+                options,
+                options[instance.OptimizeMemoryBeforeLaunch switch { true => 1, false => 2, _ => 0 }]
+            );
+            memoryOptimization.SelectionChanged += async (_, _) =>
+            {
+                if (memoryOptimization.SelectedIndex < 0)
+                    return;
+                instance.OptimizeMemoryBeforeLaunch = memoryOptimization.SelectedIndex switch
+                {
+                    1 => true,
+                    2 => false,
+                    _ => null,
+                };
+                try { await session.Save(); }
+                catch (Exception ex) { await Error(ex); }
+            };
+            management.Children.Add(Field("Optimize memory before launching", memoryOptimization));
+        }
+        management.Children.Add(Row(
+            Btn("Export modpack", () => ExportPackPage(instance)),
+            DangerButton("Delete version", () => DeleteInstance(instance))
+        ));
+        body.Children.Add(Card(management));
         body.Children.Add(OptionsBackupCard(instance));
         var savedServers = Stack(T("Saved servers", 16, true));
         savedServers.Children.Add(Btn("Show servers", async () =>

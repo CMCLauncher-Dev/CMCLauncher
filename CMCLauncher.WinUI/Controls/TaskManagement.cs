@@ -285,7 +285,11 @@ public sealed partial class MainWindow
     }
 
     // 窗口一次只运行一个受管任务，统一负责取消、按钮禁用和历史记录。
-    internal async Task Run(Func<CancellationToken, Task> operation, string? name = null)
+    internal async Task Run(
+        Func<CancellationToken, Task> operation,
+        string? name = null,
+        bool showSuccessToast = true
+    )
     {
         if (task != null)
             throw new Exception("已有任务进行中，请稍候或取消当前任务");
@@ -340,16 +344,19 @@ public sealed partial class MainWindow
             RuntimeLog.Debug(
                 $"Task name={work.Name}; state={work.State}; elapsed={work.CompletedElapsed}; bytes={work.Bytes}; stage={work.Stage}; memory={Environment.WorkingSet / 1048576}MB"
             );
-            var outcome =
-                work.State == "已完成" ? Ui("succeeded")
-                : work.State == "已取消" ? Ui("context.taskmanagement.canceled")
-                : Ui("context.taskmanagement.failed");
-            ShowToast(
-                Ui(work.Name) + " " + outcome,
-                work.State == "已完成" ? InfoBarSeverity.Success
-                    : work.State == "已取消" ? InfoBarSeverity.Informational
-                    : InfoBarSeverity.Error
-            );
+            if (showSuccessToast || work.State != "已完成")
+            {
+                var outcome =
+                    work.State == "已完成" ? Ui("succeeded")
+                    : work.State == "已取消" ? Ui("context.taskmanagement.canceled")
+                    : Ui("context.taskmanagement.failed");
+                ShowToast(
+                    Ui(work.Name) + " " + outcome,
+                    work.State == "已完成" ? InfoBarSeverity.Success
+                        : work.State == "已取消" ? InfoBarSeverity.Informational
+                        : InfoBarSeverity.Error
+                );
+            }
             recentWork.Insert(0, work);
             if (recentWork.Count > 12)
                 recentWork.RemoveAt(recentWork.Count - 1);

@@ -67,7 +67,7 @@ public static class ModpackExporter
                 foreach (
                     var child in Directory
                         .EnumerateFileSystemEntries(full)
-                        .Order(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 )
                     Visit(Path.GetRelativePath(root, child).Replace('\\', '/'));
             }

@@ -50,8 +50,10 @@ public sealed partial class LauncherCore
 
     // 判断异常是否为可重试的传输层失败（非业务错误）。
     static bool IsInstallerTransportFailure(Exception ex) =>
-        ex is HttpIOException
-        || ex is IOException { InnerException: System.Net.Sockets.SocketException }
+#if NET8_0_OR_GREATER
+        ex is HttpIOException ||
+#endif
+        ex is IOException { InnerException: System.Net.Sockets.SocketException }
         || ex is HttpRequestException request
             && (
                 request.StatusCode == null

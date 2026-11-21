@@ -1,4 +1,8 @@
+#if NET7_0_OR_GREATER
 using System.Formats.Tar;
+#else
+using ICSharpCode.SharpZipLib.Tar;
+#endif
 using System.IO.Compression;
 
 namespace CMCLauncher;
@@ -65,8 +69,13 @@ public static class RuntimeArchive
         var links = new List<(string Path, string Target)>();
         await using var file = File.OpenRead(archive);
         await using var stream = new GZipStream(file, CompressionMode.Decompress);
+#if NET7_0_OR_GREATER
         using var tar = new TarReader(stream);
         while (await tar.GetNextEntryAsync(false, ct) is { } entry)
+#else
+        using var tar = new TarInputStream(stream, System.Text.Encoding.UTF8);
+        while (await tar.GetNextEntryAsync(ct) is { } entry)
+#endif
         {
             if (++entries > 100000)
                 throw new IOException("Too many runtime archive entries.");
@@ -77,30 +86,47 @@ public static class RuntimeArchive
             if (relative is "" or ".")
                 continue;
             var path = Store.SafePath(destination, relative);
-            if (entry.EntryType == TarEntryType.Directory)
+#if NET7_0_OR_GREATER
+            var isDirectory = entry.EntryType == TarEntryType.Directory;
+            var isSymbolicLink = entry.EntryType == TarEntryType.SymbolicLink;
+            var isRegularFile = entry.EntryType is TarEntryType.RegularFile or TarEntryType.V7RegularFile;
+            var length = entry.Length;
+            var linkName = entry.LinkName;
+            var data = entry.DataStream;
+#else
+            var isDirectory = entry.TarHeader.TypeFlag == TarHeader.LF_DIR;
+            var isSymbolicLink = entry.TarHeader.TypeFlag == TarHeader.LF_SYMLINK;
+            var isRegularFile = entry.TarHeader.TypeFlag is TarHeader.LF_NORMAL or TarHeader.LF_OLDNORM;
+            var length = entry.Size;
+            var linkName = entry.TarHeader.LinkName;
+            Stream data = tar;
+#endif
+            if (isDirectory)
             {
                 Directory.CreateDirectory(path);
                 continue;
             }
             // 符号链接：校验目标仍在 destination 内，记录待最后创建。
-            if (entry.EntryType == TarEntryType.SymbolicLink)
+            if (isSymbolicLink)
             {
                 var target = Path.GetFullPath(
-                    Path.Combine(Path.GetDirectoryName(path)!, entry.LinkName)
+                    Path.Combine(Path.GetDirectoryName(path)!, linkName)
                 );
                 _ = Store.SafePath(destination, Path.GetRelativePath(destination, target));
-                links.Add((path, entry.LinkName));
+                links.Add((path, linkName));
                 continue;
             }
-            if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile))
+            if (!isRegularFile)
                 throw new IOException("Unsupported runtime archive entry.");
-            Count(entry.Length);
+            Count(length);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             await using (var output = new FileStream(path, FileMode.CreateNew))
-                if (entry.DataStream != null)
-                    await entry.DataStream.CopyToAsync(output, ct);
+                if (data != null)
+                    await data.CopyToAsync(output, ct);
+#if NET7_0_OR_GREATER
             if (!OperatingSystem.IsWindows())
                 File.SetUnixFileMode(path, entry.Mode & (UnixFileMode)0x1FF);
+#endif
         }
         // 普通文件全部写入后，再统一创建符号链接。
         foreach (var link in links)

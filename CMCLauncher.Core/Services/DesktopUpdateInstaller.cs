@@ -195,11 +195,13 @@ public static class DesktopUpdateInstaller
                 changed.Add((relative, existed));
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 File.Copy(Store.SafePath(stage, relative), destination, true);
+#if NET7_0_OR_GREATER
                 if (!OperatingSystem.IsWindows())
                     File.SetUnixFileMode(
                         destination,
                         File.GetUnixFileMode(Store.SafePath(stage, relative))
                     );
+#endif
             }
         }
         catch

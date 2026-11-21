@@ -78,7 +78,7 @@ public sealed class CmsBlueprints : IDisposable
                 throw new IOException(
                     "CMS is cooling down after an access limit. Try again later."
                 );
-            var wait = interval() - Stopwatch.GetElapsedTime(lastStart).TotalMilliseconds;
+            var wait = interval() - TimeSpan.FromSeconds((Stopwatch.GetTimestamp() - lastStart) / (double)Stopwatch.Frequency).TotalMilliseconds;
             if (wait > 0)
                 await Task.Delay(TimeSpan.FromMilliseconds(wait), ct);
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);

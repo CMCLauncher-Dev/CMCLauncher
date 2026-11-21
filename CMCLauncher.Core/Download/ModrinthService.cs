@@ -391,7 +391,8 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         CommunitySearchFilters? filters = null
     )
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        if (offset < 0)
+            throw new ArgumentOutOfRangeException(nameof(offset), offset, null);
         if (limit is < 1 or > 100)
             throw new ArgumentOutOfRangeException(nameof(limit));
         ArgumentNullException.ThrowIfNull(query);
@@ -457,7 +458,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
     {
         await using var stream = System.IO.File.OpenRead(file);
         var hash = Convert
-            .ToHexString(await System.Security.Cryptography.SHA512.HashDataAsync(stream, ct))
+            .ToHexString(await StreamHash.ComputeAsync(System.Security.Cryptography.SHA512.Create(), stream, ct))
             .ToLowerInvariant();
         JsonNode current;
         try

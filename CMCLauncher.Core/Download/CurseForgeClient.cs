@@ -158,7 +158,8 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         CancellationToken ct = default
     )
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(projectId);
+        if (projectId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(projectId), projectId, null);
         var project = (
             await GetAsync<DataResponse<CurseForgeProject>>($"mods/{projectId}", ct)
         ).Data;
@@ -175,7 +176,8 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         CancellationToken ct = default
     )
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(projectId);
+        if (projectId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(projectId), projectId, null);
         ValidatePage(index, pageSize);
         return GetAsync<CurseForgePage<CurseForgeFile>>(
             $"mods/{projectId}/files?index={index}&pageSize={pageSize}",
@@ -190,8 +192,10 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         CancellationToken ct = default
     )
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(projectId);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(fileId);
+        if (projectId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(projectId), projectId, null);
+        if (fileId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(fileId), fileId, null);
         var file = (
             await GetAsync<DataResponse<CurseForgeFile>>($"mods/{projectId}/files/{fileId}", ct)
         ).Data;
@@ -213,7 +217,8 @@ public sealed class CurseForgeClient : ICurseForgeClient, IDisposable
         CancellationToken ct = default
     )
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(fileId);
+        if (fileId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(fileId), fileId, null);
         // 每次重新查询作者设置；没有明确许可时保守拒绝，不用旧元数据推断授权。
         var project = await GetProjectAsync(projectId, ct);
         if (!project.IsAvailable || project.AllowModDistribution != true)

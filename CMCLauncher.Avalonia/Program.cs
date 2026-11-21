@@ -15,6 +15,13 @@ internal static class Program
     {
         try
         {
+#if WINDOWS
+            if (WindowsLauncherPlatform.TryRunMemoryOptimizationWorker(args, out var exitCode))
+            {
+                Environment.ExitCode = exitCode;
+                return;
+            }
+#endif
             Run(args);
         }
         catch (Exception ex)
@@ -50,15 +57,22 @@ internal static class Program
 
     static void Run(string[] args)
     {
+#if WINDOWS
+        if (!OperatingSystem.IsWindowsVersionAtLeast(6, 3))
+            throw new PlatformNotSupportedException("This build requires Windows 8.1 or later.");
+        WindowsLauncherPlatform.Initialize();
+#else
         if (OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException(
                 "On Windows, run CMCLauncher.WinUI. Avalonia is the Linux/macOS frontend."
             );
+#endif
         if (DesktopUpdateInstaller.Handle(args))
             return;
         if (CMCLauncher.Platform.GameExitWatchdog.Handle(args))
             return;
         Arguments = args;
+#if !WINDOWS
         if (OperatingSystem.IsMacOS())
             MacOSLauncherPlatform.Initialize();
         else if (OperatingSystem.IsLinux())
@@ -76,6 +90,7 @@ internal static class Program
             }
             LinuxLauncherPlatform.Initialize();
         }
+#endif
         // CI can activate the published self-contained host without opening an AppKit window.
         if (args.Length == 2 && args[0] == "--verify-platform-runtime")
         {
@@ -95,7 +110,16 @@ internal static class Program
 
 public sealed class App : Application
 {
-    public override void Initialize() => Styles.Add(new FluentTheme());
+    public override void Initialize()
+    {
+        Styles.Add(new FluentTheme());
+        Styles.Add(new global::Avalonia.Markup.Xaml.Styling.StyleInclude(
+            new Uri("avares://CMCLauncher.Avalonia/")
+        )
+        {
+            Source = new Uri("avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"),
+        });
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {

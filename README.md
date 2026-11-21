@@ -33,8 +33,11 @@ English, Simplified Chinese, Japanese, Russian, French, Spanish and Arabic inter
 | Platform | Interface | Compatibility | Updates & maintenance | Supported systems / hardware |
 | --- | --- | --- | --- | --- |
 | Windows | WinUI 3 | ✅ Supported | Actively maintained | Windows 10 (2004+) / 11, x64 |
+| Windows 8.1 | Avalonia | ⚠️ Experimental | Compatibility build | x64 |
 | Linux | Avalonia | ⚠️ Experimental | Experimental updates until stable | Debian-based, Arch-based and Red Hat-based distributions, x64 |
 | macOS | Avalonia | ⚠️ Early stage; **insufficient testing** | Low-priority maintenance | Intel (x64) and Apple M-series (ARM64) |
+
+For Windows 8.1, extract the complete `CMCLauncher-Avalonia-*-win-x64.zip` and run `CMCLauncher.Avalonia.exe`. It includes .NET 6, which is out of support. Testing on Windows 8.1 is pending.
 
 On Arch Linux x86_64, install the release package with `sudo pacman -U ./CMCLauncher-Avalonia-*-linux-x64.pkg.tar.zst`.
 

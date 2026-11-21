@@ -3,6 +3,8 @@
   <PropertyGroup>
     <OutputType>Library</OutputType>
     <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework Condition="'$(Windows81)' == 'true'">net6.0</TargetFramework>
+    <LangVersion Condition="'$(Windows81)' == 'true'">12</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <WarningsAsErrors>$(WarningsAsErrors);CA1416</WarningsAsErrors>
@@ -53,5 +55,9 @@
       Include="AngleSharp"
       Version="1.9.1"
     />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Windows81)' == 'true'">
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <PackageReference Include="System.Text.Json" Version="8.0.6" />
   </ItemGroup>
 </Project>

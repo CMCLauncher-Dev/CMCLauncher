@@ -273,6 +273,7 @@ public sealed partial class MainWindow
                 Path.Combine(session.Store.Root, "cache", "gpu-adapters.json"),
                 Verifying
             );
+        LocalizeToggle(continuous);
         continuous.IsCheckedChanged += async (_, _) =>
         {
             session.Store.Config.Settings.ContinuousStatsSampling = continuous.IsChecked == true;
@@ -306,69 +307,69 @@ public sealed partial class MainWindow
                 ? $"{bytesPerSecond / 1024 / 1024:N1} MB/s"
                 : $"{bytesPerSecond / 1024:N1} KB/s";
 
-    Control AboutPage() =>
-        Stack(
-            Card(
-                Stack(
-                    T("CMCLauncher", 26, true),
-                    T(LauncherUpdates.CurrentVersion),
-                    T(
-                        "Avalonia · .NET · "
-                            + System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier
-                    ),
-                    Row(
-                        Btn(
-                            "Project repository",
-                            () =>
-                            {
-                                Open("https://github.com/CMCLauncher-Dev/CMCLauncher");
-                                return Task.CompletedTask;
-                            }
-                        ),
-                        Btn(
-                            "Report an issue",
-                            () =>
-                            {
-                                Open(
-                                    "https://github.com/CMCLauncher-Dev/CMCLauncher/issues/new/choose"
-                                );
-                                return Task.CompletedTask;
-                            }
-                        ),
-                        Btn(
-                            "Website",
-                            () =>
-                            {
-                                Open("https://cmcl.ctfun.top/");
-                                return Task.CompletedTask;
-                            }
-                        ),
-                        Btn(
-                            "License",
-                            () =>
-                            {
-                                Open(
-                                    "https://github.com/CMCLauncher-Dev/CMCLauncher/blob/main/LICENSE"
-                                );
-                                return Task.CompletedTask;
-                            }
-                        )
-                    )
-                )
-            ),
+    Control AboutPage()
+    {
+        var logo = new global::Avalonia.Media.Imaging.Bitmap(
+            Path.Combine(AppContext.BaseDirectory, "assets", "cmc-logo.png")
+        );
+        var image = new Image
+        {
+            Source = logo,
+            Width = 72,
+            Height = 72,
+            VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top,
+        };
+        image.DetachedFromVisualTree += (_, _) => logo.Dispose();
+        var build = typeof(MainWindow).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault();
+        var details = Stack(
+            T("CMCLauncher", 24, true),
+            T("A fast, modern Minecraft launcher.", 13),
+            T(Ui("Version") + "  " + LauncherUpdates.CurrentVersion, 13),
+            T(Ui("Build") + "  " + (build?.InformationalVersion ?? LauncherUpdates.CurrentVersion), 12),
+            T(Ui("License") + "  " + Ui("GNU AGPL v3"), 12),
+            Row(
+                AboutLink("Project repository", "https://github.com/CMCLauncher-Dev/CMCLauncher"),
+                AboutLink("Report an issue", "https://github.com/CMCLauncher-Dev/CMCLauncher/issues/new/choose")
+            )
+        );
+        details.Spacing = 8;
+        var identity = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+            ColumnSpacing = 18,
+        };
+        identity.Children.Add(image);
+        Grid.SetColumn(details, 1);
+        identity.Children.Add(details);
+        return Stack(
+            Card(identity),
+            LauncherUpdateSettings(),
             AcknowledgementCards(Ui("Contributors"), AboutAcknowledgements.Contributors, true),
             AcknowledgementCards(
                 Ui("Open-source projects and services"),
                 AboutAcknowledgements.Projects,
                 false
-            ),
-            Card(
-                Stack(
-                    T("Launcher updates", 18, true),
-                    Btn("Check for updates", () => CheckDesktopUpdates(true))
-                )
             )
         );
+    }
+
+    Button AboutLink(string label, string url)
+    {
+        var link = Btn(label, () =>
+        {
+            Open(url);
+            return Task.CompletedTask;
+        });
+        link.Background = global::Avalonia.Media.Brushes.Transparent;
+        link.Foreground = Accent;
+        link.Padding = new global::Avalonia.Thickness(0);
+        link.MinWidth = 0;
+        link.MinHeight = 24;
+        link.FontSize = 12;
+        return link;
+    }
 
     Control AcknowledgementCards(string title, IReadOnlyList<Acknowledgement> entries, bool compact)
     {
@@ -416,14 +417,19 @@ public sealed partial class MainWindow
                 }
             );
             link.Content = content;
-            link.Padding = new global::Avalonia.Thickness(8, 6);
-            link.MinHeight = compact ? 34 : 40;
+            link.Padding = new global::Avalonia.Thickness(0);
+            link.MinWidth = link.MinHeight = 0;
+            link.Background = global::Avalonia.Media.Brushes.Transparent;
+            link.Foreground = Accent;
             link.HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
             link.HorizontalContentAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
             ToolTip.SetTip(link, entry.Name);
-            Grid.SetColumn(link, i % columns);
-            Grid.SetRow(link, i / columns);
-            cards.Children.Add(link);
+            var tile = Card(link);
+            tile.Padding = new global::Avalonia.Thickness(8, 6);
+            tile.CornerRadius = new global::Avalonia.CornerRadius(5);
+            Grid.SetColumn(tile, i % columns);
+            Grid.SetRow(tile, i / columns);
+            cards.Children.Add(tile);
             link.DetachedFromVisualTree += (_, _) =>
             {
                 if (((Image)content.Children[0]).Source is IDisposable bitmap)

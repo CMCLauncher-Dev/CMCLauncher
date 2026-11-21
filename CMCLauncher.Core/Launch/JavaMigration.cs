@@ -96,7 +96,7 @@ public static partial class JavaManager
             || Within(source, destination)
             || (useSelectedDirectory
                 ? Directory.EnumerateFileSystemEntries(destination).Any()
-                : Path.Exists(destination))
+                : (File.Exists(destination) || Directory.Exists(destination)))
         )
             throw new IOException(
                 "Choose a separate folder without an installation of the same name."
@@ -138,7 +138,7 @@ public static partial class JavaManager
             }
             catch
             {
-                if (useSelectedDirectory && !Path.Exists(destination))
+                if (useSelectedDirectory && !(File.Exists(destination) || Directory.Exists(destination)))
                     Directory.CreateDirectory(destination);
                 throw;
             }
@@ -186,7 +186,7 @@ public static partial class JavaManager
                 }
                 catch (IOException) { }
                 catch (UnauthorizedAccessException) { }
-            if (!committed && published && useSelectedDirectory && !Path.Exists(destination))
+            if (!committed && published && useSelectedDirectory && !(File.Exists(destination) || Directory.Exists(destination)))
                 Directory.CreateDirectory(destination);
         }
     }
@@ -235,8 +235,10 @@ public static partial class JavaManager
                         FileAccess.Write
                     );
                     await input.CopyToAsync(output, ct);
+#if NET7_0_OR_GREATER
                     if (!OperatingSystem.IsWindows())
                         File.SetUnixFileMode(target, File.GetUnixFileMode(item));
+#endif
                 }
             }
         }

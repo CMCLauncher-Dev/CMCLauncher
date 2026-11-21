@@ -117,7 +117,8 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         await gate.WaitAsync(ct);
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
+            if (disposed)
+                throw new ObjectDisposedException(GetType().FullName);
             if (Running)
                 throw new IOException("Stop Frp Client before deleting a client version.");
             var target = Store.SafePath(Root, Version(version));
@@ -465,7 +466,8 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         string? stage = null;
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
+            if (disposed)
+                throw new ObjectDisposedException(GetType().FullName);
             if (Running)
                 throw new IOException("Stop Frp Client before installing a client.");
             if (
@@ -528,6 +530,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
                 Directory.CreateDirectory(destination);
                 var target = Store.SafePath(destination, "frpc");
                 File.Move(clients[0], target);
+#if NET7_0_OR_GREATER
                 if (!OperatingSystem.IsWindows())
                     File.SetUnixFileMode(
                         target,
@@ -539,6 +542,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
                             | UnixFileMode.OtherRead
                             | UnixFileMode.OtherExecute
                     );
+#endif
             }
             finally
             {
@@ -623,7 +627,8 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         await gate.WaitAsync(ct);
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
+            if (disposed)
+                throw new ObjectDisposedException(GetType().FullName);
             await VerifyCore(version, config, ct);
         }
         finally
@@ -668,13 +673,15 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         await gate.WaitAsync(ct);
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
+            if (disposed)
+                throw new ObjectDisposedException(GetType().FullName);
             if (Running)
                 throw new IOException("Frp Client is already running.");
             await completion;
             await VerifyCore(version, config, ct);
             ct.ThrowIfCancellationRequested();
-            ObjectDisposedException.ThrowIf(disposed, this);
+            if (disposed)
+                throw new ObjectDisposedException(GetType().FullName);
             process?.Dispose();
             ExitCode = null;
             process =

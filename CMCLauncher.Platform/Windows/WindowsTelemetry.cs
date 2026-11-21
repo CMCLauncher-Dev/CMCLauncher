@@ -115,8 +115,13 @@ public sealed partial class WindowsLauncherPlatform
         timeout.CancelAfter(TimeSpan.FromSeconds(8));
         try
         {
+#if NET6_0
+            var output = process.StandardOutput.ReadToEndAsync().WaitAsync(timeout.Token);
+            var error = process.StandardError.ReadToEndAsync().WaitAsync(timeout.Token);
+#else
             var output = process.StandardOutput.ReadToEndAsync(timeout.Token);
             var error = process.StandardError.ReadToEndAsync(timeout.Token);
+#endif
             await process.WaitForExitAsync(timeout.Token);
             var json = await output;
             await error;

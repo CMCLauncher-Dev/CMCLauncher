@@ -2,6 +2,8 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework Condition="'$(Windows81)' == 'true'">net6.0-windows</TargetFramework>
+    <LangVersion Condition="'$(Windows81)' == 'true'">12</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>CMCLauncher.Avalonia</AssemblyName>
@@ -10,11 +12,13 @@
     <ApplicationIcon>../CMCLauncher.WinUI/assets/cmc-logo.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Condition="'$(Windows81)' == 'true'" Include="../CMCLauncher.Platform/Windows/CMCLauncher.Platform.Windows.csproj" />
     <ProjectReference Include="../CMCLauncher.Core/CMCLauncher.Core.csproj" />
-    <ProjectReference Include="../CMCLauncher.Platform/Linux/CMCLauncher.Platform.Linux.csproj" />
-    <ProjectReference Include="../CMCLauncher.Platform/MacOS/CMCLauncher.Platform.MacOS.csproj" />
+    <ProjectReference Condition="'$(Windows81)' != 'true'" Include="../CMCLauncher.Platform/Linux/CMCLauncher.Platform.Linux.csproj" />
+    <ProjectReference Condition="'$(Windows81)' != 'true'" Include="../CMCLauncher.Platform/MacOS/CMCLauncher.Platform.MacOS.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.23" />
     <PackageReference
       Include="Avalonia.Desktop"
       Version="11.3.23"
@@ -45,11 +49,12 @@
   <Target
     Name="RejectWindowsAvaloniaPublish"
     BeforeTargets="PrepareForPublish;Publish"
-    Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))"
+    Condition="'$(Windows81)' != 'true' And $([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('win-'))"
   >
     <Error Text="Windows releases use CMCLauncher.WinUI. Publish Avalonia for Linux or macOS." />
   </Target>
   <ItemGroup>
+    <Content Include="../CMCLauncher.WinUI/assets/cmc-logo.png" Link="assets/cmc-logo.png" CopyToOutputDirectory="PreserveNewest" />
     <Content
       Include="../CMCLauncher.WinUI/assets/about/*.png"
       Link="assets/about/%(Filename)%(Extension)"

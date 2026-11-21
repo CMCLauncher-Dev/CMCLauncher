@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework Condition="'$(Windows81)' == 'true'">net6.0</TargetFramework>
+    <LangVersion Condition="'$(Windows81)' == 'true'">12</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <WarningsAsErrors>$(WarningsAsErrors);CA1416</WarningsAsErrors>

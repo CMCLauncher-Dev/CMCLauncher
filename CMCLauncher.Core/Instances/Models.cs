@@ -61,6 +61,7 @@ public sealed class Settings
         : UseBmclApi ? "mirror"
         : "official";
     public bool AutoMemory { get; set; } = true;
+    public bool OptimizeMemoryBeforeLaunch { get; set; }
     public string MicrosoftClientId { get; set; } = "";
     public string Proxy { get; set; } = "";
     public string ProxyMode { get; set; } = "auto";
@@ -177,6 +178,7 @@ public sealed class Instance
     public DateTime? LastPlayed { get; set; }
     public bool Favorite { get; set; }
     public bool DebugMode { get; set; }
+    public bool? OptimizeMemoryBeforeLaunch { get; set; }
     public int OptionsBackupLimit { get; set; } = 10;
 
     public override string ToString() => $"{Name}  ·  {GameVersion} / {Loader}";

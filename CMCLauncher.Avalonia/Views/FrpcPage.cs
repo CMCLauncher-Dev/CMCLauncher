@@ -378,13 +378,22 @@ public sealed partial class MainWindow
         var installed = session.Frpc.Installed();
         var online = Choice(Array.Empty<string>());
         var clients = Choice(installed, session.Store.Config.Settings.FrpcVersion);
-        var message = T("");
+        var summary = T("", 12);
+        void UpdateSummary() =>
+            summary.Text = clients.SelectedItem is string selected
+                ? Ui("Installed · ") + selected
+                : Ui("Client not downloaded");
+        UpdateSummary();
+        var message = T("", 12);
+        message.IsVisible = false;
+        online.PlaceholderText = Ui("Loading releases…");
+        clients.PlaceholderText = Ui("Not downloaded");
         var download = Btn(
             "Download online",
             async () =>
             {
                 if (online.SelectedItem is not string version)
-                    throw new IOException("Select an online version.");
+                    throw new IOException(Ui("Select an online release first."));
                 await session.Run(
                     "Download frpc",
                     async token =>
@@ -400,12 +409,12 @@ public sealed partial class MainWindow
             true
         );
         var remove = Btn(
-            "Delete client",
+            "Delete downloaded version",
             async () =>
             {
                 if (
                     clients.SelectedItem is not string version
-                    || !await Confirm("Delete client?", version)
+                    || !await Confirm("Delete downloaded version?", version)
                 )
                     return;
                 await session.Frpc.Remove(version);
@@ -415,7 +424,10 @@ public sealed partial class MainWindow
                 await Navigate("settings");
             }
         );
-        remove.IsEnabled = installed.Length > 0 && !session.Frpc.Running;
+        bool CanRemove() => clients.SelectedItem is string && !session.Frpc.Running;
+        buttonAvailability.Add(remove, CanRemove);
+        download.IsEnabled = false;
+        remove.IsEnabled = CanRemove();
         remove.HorizontalAlignment = HorizontalAlignment.Right;
         var fields = new Grid
         {
@@ -424,20 +436,35 @@ public sealed partial class MainWindow
             ColumnSpacing = 12,
             RowSpacing = 10,
         };
-        var onlineField = Field("Online version", online);
+        var onlineField = Field("Online versions", online);
         var installedField = Field("Downloaded client", clients);
         fields.Children.Add(onlineField);
         Grid.SetColumn(installedField, 1);
         fields.Children.Add(installedField);
-        Grid.SetRow(download, 1);
-        fields.Children.Add(download);
-        Grid.SetRow(remove, 1);
+        bool? fieldsNarrow = null;
+        fields.SizeChanged += (_, e) =>
+        {
+            var narrow = e.NewSize.Width < 480;
+            if (fieldsNarrow == narrow)
+                return;
+            fieldsNarrow = narrow;
+            Grid.SetColumnSpan(onlineField, narrow ? 2 : 1);
+            Grid.SetColumnSpan(installedField, narrow ? 2 : 1);
+            Grid.SetColumn(installedField, narrow ? 0 : 1);
+            Grid.SetRow(installedField, narrow ? 1 : 0);
+        };
+        var actions = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            ColumnSpacing = 12,
+        };
+        actions.Children.Add(download);
         Grid.SetColumn(remove, 1);
-        fields.Children.Add(remove);
-        var card = Card(Stack(T("frpc", 15, true), fields, message));
+        actions.Children.Add(remove);
+        var card = Card(Stack(T("frpc", 15, true), summary, fields, actions, message));
         card.Padding = new global::Avalonia.Thickness(12);
         var loading = false;
-        online.DropDownOpened += async (_, _) =>
+        async Task LoadReleases()
         {
             if (loading || online.ItemCount > 0)
                 return;
@@ -446,20 +473,31 @@ public sealed partial class MainWindow
             {
                 var releases = await session.Frpc.Releases(1, ct);
                 online.ItemsSource = releases.Versions;
-                online.SelectedIndex = 0;
+                online.PlaceholderText = Ui("No releases available");
+                message.IsVisible = false;
+                if (releases.Versions.Length > 0)
+                {
+                    online.SelectedIndex = 0;
+                    download.IsEnabled = true;
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             catch (Exception ex)
             {
+                online.PlaceholderText = Ui("No releases available");
                 message.Text = ex.Message;
+                message.IsVisible = true;
             }
             finally
             {
                 loading = false;
             }
-        };
+        }
+        online.DropDownOpened += async (_, _) => await LoadReleases();
         clients.SelectionChanged += async (_, _) =>
         {
+            UpdateSummary();
+            remove.IsEnabled = CanRemove();
             if (clients.SelectedItem is string version)
             {
                 session.Store.Config.Settings.FrpcVersion = version;

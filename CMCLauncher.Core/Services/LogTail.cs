@@ -9,7 +9,8 @@ public static class LogTail
     // 游戏日志可能远超报告限制，因此限制磁盘读取后再解码。
     public static string Read(string path, int maxCharacters)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(maxCharacters);
+        if (maxCharacters < 0)
+            throw new ArgumentOutOfRangeException(nameof(maxCharacters), maxCharacters, null);
         if (maxCharacters == 0)
             return "";
         using var stream = new FileStream(

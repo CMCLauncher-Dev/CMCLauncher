@@ -244,6 +244,7 @@ public sealed partial class MainWindow
             await VerifyAccountSelection(checks);
             await VerifyNavigationLocales(checks);
             VerifyLiveTheme(checks);
+            await VerifyAppearanceSelection(checks);
             await Navigate("mod");
             foreach (var input in pageContent.GetVisualDescendants().OfType<TextBox>())
                 input.Text = "typing must not search";
@@ -414,6 +415,52 @@ public sealed partial class MainWindow
             Environment.ExitCode = 1;
         }
         Close();
+    }
+
+    async Task VerifyAppearanceSelection(List<string> checks)
+    {
+        var settings = session.Store.Config.Settings;
+        var previousLanguage = settings.LauncherLanguage;
+        var previousPreset = settings.ColorPreset;
+        try
+        {
+            settings.LauncherLanguage = "zh_cn";
+            settings.ColorPreset = "native";
+            await Navigate("appearance");
+            var controls = pageContent.GetVisualDescendants().ToArray();
+            var presets = controls.OfType<ComboBox>().Single(c => c.SelectedItem is ThemePreset);
+            var items = presets.Items.OfType<ThemePreset>().ToDictionary(p => p.Id);
+            if (pageTitle.Text != "个性化" || Ui(items["cream"].DisplayName) != "奶油白"
+                || controls.OfType<ToggleSwitch>().Any(toggle => toggle.OffContent?.ToString() == "Off"))
+                throw new IOException("The Chinese appearance page has untranslated controls.");
+            presets.SelectedItem = items["cream"];
+            if (settings.ColorPreset != "cream" || !Classes.Contains("custom-appearance"))
+                throw new IOException("Selecting a theme preset did not apply immediately.");
+            presets.SelectedItem = items["custom"];
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Render);
+            if (!pageContent.GetVisualDescendants().OfType<TextBlock>()
+                .Any(text => text.Text == Ui("Edit colors") && text.IsEffectivelyVisible))
+                throw new IOException("The custom palette editor did not open.");
+            presets.SelectedItem = items["native"];
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                if (new Store(session.Store.Root).Config.Settings.ColorPreset == "native")
+                    break;
+                await Task.Delay(25);
+            }
+            if (new Store(session.Store.Root).Config.Settings.ColorPreset != "native"
+                || pageContent.GetVisualDescendants().OfType<TextBlock>()
+                    .Any(text => text.Text == Ui("Edit colors") && text.IsEffectivelyVisible))
+                throw new IOException("The native theme did not persist or hide the custom palette.");
+            checks.Add("PASS live localized appearance selection and persistence");
+        }
+        finally
+        {
+            settings.LauncherLanguage = previousLanguage;
+            settings.ColorPreset = previousPreset;
+            await session.Save();
+            ApplyTheme();
+        }
     }
 
     void VerifyLiveTheme(List<string> checks)
@@ -883,7 +930,7 @@ public sealed partial class MainWindow
             session.Store.Config.Settings.LauncherLanguage == "zh_cn"
             && navigationVisuals["root:downloads"].Label.Text == "下载"
             && navigationVisuals["root:home"].Label.Text == "主页"
-            && pageTitle.Text == Ui("Settings")
+            && pageTitle.Text == Ui("Launcher settings")
             && pageContent.GetVisualDescendants().OfType<TextBlock>()
                 .Any(t => t.Text == Ui("Launcher language"));
         for (var i = 0; i < 120 && !ChineseUiReady(); i++)
@@ -904,7 +951,7 @@ public sealed partial class MainWindow
             await Navigate("settings");
             if (
                 navigationVisuals["root:more"].Label.Text != Ui("更多")
-                || pageTitle.Text != Ui("Settings")
+                || pageTitle.Text != Ui("Launcher settings")
             )
                 throw new IOException("Sidebar locale mismatch: " + pack.Code);
         }

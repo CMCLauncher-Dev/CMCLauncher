@@ -22,12 +22,36 @@ public sealed partial class MainWindow
     bool homeCustomizeMode;
     static readonly (string Id, string Title)[] homeCardCatalog =
     [
-        ("account", "账号"),
-        ("game", "游戏"),
-        ("performance", "性能监视器"),
-        ("note", "笔记"),
-        ("news", "Minecraft 新闻"),
+        ("account", "Accounts"),
+        ("game", "Game"),
+        ("performance", "Performance monitor"),
+        ("note", "Notes"),
+        ("news", "Minecraft news"),
     ];
+
+    Button HomeCustomizeAction()
+    {
+        var label = homeCustomizeMode ? "Finish customizing" : "Customize home";
+        var button = Btn(label, async () =>
+        {
+            homeCustomizeMode = !homeCustomizeMode;
+            await Navigate("home");
+        });
+        button.Name = "HomeCustomizeButton";
+        button.Content = NavigationIcon(
+            homeCustomizeMode
+                ? "M5,12 L10,17 L19,7"
+                : "M9,3 H15 L16,6 L19,7 L21,11 L19,13 L19,16 L16,19 L13,18 L11,21 L7,19 L7,16 L4,14 L4,10 L7,8 Z M15,12 A3,3 0 1 0 9,12 A3,3 0 1 0 15,12"
+        );
+        button.MinWidth = button.MinHeight = 32;
+        button.Width = button.Height = 32;
+        button.Padding = new Thickness(0);
+        button.HorizontalContentAlignment = HorizontalAlignment.Center;
+        button.VerticalContentAlignment = VerticalAlignment.Center;
+        ToolTip.SetTip(button, Ui(label));
+        global::Avalonia.Automation.AutomationProperties.SetName(button, Ui(label));
+        return button;
+    }
 
     Control HomePage()
     {
@@ -38,25 +62,8 @@ public sealed partial class MainWindow
         var area = Stack();
         area.MaxWidth = 860;
         area.HorizontalAlignment = HorizontalAlignment.Stretch;
-        var toolbar = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto"),
-            ColumnSpacing = 8,
-        };
         if (homeCustomizeMode)
-            toolbar.Children.Add(Btn("Add cards", OpenHomeCardDrawer));
-        var edit = Btn(
-            homeCustomizeMode ? "Done" : "Customize home",
-            async () =>
-            {
-                homeCustomizeMode = !homeCustomizeMode;
-                await Navigate("home");
-            }
-        );
-        edit.Name = "HomeCustomizeButton";
-        Grid.SetColumn(edit, 1);
-        toolbar.Children.Add(edit);
-        area.Children.Add(toolbar);
+            area.Children.Add(Btn("Add cards", OpenHomeCardDrawer));
         var dashboard = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("*,*"),
@@ -148,7 +155,7 @@ public sealed partial class MainWindow
                 var index = settings.HomeCards.IndexOf(placement);
                 var up = HomeTool(
                     "↑",
-                    "上移",
+                    "Move up",
                     () =>
                         MoveHomeCard(
                             placement.Id,
@@ -161,7 +168,7 @@ public sealed partial class MainWindow
                 tools.Children.Add(up);
                 var down = HomeTool(
                     "↓",
-                    "下移",
+                    "Move down",
                     () =>
                         MoveHomeCard(
                             placement.Id,
@@ -175,12 +182,12 @@ public sealed partial class MainWindow
                 Grid.SetColumn(down, 2);
                 tools.Children.Add(down);
                 var width = Choice(
-                    new[] { "半宽", "全宽" },
-                    placement.Width == 1 ? "半宽" : "全宽"
+                    new[] { "Half width", "Full width" },
+                    placement.Width == 1 ? "Half width" : "Full width"
                 );
                 var height = Choice(
-                    new[] { "紧凑", "标准", "宽松" },
-                    new[] { "紧凑", "标准", "宽松" }[Math.Clamp(placement.Height, 1, 3) - 1]
+                    new[] { "Compact", "Standard", "Spacious" },
+                    new[] { "Compact", "Standard", "Spacious" }[Math.Clamp(placement.Height, 1, 3) - 1]
                 );
                 width.MinWidth = height.MinWidth = 0;
                 width.SelectionChanged += async (_, _) =>
@@ -211,8 +218,8 @@ public sealed partial class MainWindow
                         await Error(ex);
                     }
                 };
-                var widthField = Field("宽度", width);
-                var heightField = Field("高度", height);
+                var widthField = Field("Width", width);
+                var heightField = Field("Height", height);
                 Grid.SetColumn(widthField, 3);
                 Grid.SetColumn(heightField, 4);
                 tools.Children.Add(widthField);
@@ -221,7 +228,7 @@ public sealed partial class MainWindow
                 {
                     var remove = HomeTool(
                         "×",
-                        "删除",
+                        "Delete",
                         async () =>
                         {
                             settings.HomeCards.Remove(placement);
@@ -542,17 +549,17 @@ public sealed partial class MainWindow
                 {
                     T(account?.Name ?? "未登录", 18, true),
                     T(
-                        account?.Type == "microsoft" ? "Microsoft 正版账号"
+                        account?.Type == "microsoft" ? "Verified Minecraft account"
                             : account?.Type == "yggdrasil" ? "External account"
-                            : account?.Type == "offline" ? "离线账号"
-                            : "登录正版账号或添加离线身份",
+                            : account?.Type == "offline" ? "Offline account"
+                            : "Sign in with Microsoft to unlock offline accounts.",
                         11
                     ),
                 },
             };
             Grid.SetColumn(info, 1);
             identity.Children.Add(info);
-            var manage = Btn(account == null ? "添加账号" : "账号管理", () => Navigate("accounts"));
+            var manage = Btn(account == null ? "添加账号" : "Accounts", () => Navigate("accounts"));
             Grid.SetColumn(manage, 2);
             identity.Children.Add(manage);
             body.Children.Add(identity);
@@ -571,25 +578,25 @@ public sealed partial class MainWindow
         else if (placement.Id == "game")
         {
             var current = session.Selected;
-            body.Children.Add(T("当前游戏版本", 12));
-            var title = T(current?.Name ?? "还没有游戏版本", 23, true);
+            body.Children.Add(T("Current game version", 12));
+            var title = T(current?.Name ?? "No game version yet", 23, true);
             title.MaxLines = 1;
             title.TextTrimming = TextTrimming.CharacterEllipsis;
             body.Children.Add(title);
             body.Children.Add(
                 T(
                     current == null
-                        ? "下载 Minecraft，或添加已有的 .minecraft 文件夹。"
+                        ? "Download Minecraft or add an existing .minecraft folder."
                         : $"Minecraft {current.GameVersion} · {current.Loader}",
                     13
                 )
             );
             body.Children.Add(
                 Row(
-                    Btn("切换版本", () => Navigate("instances")),
+                    Btn("Switch version", () => Navigate("instances")),
                     current == null
-                        ? Btn("添加本地游戏", ImportLocal)
-                        : Btn("版本设置", InstanceSettings)
+                        ? Btn("Add local game", ImportLocal)
+                        : Btn("Version settings", InstanceSettings)
                 )
             );
             var state = T("", 12);
@@ -602,7 +609,7 @@ public sealed partial class MainWindow
                 Foreground = Accent,
             };
             var launch = Btn(
-                current == null ? "下载游戏" : "启动游戏",
+                current == null ? "Download game" : "Launch game",
                 current == null
                     ? () => Navigate("downloads")
                     : () => session.Run("Launch game", session.LaunchSelected),
@@ -618,7 +625,7 @@ public sealed partial class MainWindow
             };
             var cancel = HomeTool(
                 "×",
-                "取消启动",
+                "Cancel launch",
                 () =>
                 {
                     session.Cancel();
@@ -651,9 +658,9 @@ public sealed partial class MainWindow
                 state.Text = session.Launching
                     ? session.Status
                     : Ui(
-                        current == null ? "从选择版本开始"
-                        : session.Account == null ? "添加账号后即可启动"
-                        : "已准备就绪"
+                        current == null ? "Choose a game version to get started"
+                        : session.Account == null ? "Add an account to launch the game"
+                        : "Ready to play"
                     );
                 launchRow.IsVisible = session.Launching;
                 launchProgress.IsIndeterminate = false;
@@ -673,7 +680,7 @@ public sealed partial class MainWindow
         }
         else if (placement.Id == "note")
         {
-            body.Children.Add(T("笔记", 18, true));
+            body.Children.Add(T("Notes", 18, true));
             var note = Input(settings.HomeNote, "Write a note…", true);
             note.MinHeight = 80;
             note.LostFocus += async (_, _) =>
@@ -692,12 +699,12 @@ public sealed partial class MainWindow
         }
         else if (placement.Id == "news")
         {
-            body.Children.Add(T("Minecraft 新闻", 18, true));
-            body.Children.Add(T("浏览 Minecraft 官方新闻与更新动态。", 12));
+            body.Children.Add(T("Minecraft news", 18, true));
+            body.Children.Add(T("Browse official Minecraft news and updates.", 12));
             body.Children.Add(
                 Row(
                     Btn(
-                        "官方新闻",
+                        "Official news",
                         () =>
                         {
                             Open("https://www.minecraft.net/en-us/articles");
@@ -705,7 +712,7 @@ public sealed partial class MainWindow
                         }
                     ),
                     Btn(
-                        "游戏更新",
+                        "Game updates",
                         () =>
                         {
                             Open("https://www.minecraft.net/en-us/updates");
@@ -717,7 +724,7 @@ public sealed partial class MainWindow
         }
         else if (placement.Id == "performance")
         {
-            body.Children.Add(T("性能监视器", 18, true));
+            body.Children.Add(T("Performance monitor", 18, true));
             var app = T("", 12);
             var cpu = T("", 12);
             var memory = T("", 12);
@@ -744,7 +751,7 @@ public sealed partial class MainWindow
             void Update()
             {
                 using var process = Process.GetCurrentProcess();
-                app.Text = Ui("启动器内存") + $": {process.WorkingSet64 / 1048576d:N0} MB";
+                app.Text = Ui("Launcher memory") + $": {process.WorkingSet64 / 1048576d:N0} MB";
                 cpu.Text =
                     Ui("CPU 占用")
                     + ": "

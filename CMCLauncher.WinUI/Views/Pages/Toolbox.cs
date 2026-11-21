@@ -34,6 +34,15 @@ public sealed partial class MainWindow
     void ToolboxPage()
     {
         Header("Toolbox", "Utilities");
+        if (LauncherPlatform.Current.SupportsMemoryOptimization)
+        {
+            var utilities = new StackPanel { Spacing = 8 };
+            utilities.Children.Add(Text("Small tools", 16, true));
+            utilities.Children.Add(Action("Memory optimization", (_, _) => OptimizeMemoryNow()));
+            var card = CompactCard(utilities);
+            card.Tag = "toolbox-small-tools";
+            PageBody.Children.Add(card);
+        }
         var cards = new Grid { ColumnSpacing = 12, RowSpacing = 12, VerticalAlignment = VerticalAlignment.Top };
         for (var i = 0; i < 3; i++)
             cards.ColumnDefinitions.Add(
@@ -85,6 +94,22 @@ public sealed partial class MainWindow
             cards.Children.Add(card);
         }
         PageBody.Children.Add(cards);
+    }
+
+    internal async Task OptimizeMemoryNow()
+    {
+        MemoryOptimizationResult result = default;
+        await Run(async ct =>
+        {
+            ShowToast(Ui("Optimizing memory"), InfoBarSeverity.Informational);
+            result = await Task.Run(() => LauncherPlatform.Current.OptimizeMemory(ct), ct);
+            ct.ThrowIfCancellationRequested();
+        }, Ui("Optimizing memory"), showSuccessToast: false);
+        AddLog($"Memory optimization completed: {result.CompletedOperations} · {result.AvailableBeforeMb} → {result.AvailableAfterMb} MiB");
+        var message = result.AvailableGainMb is long gain && result.AvailableAfterMb is long available
+            ? UiFormat("Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.", gain, available)
+            : UiFormat("Memory optimization finished. System operations completed: {0}.", result.SystemOperationsCompleted);
+        ShowToast(Ui("Memory optimization complete") + " · " + message);
     }
 
     bool terracottaBusy,

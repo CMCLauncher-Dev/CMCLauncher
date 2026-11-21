@@ -371,9 +371,9 @@ public sealed partial class LauncherCore : IDisposable
                 FileOptions.Asynchronous | FileOptions.SequentialScan
             );
             var bytes =
-                algorithm == "sha512" ? await SHA512.HashDataAsync(stream, ct)
-                : algorithm == "sha256" ? await SHA256.HashDataAsync(stream, ct)
-                : await SHA1.HashDataAsync(stream, ct);
+                algorithm == "sha512" ? await StreamHash.ComputeAsync(SHA512.Create(), stream, ct)
+                : algorithm == "sha256" ? await StreamHash.ComputeAsync(SHA256.Create(), stream, ct)
+                : await StreamHash.ComputeAsync(SHA1.Create(), stream, ct);
             return Convert.ToHexString(bytes).Equals(hash, StringComparison.OrdinalIgnoreCase);
         }
         // 已有文件先校验，完整时直接复用；重新下载不会直接覆盖旧文件。
@@ -441,9 +441,9 @@ public sealed partial class LauncherCore : IDisposable
                     FileOptions.Asynchronous | FileOptions.SequentialScan
                 );
                 var bytes =
-                    algorithm == "sha512" ? await SHA512.HashDataAsync(stream, ct)
-                    : algorithm == "sha256" ? await SHA256.HashDataAsync(stream, ct)
-                    : await SHA1.HashDataAsync(stream, ct);
+                    algorithm == "sha512" ? await StreamHash.ComputeAsync(SHA512.Create(), stream, ct)
+                    : algorithm == "sha256" ? await StreamHash.ComputeAsync(SHA256.Create(), stream, ct)
+                    : await StreamHash.ComputeAsync(SHA1.Create(), stream, ct);
                 if (!Convert.ToHexString(bytes).Equals(hash, StringComparison.OrdinalIgnoreCase))
                     throw new Exception("文件哈希校验失败");
             }
@@ -1478,6 +1478,25 @@ public sealed partial class LauncherCore : IDisposable
             using var external = new ExternalAuth(store.Config.Settings);
             authenticationArguments = await external.LaunchArguments(account, store.Root, ct);
         }
+        var platform = LauncherPlatform.Current;
+        if (platform.SupportsMemoryOptimization &&
+            (instance.OptimizeMemoryBeforeLaunch ?? store.Config.Settings.OptimizeMemoryBeforeLaunch))
+        {
+            Status?.Invoke("Optimizing memory");
+            try
+            {
+                var result = await Task.Run(() => platform.OptimizeMemory(ct), ct);
+                Log?.Invoke(
+                    $"Memory optimization: {result.SystemOperationsCompleted} system operations completed ({result.CompletedOperations}), "
+                    + $"available memory {result.AvailableBeforeMb} → {result.AvailableAfterMb} MiB."
+                );
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or MemoryOptimizationDeclinedException)
+            {
+                Log?.Invoke("Memory optimization could not run: " + ex.Message);
+            }
+        }
+        ct.ThrowIfCancellationRequested();
         var args = BuildArguments(
             version,
             storage,

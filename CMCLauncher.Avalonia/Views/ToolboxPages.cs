@@ -51,7 +51,35 @@ public sealed partial class MainWindow
             Grid.SetRow(card, index / 3);
             cards.Children.Add(card);
         }
-        return cards;
+        if (!LauncherPlatform.Current.SupportsMemoryOptimization)
+            return cards;
+
+        var utilities = Card(Stack(
+            T("Small tools", 16, true),
+            Btn("Memory optimization", OptimizeMemoryNow)
+        ));
+        utilities.Padding = new global::Avalonia.Thickness(11, 7);
+        return Stack(utilities, cards);
+    }
+
+    async Task OptimizeMemoryNow()
+    {
+        MemoryOptimizationResult result = default;
+        var completed = await session.Run("Optimizing memory", async ct =>
+        {
+            ShowToast(Ui("Optimizing memory"));
+            result = await Task.Run(() => LauncherPlatform.Current.OptimizeMemory(ct), ct);
+            ct.ThrowIfCancellationRequested();
+        }, showSuccessToast: false);
+        if (!completed)
+            return;
+
+        session.Log("INFO", $"Memory optimization completed: {result.CompletedOperations} · {result.AvailableBeforeMb} → {result.AvailableAfterMb} MiB");
+        var language = session.Store.Config.Settings.LauncherLanguage;
+        var message = result.AvailableGainMb is long gain && result.AvailableAfterMb is long available
+            ? session.Locales.Format(language, "Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.", gain, available)
+            : session.Locales.Format(language, "Memory optimization finished. System operations completed: {0}.", result.SystemOperationsCompleted);
+        ShowToast(Ui("Memory optimization complete") + " · " + message);
     }
 
     bool terracottaBusy,

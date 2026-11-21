@@ -272,8 +272,8 @@ public sealed class MinecraftDirectoryManager(Store store)
                 await input.CopyToAsync(output, ct);
                 input.Position = 0;
                 output.Position = 0;
-                var hash = await SHA256.HashDataAsync(input, ct);
-                if (!hash.SequenceEqual(await SHA256.HashDataAsync(output, ct)))
+                var hash = await StreamHash.ComputeAsync(SHA256.Create(), input, ct);
+                if (!hash.SequenceEqual(await StreamHash.ComputeAsync(SHA256.Create(), output, ct)))
                     throw new IOException("A file failed migration verification.");
                 copiedHashes[file] = hash;
             }
@@ -282,7 +282,7 @@ public sealed class MinecraftDirectoryManager(Store store)
             {
                 NoLinks(file);
                 await using var input = File.OpenRead(file);
-                if (!copiedHashes[file].SequenceEqual(await SHA256.HashDataAsync(input, ct)))
+                if (!copiedHashes[file].SequenceEqual(await StreamHash.ComputeAsync(SHA256.Create(), input, ct)))
                     throw new IOException(
                         "The source changed during migration. Close other launchers and retry."
                     );

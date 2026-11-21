@@ -79,7 +79,7 @@ public static class ModpackExportReferences
         if (format == "modrinth")
         {
             var hash = Convert
-                .ToHexString(await SHA512.HashDataAsync(stream, ct))
+                .ToHexString(await StreamHash.ComputeAsync(SHA512.Create(), stream, ct))
                 .ToLowerInvariant();
             var version = await core.Json(
                 "https://api.modrinth.com/v2/version_file/" + hash + "?algorithm=sha512",
@@ -122,7 +122,7 @@ public static class ModpackExportReferences
             applicationAccessApproved: CurseForgeCredentials.ConfiguredApiKey != null
         );
         var metadata = (await api.Query($"mods/{project}/files/{id}", ct))["data"]!;
-        var sha1 = Convert.ToHexString(await SHA1.HashDataAsync(stream, ct));
+        var sha1 = Convert.ToHexString(await StreamHash.ComputeAsync(SHA1.Create(), stream, ct));
         if (
             metadata.S("isAvailable") != "true"
             || metadata.Int("modId") != project

@@ -12,7 +12,15 @@ public sealed partial class MainWindow
         page = "toolbox";
         expandedNavigation = "more";
         await RenderAsync();
-        check(themeCards.Count == 5, "toolbox presents five independent tool cards");
+        var canOptimize = LauncherPlatform.Current.SupportsMemoryOptimization;
+        check(themeCards.Count == (canOptimize ? 6 : 5), "toolbox presents independent tool cards");
+        if (canOptimize)
+            check(
+                PageBody.Children.FirstOrDefault() is Border { Tag: "toolbox-small-tools" } utilities
+                    && Descendants(utilities).OfType<Button>()
+                        .Any(button => button.Content?.ToString() == Ui("Memory optimization")),
+                "memory optimization appears in the top small tools card"
+            );
         check(
             navigationButtons.ContainsKey("page:toolbox")
                 && !navigationButtons.ContainsKey("page:frpc")

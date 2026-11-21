@@ -33,8 +33,11 @@
 | 平台 | 界面 | 兼容性 | 更新维护状态 | 支持系统 / 硬件 |
 | --- | --- | --- | --- | --- |
 | Windows | WinUI 3 | ✅支持 | 持续维护 | Windows 10（2004 及以上）/ 11，x64 |
+| Windows 8.1 | Avalonia | ⚠️ 实验性 | 兼容构建 | x64 |
 | Linux | Avalonia | ⚠️实验性 | 实验性更新，直到稳定 | Debian 系、Arch 系、Red Hat 系发行版，x64 |
 | macOS | Avalonia | ⚠️早期阶段，**缺乏测试** | 低优先级维护 | Intel（x64）、Apple M 系列（ARM64） |
+
+Windows 8.1 请完整解压 `CMCLauncher-Avalonia-*-win-x64.zip`，再运行 `CMCLauncher.Avalonia.exe`。压缩包内置已停止维护的 .NET 6，仍需在 Windows 8.1 上验证。
 
 Arch Linux x86_64 可用 `sudo pacman -U ./CMCLauncher-Avalonia-*-linux-x64.pkg.tar.zst` 安装对应发行包。
 

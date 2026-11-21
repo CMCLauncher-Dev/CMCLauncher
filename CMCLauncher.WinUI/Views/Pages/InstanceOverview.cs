@@ -84,6 +84,29 @@ public sealed partial class MainWindow
             catch (Exception ex) { await Error(ex); }
         };
         management.Children.Add(debug);
+        if (LauncherPlatform.Current.SupportsMemoryOptimization)
+        {
+            var memoryOptimization = new ComboBox
+            {
+                Header = Ui("Optimize memory before launching"),
+                ItemsSource = new[] { Ui("Follow launcher settings"), Ui("context.settingspage.on"), Ui("Off") },
+                SelectedIndex = instance.OptimizeMemoryBeforeLaunch switch { true => 1, false => 2, _ => 0 },
+            };
+            memoryOptimization.SelectionChanged += async (_, _) =>
+            {
+                if (memoryOptimization.SelectedIndex < 0)
+                    return;
+                instance.OptimizeMemoryBeforeLaunch = memoryOptimization.SelectedIndex switch
+                {
+                    1 => true,
+                    2 => false,
+                    _ => null,
+                };
+                try { await store.Save(); }
+                catch (Exception ex) { await Error(ex); }
+            };
+            management.Children.Add(memoryOptimization);
+        }
         management.Children.Add(
             Buttons(
                 Action(

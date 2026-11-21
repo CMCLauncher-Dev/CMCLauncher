@@ -49,7 +49,9 @@ public static partial class DataPackGenerator
     // 查询指定游戏版本对应的数据包 pack_format；不支持的版本抛出异常。
     public static (int Major, int Minor) GetDataPackFormat(string gameVersion)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(gameVersion);
+        ArgumentNullException.ThrowIfNull(gameVersion);
+        if (string.IsNullOrWhiteSpace(gameVersion))
+            throw new ArgumentException("Value cannot be empty or whitespace.", nameof(gameVersion));
         return Formats.TryGetValue(gameVersion, out var format)
             ? format
             : throw new ArgumentException(
@@ -78,9 +80,13 @@ public static partial class DataPackGenerator
     {
         var (packName, gameVersion, description, packNamespace) = options;
         GetDataPackFormat(gameVersion);
-        ArgumentException.ThrowIfNullOrWhiteSpace(packName);
+        ArgumentNullException.ThrowIfNull(packName);
+        if (string.IsNullOrWhiteSpace(packName))
+            throw new ArgumentException("Value cannot be empty or whitespace.", nameof(packName));
         ArgumentNullException.ThrowIfNull(description);
-        ArgumentException.ThrowIfNullOrWhiteSpace(packNamespace);
+        ArgumentNullException.ThrowIfNull(packNamespace);
+        if (string.IsNullOrWhiteSpace(packNamespace))
+            throw new ArgumentException("Value cannot be empty or whitespace.", nameof(packNamespace));
         // 使用各平台都能保存的单个目录名，不把用户输入当作相对路径。
         if (
             Encoding.UTF8.GetByteCount(packName) > 255

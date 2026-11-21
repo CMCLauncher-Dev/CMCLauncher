@@ -56,6 +56,8 @@ internal static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        if (WindowsLauncherPlatform.TryRunMemoryOptimizationWorker(args, out var exitCode))
+            return exitCode;
         WindowsLauncherPlatform.Initialize();
 #if SINGLE_FILE
         ExtractCompanionFiles();

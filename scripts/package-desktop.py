@@ -1,10 +1,11 @@
-"""Package the Linux/macOS frontend without losing its executable permission."""
+"""Package desktop builds and preserve executable permissions on Linux and macOS."""
 
 import argparse
 import os
 import struct
 from pathlib import Path
 import tarfile
+import zipfile
 
 
 def validate_apphost(path: Path, rid: str) -> None:
@@ -13,6 +14,17 @@ def validate_apphost(path: Path, rid: str) -> None:
         if rid == "linux-x64":
             if header[:4] != b"\x7fELF":
                 raise ValueError("The app host does not match the target platform.")
+            return
+        if rid == "win-x64":
+            if header[:2] != b"MZ":
+                raise ValueError("The app host does not match the target platform.")
+            stream.seek(0x3C)
+            offset = stream.read(4)
+            if len(offset) != 4:
+                raise ValueError("The PE app host header is incomplete.")
+            stream.seek(struct.unpack("<I", offset)[0])
+            if stream.read(6) != b"PE\0\0\x64\x86":
+                raise ValueError("The PE app host is not x64.")
             return
         expected = {"osx-arm64": 0x0100000C, "osx-x64": 0x01000007}[rid]
         if len(header) != 8:
@@ -38,7 +50,8 @@ def package(publish: Path, output: Path, rid: str) -> None:
     output = output.resolve()
     if publish == output or publish in output.parents:
         raise ValueError("The archive must be outside the publish directory.")
-    required = ("CMCLauncher.Avalonia", "CMCLauncher.Avalonia.dll", "CMCLauncher.Core.dll")
+    executable = "CMCLauncher.Avalonia.exe" if rid == "win-x64" else "CMCLauncher.Avalonia"
+    required = (executable, "CMCLauncher.Avalonia.dll", "CMCLauncher.Core.dll")
     if not all((publish / name).is_file() for name in required):
         raise ValueError("Desktop runtime files are missing.")
     validate_apphost(publish / required[0], rid)
@@ -58,26 +71,38 @@ def package(publish: Path, output: Path, rid: str) -> None:
     temporary = output.with_name(output.name + ".partial")
     repo = Path(__file__).resolve().parent.parent
     try:
-        with tarfile.open(temporary, "w:gz") as archive:
-            for file in files:
-                if not file.is_file():
-                    continue
-                relative = file.relative_to(publish).as_posix()
-                if relative in {"README.md", "LICENSE"}:
-                    continue
-                info = archive.gettarinfo(str(file), arcname=relative)
-                info.uid = info.gid = 0
-                info.uname = info.gname = ""
-                if relative == required[0]:
-                    info.mode |= 0o111
-                with file.open("rb") as stream:
-                    archive.addfile(info, stream)
-            for name in ("README.md", "LICENSE"):
-                archive.add(repo / name, arcname=name, recursive=False)
-        with tarfile.open(temporary, "r:gz") as archive:
-            names = archive.getnames()
-            if len(names) != len(set(names)) or not archive.getmember(required[0]).mode & 0o111:
-                raise ValueError("The desktop archive failed verification.")
+        if rid == "win-x64":
+            with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                for file in files:
+                    relative = file.relative_to(publish).as_posix()
+                    if file.is_file() and relative not in {"README.md", "LICENSE"}:
+                        archive.write(file, relative)
+                for name in ("README.md", "LICENSE"):
+                    archive.write(repo / name, name)
+            with zipfile.ZipFile(temporary) as archive:
+                if not set(required).issubset(archive.namelist()) or archive.testzip() is not None:
+                    raise ValueError("The desktop archive failed verification.")
+        else:
+            with tarfile.open(temporary, "w:gz") as archive:
+                for file in files:
+                    if not file.is_file():
+                        continue
+                    relative = file.relative_to(publish).as_posix()
+                    if relative in {"README.md", "LICENSE"}:
+                        continue
+                    info = archive.gettarinfo(str(file), arcname=relative)
+                    info.uid = info.gid = 0
+                    info.uname = info.gname = ""
+                    if relative == required[0]:
+                        info.mode |= 0o111
+                    with file.open("rb") as stream:
+                        archive.addfile(info, stream)
+                for name in ("README.md", "LICENSE"):
+                    archive.add(repo / name, arcname=name, recursive=False)
+            with tarfile.open(temporary, "r:gz") as archive:
+                names = archive.getnames()
+                if len(names) != len(set(names)) or not archive.getmember(required[0]).mode & 0o111:
+                    raise ValueError("The desktop archive failed verification.")
         temporary.replace(output)
     finally:
         temporary.unlink(missing_ok=True)
@@ -88,6 +113,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--publish", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--rid", choices=("linux-x64", "osx-arm64", "osx-x64"), required=True)
+    parser.add_argument("--rid", choices=("linux-x64", "osx-arm64", "osx-x64", "win-x64"), required=True)
     options = parser.parse_args()
     package(options.publish, options.output, options.rid)
