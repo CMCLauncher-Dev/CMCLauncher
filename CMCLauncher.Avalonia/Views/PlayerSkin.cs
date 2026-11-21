@@ -47,7 +47,7 @@ public sealed partial class MainWindow
         var dialog = new Window
         {
             Title = Ui("Change skin") + " · " + account.Name,
-            Width = 460,
+            Width = 540,
             SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
@@ -196,14 +196,31 @@ public sealed partial class MainWindow
                 throw new InvalidDataException("Select a 64×64 or 64×32 PNG skin.");
             return bytes;
         });
+        Control InputWithAction(string label, TextBox input, Button button)
+        {
+            var row = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,Auto"),
+                ColumnSpacing = 8,
+            };
+            button.VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Stretch;
+            button.VerticalContentAlignment = global::Avalonia.Layout.VerticalAlignment.Center;
+            Grid.SetColumn(button, 1);
+            row.Children.Add(input);
+            row.Children.Add(button);
+            return Field(label, row);
+        }
+
         dialog.Content = new Border
         {
             Padding = new Thickness(18),
             Child = new ScrollViewer
             {
                 MaxHeight = 580,
-                Content = Stack(previewRow, status, fileButton, Field("Skin image URL", url),
-                    urlButton, Field("Minecraft Java username", playerName), playerButton, slim, Row(apply, cancel)),
+                Content = Stack(previewRow, status, fileButton,
+                    InputWithAction("Skin image URL", url, urlButton),
+                    InputWithAction("Minecraft Java username", playerName, playerButton),
+                    slim, Row(apply, cancel)),
             },
         };
         bool confirmed;

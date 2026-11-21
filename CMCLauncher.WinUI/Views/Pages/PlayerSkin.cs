@@ -50,6 +50,18 @@ public sealed partial class MainWindow
         var urlButton = new Button { Content = Ui("Import from URL") };
         var playerName = new TextBox { Header = Ui("Minecraft Java username") };
         var playerButton = new Button { Content = Ui("Load player skin") };
+        static Grid InputWithAction(TextBox input, Button button)
+        {
+            var row = new Grid { ColumnSpacing = 8 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            button.VerticalAlignment = VerticalAlignment.Bottom;
+            Grid.SetColumn(button, 1);
+            row.Children.Add(input);
+            row.Children.Add(button);
+            return row;
+        }
+
         var dialog = new ContentDialog
         {
             XamlRoot = Content.XamlRoot,
@@ -63,10 +75,20 @@ public sealed partial class MainWindow
                 Content = new StackPanel
                 {
                     Spacing = 10,
-                    Children = { previewRow, status, fileButton, url, urlButton, playerName, playerButton, slim },
+                    Children =
+                    {
+                        previewRow, status, fileButton,
+                        InputWithAction(url, urlButton),
+                        InputWithAction(playerName, playerButton),
+                        slim,
+                    },
                 },
             },
         };
+
+        var dialogWidth = Math.Min(420, Math.Max(0, Content.XamlRoot.Size.Width - 48));
+        dialog.Resources["ContentDialogMinWidth"] = dialogWidth;
+        dialog.Resources["ContentDialogMaxWidth"] = dialogWidth;
 
         void RenderPreview()
         {
