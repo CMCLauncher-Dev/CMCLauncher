@@ -24,7 +24,7 @@ public sealed partial class MainWindow
             .OfType<Button>()
             .Where(b => b.Content?.ToString() == Ui("Open"))
             .ToArray();
-        check(open.Length == 4, "each tool card has an open button");
+        check(open.Length == 5, "each tool card has an open button");
         (
             (IInvokeProvider)new ButtonAutomationPeer(open[1]).GetPattern(PatternInterface.Invoke)
         ).Invoke();
