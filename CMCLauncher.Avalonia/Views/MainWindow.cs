@@ -33,6 +33,7 @@ public sealed partial class MainWindow : Window
     readonly TextBlock pageTitle = new() { FontSize = 26, FontWeight = FontWeight.SemiBold };
     readonly TranslateTransform toastOffset = new();
     static readonly TimeSpan toastFadeDuration = TimeSpan.FromMilliseconds(650);
+    readonly TextBlock pageSubtitle = new() { FontSize = 13, TextWrapping = TextWrapping.Wrap };
     readonly Border toast = new()
     {
         CornerRadius = new CornerRadius(24),
@@ -168,7 +169,7 @@ public sealed partial class MainWindow : Window
             RowDefinitions = new RowDefinitions("Auto,*"),
             Margin = new Thickness(28, 22),
         };
-        pageHeader.Children.Add(pageTitle);
+        pageHeader.Children.Add(Stack(pageTitle, pageSubtitle));
         body.Children.Add(pageHeader);
         var scroll = new ScrollViewer
         {
@@ -411,6 +412,9 @@ public sealed partial class MainWindow : Window
             Grid.SetColumn(customize, 1);
             pageHeader.Children.Add(customize);
         }
+        pageSubtitle.IsVisible = target == "accounts";
+        if (pageSubtitle.IsVisible)
+            pageSubtitle.Text = Ui("选择用于启动游戏的身份，或添加新的账号。");
         pageTitle.Text = Ui(
             target switch
             {
@@ -775,7 +779,7 @@ public sealed partial class MainWindow : Window
     async Task<bool> Confirm(string title, string message) =>
         await Dialog(title, Stack(T(message)), true);
 
-    async Task<bool> Dialog(string title, Control content, bool confirm, bool danger = false)
+    async Task<bool> Dialog(string title, Control content, bool confirm, bool danger = false, string? confirmLabel = null)
     {
         var window = new Window
         {
@@ -804,7 +808,7 @@ public sealed partial class MainWindow : Window
             ColumnSpacing = 10,
         };
         var approve = Btn(
-            confirm ? "Confirm" : "OK",
+            confirm ? confirmLabel ?? "Confirm" : "OK",
             () =>
             {
                 window.Close(true);

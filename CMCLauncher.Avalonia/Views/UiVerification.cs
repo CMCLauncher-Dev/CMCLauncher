@@ -573,9 +573,9 @@ public sealed partial class MainWindow
             var use = pageContent
                 .GetVisualDescendants()
                 .OfType<Button>()
-                .Single(b => b.Tag?.ToString() == "use-account:" + unverified.Key);
-            if (use.IsEnabled)
-                throw new IOException("An unverified Microsoft identity was selectable.");
+                .FirstOrDefault(b => b.Tag?.ToString() == "use-account:" + unverified.Key);
+            if (use != null)
+                throw new IOException("An unverified Microsoft identity was visible.");
             session.Account = unverified;
             await session.RemoveAccount(unverified);
             if (session.Account != null)

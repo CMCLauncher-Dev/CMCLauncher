@@ -839,41 +839,167 @@ public sealed partial class MainWindow
     Control JavaPage()
     {
         var list = Stack();
-        var major = Choice(new[] { 8, 17, 21, 25 }, 21);
+        var settings = session.Store.Config.Settings;
+        void ReportJava(string message)
+        {
+            session.ReportStatus(message);
+            session.Log("INFO", message);
+        }
+        Button JavaAction(string label, string glyph, Func<Task> action)
+        {
+            var button = Btn(label, action);
+            var icon = NavigationIcon(glyph);
+            icon.Width = icon.Height = 16;
+            button.Content = icon;
+            button.MinWidth = button.MinHeight = 28;
+            button.Padding = new global::Avalonia.Thickness(6);
+            button.Background = global::Avalonia.Media.Brushes.Transparent;
+            button.BorderThickness = new global::Avalonia.Thickness(0);
+            ToolTip.SetTip(button, Ui(label));
+            global::Avalonia.Automation.AutomationProperties.SetName(button, Ui(label));
+            return button;
+        }
+
         void Draw()
         {
             list.Children.Clear();
-            foreach (var java in session.Store.Config.Settings.JavaInstallations.ToArray())
-                list.Children.Add(
-                    Card(
-                        Stack(
-                            T(java.Version + " · " + java.Vendor, 15, true),
-                            T(java.Path, 12),
-                            Row(
-                                Btn(
-                                    "Use Java",
-                                    async () =>
-                                    {
-                                        session.Store.Config.Settings.JavaPath = java.Path;
-                                        await session.Save();
-                                    }
-                                ),
-                                ConfirmationButton(
-                                    "Remove from list",
-                                    "Remove Java entry?",
-                                    async () =>
-                                    {
-                                        JavaManager.Remove(session.Store.Config.Settings, java);
-                                        await session.Save();
-                                        Draw();
-                                    },
-                                    "Remove"
-                                )
-                            )
-                        )
-                    )
+            if (!string.IsNullOrWhiteSpace(settings.JavaPath) &&
+                !settings.JavaInstallations.Any(java => java.Path == settings.JavaPath))
+                list.Children.Add(T(session.Locales.Format(settings.LauncherLanguage,
+                    "Manual Java setting: {0} (import it for full details)", settings.JavaPath), 12));
+            if (settings.JavaInstallations.Count == 0)
+                list.Children.Add(T("No Java added yet. Import or scan local installations.", 13));
+
+            foreach (var java in settings.JavaInstallations.OrderByDescending(j => j.Major).ThenBy(j => j.Vendor))
+            {
+                var detail = Stack(T($"Java {java.Version} · {java.Vendor}", 14, true),
+                    T(java.Architecture + " · " + java.Path, 12));
+                detail.Spacing = 5;
+                if (JavaManager.AffectedByJava4Shell(java))
+                {
+                    var warning = T("This Java version is affected by the Java4Shell vulnerability (CVE-2026-114938). Update to a fixed release or the launcher will disable its fast Base64 path automatically.", 12, true);
+                    warning.Foreground = global::Avalonia.Media.Brush.Parse(Light ? "#8B171F" : "#FFB4BC");
+                    detail.Children.Add(new Border
+                    {
+                        Padding = new global::Avalonia.Thickness(10, 6),
+                        CornerRadius = new global::Avalonia.CornerRadius(4),
+                        Background = global::Avalonia.Media.Brush.Parse(Light ? "#FFEBED" : "#401820"),
+                        Child = warning,
+                    });
+                }
+                if (!File.Exists(java.Path))
+                    detail.Children.Add(T("File does not exist. Re-import or remove the entry.", 12));
+                var actions = Row(
+                    JavaAction("Update Java", "M19,10 A7,7 0 1 0 18,16 M19,5 V10 H14", async () =>
+                    {
+                        if (JavaManager.UpdateBrand(session.Store, java) == null)
+                        {
+                            ShowToast(Ui("Automatic updates are unavailable for this Java brand, version or architecture."));
+                            return;
+                        }
+                        if (JavaManager.ManagedBrand(session.Store, java) == null &&
+                            !await Confirm("Update Java", "CMCLauncher will install the update separately and switch its Java entry. The imported files will be kept."))
+                            return;
+                        session.EnsureFilesIdle();
+                        bool updated = false;
+                        if (await session.Run("Update Java", async ct =>
+                            updated = await JavaManager.UpdateJava(session.Core, session.Store, java, ct, ReportJava)))
+                            ShowToast(Ui(updated ? "Java updated" : "No newer Java release found"));
+                        Draw();
+                    }),
+                    JavaAction("Move Java", "M3,18 V6 H9 L11,8 H21 V18 H3 Z M11,13 H18 M15,10 L18,13 L15,16", async () =>
+                    {
+                        session.EnsureFilesIdle();
+                        if (await Folder() is not { } parent)
+                            return;
+                        var removedSource = false;
+                        if (await session.Run("Move Java", async ct =>
+                        {
+                            session.EnsureFilesIdle();
+                            removedSource = await JavaManager.MigrateJava(session.Store, java, parent, ct);
+                        }))
+                            ShowToast(Ui(removedSource ? "Java moved successfully." : "Switched to the new Java folder. Original files were kept."));
+                        Draw();
+                    }),
+                    JavaAction("Remove from list", "M5,12 H19", async () =>
+                    {
+                        if (!await Confirm("Remove Java entry?", java.Path))
+                            return;
+                        JavaManager.Remove(settings, java);
+                        await session.Save();
+                        Draw();
+                    }),
+                    JavaAction("Delete Java folder", "M4,6 H20 M9,6 V3 H15 V6 M6,6 L7,21 H17 L18,6 M10,10 V17 M14,10 V17", async () =>
+                    {
+                        session.EnsureFilesIdle();
+                        var folder = JavaManager.JavaDirectoryForDeletion(session.Store, java);
+                        if (!await Dialog("Delete Java folder",
+                            T(Ui("Move this Java installation to the Recycle Bin? Other apps using it may stop working.") + Environment.NewLine + folder), true, danger: true))
+                            return;
+                        await session.Run("Delete Java folder", async ct =>
+                        {
+                            session.EnsureFilesIdle();
+                            if (!string.Equals(folder, JavaManager.JavaDirectoryForDeletion(session.Store, java),
+                                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                                throw new IOException("The Java installation folder changed.");
+                            ct.ThrowIfCancellationRequested();
+                            await Trash(folder);
+                            if (Directory.Exists(folder))
+                                throw new IOException("The Java installation folder was not deleted.");
+                            JavaManager.Remove(settings, java);
+                            await session.Save();
+                        });
+                        Draw();
+                    })
                 );
+                actions.VerticalAlignment = VerticalAlignment.Center;
+                foreach (var action in actions.Children)
+                    action.Margin = new global::Avalonia.Thickness(2, 0);
+                var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
+                row.Children.Add(detail);
+                Grid.SetColumn(actions, 1);
+                row.Children.Add(actions);
+                var card = Card(row);
+                card.Padding = new global::Avalonia.Thickness(11, 7);
+                list.Children.Add(card);
+            }
         }
+
+        async Task DownloadJava()
+        {
+            var versions = Choice(new[] { 8, 11, 17, 21, 25 }, 21);
+            var brands = Choice(JavaManager.DownloadBrands(21));
+            versions.SelectionChanged += (_, _) =>
+            {
+                if (versions.SelectedItem is not int version)
+                    return;
+                var available = JavaManager.DownloadBrands(version).ToArray();
+                var previous = (brands.SelectedItem as JavaManager.JavaBrand)?.Id;
+                brands.ItemsSource = available;
+                brands.SelectedItem = available.FirstOrDefault(brand => brand.Id == previous) ?? available[0];
+            };
+            string? parent = null;
+            var location = T(Path.Combine(session.Store.Root, "runtimes"), 12);
+            var choose = Btn("Choose folder", async () =>
+            {
+                if (await Folder() is { } folder)
+                {
+                    parent = folder;
+                    location.Text = folder;
+                }
+            });
+            if (!await Dialog("Download Java", Stack(Field("Java version", versions), Field("Java brand", brands), choose, location), true, confirmLabel: "Download Java")
+                || versions.SelectedItem is not int major || brands.SelectedItem is not JavaManager.JavaBrand brand)
+                return;
+            await session.Run(session.Locales.Format(settings.LauncherLanguage, "Download Java {0}", major), async ct =>
+            {
+                var java = await JavaManager.Download(session.Core, session.Store, major, ct, ReportJava, brand.Id, parent);
+                JavaManager.Register(settings, java);
+                await session.Save();
+            });
+            Draw();
+        }
+
         async Task Scan(string? folder = null)
         {
             await session.Run(
@@ -918,93 +1044,50 @@ public sealed partial class MainWindow
         Draw();
         return Stack(
             Row(
+                Btn("Import Java", async () =>
+                {
+                    var path = await OpenFile();
+                    if (path == null)
+                        return;
+                    await session.Run("Import Java", async ct =>
+                    {
+                        JavaManager.Register(settings, await JavaManager.Inspect(path, ct));
+                        await session.Save();
+                    });
+                    Draw();
+                }),
                 Btn("Scan Java", () => Scan()),
-                Btn(
-                    "Scan folder",
-                    async () =>
+                Btn("Scan folder", async () =>
+                {
+                    if (await Folder() is { } folder)
+                        await Scan(folder);
+                }),
+                Btn("Download Java", DownloadJava, true),
+                Btn("Use Java from PATH", async () =>
+                {
+                    var paths = (Environment.GetEnvironmentVariable("PATH") ?? "")
+                        .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(entry => Path.Combine(entry.Trim().Trim('"'), JavaManager.JavaExecutable))
+                        .Where(File.Exists)
+                        .Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
+                        .ToArray();
+                    if (paths.Length == 0)
+                        throw new IOException(Ui("Java not found in PATH."));
+                    await session.Run("Import Java from PATH", async ct =>
                     {
-                        var folder = await Folder();
-                        if (folder != null)
-                            await Scan(folder);
-                    }
-                ),
-                Btn(
-                    "Import Java",
-                    async () =>
-                    {
-                        var path = await OpenFile();
-                        if (path != null)
+                        foreach (var path in paths)
                         {
-                            await session.Run(
-                                "Import Java",
-                                async ct =>
-                                {
-                                    JavaManager.Register(
-                                        session.Store.Config.Settings,
-                                        await JavaManager.Inspect(path, ct)
-                                    );
-                                    await session.Save();
-                                }
-                            );
-                            Draw();
+                            ct.ThrowIfCancellationRequested();
+                            try { JavaManager.Register(settings, await JavaManager.Inspect(path, ct)); }
+                            catch (Exception ex) when (!ct.IsCancellationRequested)
+                            {
+                                session.Log("DEBUG", ex.Message);
+                            }
                         }
-                    }
-                )
-            ),
-            Row(
-                Btn(
-                    "Use Java from PATH",
-                    async () =>
-                    {
-                        var path = (Environment.GetEnvironmentVariable("PATH") ?? "")
-                            .Split(Path.PathSeparator)
-                            .Select(entry =>
-                                Path.Combine(entry.Trim().Trim('"'), JavaManager.JavaExecutable)
-                            )
-                            .FirstOrDefault(File.Exists);
-                        if (path == null)
-                            throw new IOException(Ui("No Java installation was found on PATH."));
-                        await session.Run(
-                            "Import Java",
-                            async ct =>
-                            {
-                                var java = await JavaManager.Inspect(path, ct);
-                                JavaManager.Register(session.Store.Config.Settings, java);
-                                session.Store.Config.Settings.JavaPath = java.Path;
-                                await session.Save();
-                            }
-                        );
-                        Draw();
-                    }
-                ),
-                major,
-                Btn(
-                    "Download Temurin",
-                    async () =>
-                    {
-                        await session.Run(
-                            "Download Java",
-                            async ct =>
-                            {
-                                var java = await JavaManager.Download(
-                                    session.Core,
-                                    session.Store,
-                                    (int)major.SelectedItem!,
-                                    ct,
-                                    value =>
-                                    {
-                                        session.ReportStatus(value);
-                                        session.Log("INFO", value);
-                                    }
-                                );
-                                JavaManager.Register(session.Store.Config.Settings, java);
-                                await session.Save();
-                            }
-                        );
-                        Draw();
-                    },
-                    true
-                )
+                        await session.Save();
+                    });
+                    Draw();
+                })
             ),
             list
         );
@@ -1012,182 +1095,224 @@ public sealed partial class MainWindow
 
     Control AccountsPage()
     {
-        var body = Stack();
-        var code = T("");
-        var signInUrl = "https://www.microsoft.com/link";
-        var deviceCode = "";
-        body.Children.Add(
-            Card(
-                Stack(
-                    T("Microsoft", 18, true),
-                    code,
-                    Row(
-                        Btn(
-                            "Sign in with Microsoft",
-                            async () =>
-                            {
-                                await session.Run(
-                                    "Microsoft sign-in",
-                                    async ct =>
-                                    {
-                                        var identity = await new MicrosoftAuth(session.Core).Login(
-                                            "",
-                                            (value, url) =>
-                                                Dispatcher.UIThread.Post(() =>
-                                                {
-                                                    code.Text = value + "\n" + url;
-                                                    deviceCode = value;
-                                                    signInUrl = url;
-                                                }),
-                                            ct,
-                                            session.ReportStatus
-                                        );
-                                        session.Store.Config.Accounts.RemoveAll(a =>
-                                            a.Type == identity.Type && a.Uuid == identity.Uuid
-                                        );
-                                        session.Store.Config.Accounts.Add(identity);
-                                        session.Account = identity;
-                                        await session.Save();
-                                    }
-                                );
-                                await Navigate("accounts");
-                            },
-                            true
-                        ),
-                        Btn(
-                            "复制设备代码",
-                            async () =>
-                            {
-                                if (Clipboard != null && deviceCode.Length > 0)
-                                    await Clipboard.SetTextAsync(deviceCode);
-                            }
-                        ),
-                        Btn(
-                            "Open sign-in page",
-                            () =>
-                            {
-                                Open(signInUrl);
-                                return Task.CompletedTask;
-                            }
-                        )
-                    )
-                )
-            )
-        );
-        var offlineName = Input("", "Player name");
-        var offline = Btn(
-            "Add offline account",
-            async () =>
+        var accounts = session.Store.Config.Accounts;
+        var saved = Stack(T("已保存的账号", 18, true));
+        var add = Stack(T("添加账号", 18, true));
+        var visible = accounts.Where(a => a.Type != "microsoft" || MicrosoftAuth.IsVerifiedMinecraftPlayer(a)).ToArray();
+        if (visible.Length == 0)
+            saved.Children.Add(Card(T("还没有账号，请在下方登录 Microsoft 账号。", 13)));
+
+        async Task SaveAccount(Account identity)
+        {
+            MicrosoftAuth.EnsureAccountAllowed(accounts, identity);
+            accounts.RemoveAll(a => a.Key == identity.Key);
+            accounts.Add(identity);
+            session.Account = identity;
+            await session.Save();
+        }
+
+        foreach (var identity in visible)
+        {
+            var allowed = MicrosoftAuth.CanUseAccount(accounts, identity);
+            var current = session.Account?.Key == identity.Key && allowed;
+            var use = Btn(current ? "当前使用" : "使用此账号", async () =>
             {
-                if (!MicrosoftAuth.CanUseOffline(session.Store.Config.Accounts))
-                    throw new IOException(MicrosoftAuth.OfflineLockedMessage);
-                var identity = Account.Offline(offlineName.Text?.Trim() ?? "");
-                session.Store.Config.Accounts.Add(identity);
+                MicrosoftAuth.EnsureAccountAllowed(accounts, identity);
                 session.Account = identity;
                 await session.Save();
                 await Navigate("accounts");
-            }
-        );
-        offline.IsEnabled = MicrosoftAuth.CanUseOffline(session.Store.Config.Accounts);
-        body.Children.Add(Card(Stack(T("Offline identity", 18, true), offlineName, offline)));
-        var server = Input("https://littleskin.cn/api/yggdrasil");
-        var login = Input();
-        var password = Input();
-        password.PasswordChar = '●';
-        body.Children.Add(
-            Card(
-                new Expander
-                {
-                    Header = Ui("External sign-in (authlib-injector)"),
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    Content = Stack(
-                        Field("Authentication server", server),
-                        Field("Username", login),
-                        Field("Password", password),
-                        Btn(
-                            "Sign in",
-                            async () =>
-                            {
-                                await session.Run(
-                                    "External sign-in",
-                                    async ct =>
-                                    {
-                                        using var external = new ExternalAuth(
-                                            session.Store.Config.Settings
-                                        );
-                                        var identity = await external.Login(
-                                            session.Store.Config.Accounts,
-                                            server.Text ?? "",
-                                            login.Text ?? "",
-                                            password.Text ?? "",
-                                            async profiles =>
-                                            {
-                                                var picker = Choice(profiles);
-                                                return await Dialog("Choose profile", picker, true)
-                                                    ? picker.SelectedItem as ExternalProfile
-                                                    : null;
-                                            },
-                                            ct
-                                        );
-                                        password.Text = "";
-                                        session.Store.Config.Accounts.Add(identity);
-                                        session.Account = identity;
-                                        await session.Save();
-                                    }
-                                );
-                                await Navigate("accounts");
-                            },
-                            true
-                        )
-                    ),
-                }
-            )
-        );
-        foreach (var card in body.Children.OfType<Border>())
-            if (card.Child is Expander { Content: StackPanel external })
-            {
-                var allowed = MicrosoftAuth.CanUseExternal(session.Store.Config.Accounts);
-                foreach (var signIn in external.Children.OfType<Button>())
-                    signIn.IsEnabled = allowed;
-                if (!allowed)
-                    external.Children.Add(T(MicrosoftAuth.ExternalLockedMessage, 12));
-            }
-        foreach (var identity in session.Store.Config.Accounts.ToArray())
-        {
-            var use = Btn(
-                "Use account",
+            }, current);
+            use.Tag = "use-account:" + identity.Key;
+            use.IsEnabled = allowed;
+            var actions = Row(use, ConfirmationButton(
+                "Remove account", Ui("Remove account?") + " " + identity.Name,
                 async () =>
                 {
-                    MicrosoftAuth.EnsureAccountAllowed(session.Store.Config.Accounts, identity);
-                    session.Account = identity;
-                    await session.Save();
+                    await session.RemoveAccount(identity);
                     await Navigate("accounts");
-                }
-            );
-            use.Tag = "use-account:" + identity.Key;
-            use.IsEnabled = MicrosoftAuth.CanUseAccount(session.Store.Config.Accounts, identity);
-            body.Children.Add(
-                Card(
-                    Stack(
-                        Row(AccountAvatar(identity, 40), T(identity.ToString(), 16, true)),
-                        Row(
-                            use,
-                            ConfirmationButton(
-                                "Remove account",
-                                Ui("Remove account?") + " " + identity.Name,
-                                async () =>
-                                {
-                                    await session.RemoveAccount(identity);
-                                    await Navigate("accounts");
-                                },
-                                "Remove"
-                            )
-                        )
-                    )
-                )
-            );
+                }, "Remove"));
+            var provider = identity.Type switch
+            {
+                "microsoft" => "Microsoft",
+                "yggdrasil" => identity.AuthServer,
+                _ => "离线账号",
+            };
+            var identityRow = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 12 };
+            identityRow.Children.Add(AccountAvatar(identity, 40));
+            var details = Stack(T(identity.Name, 16, true), T(provider, 11));
+            details.Spacing = 2;
+            Grid.SetColumn(details, 1);
+            identityRow.Children.Add(details);
+            var cardBody = Stack(identityRow);
+            if (!allowed)
+                cardBody.Children.Add(T(identity.Type == "yggdrasil"
+                    ? MicrosoftAuth.ExternalLockedMessage
+                    : "context.accounts.this_account_must_be_verified_again_through_microsoft_sign_in", 12));
+            saved.Children.Add(Card(AccountColumns(cardBody, actions, 620, rightAlign: true)));
         }
-        return body;
+
+        var loginStatus = T("", 12);
+        var codeText = Input();
+        codeText.IsReadOnly = true;
+        var verificationUrl = "";
+        async Task CopyCode()
+        {
+            if (Clipboard == null || string.IsNullOrEmpty(codeText.Text))
+                return;
+            await Clipboard.SetTextAsync(codeText.Text);
+            loginStatus.Text = Ui("Device code copied. Paste it in your browser to continue.");
+        }
+        void OpenSignIn()
+        {
+            if (MicrosoftAuth.IsVerificationUrl(verificationUrl))
+                Open(verificationUrl);
+        }
+        var codeActions = Stack(
+            T("请在浏览器中输入设备代码："),
+            codeText,
+            Row(Btn("复制设备代码", CopyCode), Btn("重新打开浏览器", () =>
+            {
+                OpenSignIn();
+                return Task.CompletedTask;
+            })),
+            Btn("Open sign-in page", () =>
+            {
+                OpenSignIn();
+                return Task.CompletedTask;
+            })
+        );
+        codeActions.IsVisible = false;
+        loginStatus.IsVisible = false;
+        var microsoft = Btn("Microsoft 设备代码登录", async () =>
+        {
+            loginStatus.IsVisible = true;
+            loginStatus.Text = Ui("Requesting a device code…");
+            codeActions.IsVisible = false;
+            verificationUrl = "";
+            codeText.Text = "";
+            try
+            {
+                var completed = await session.Run("Microsoft sign-in", async ct =>
+                {
+                    var identity = await new MicrosoftAuth(session.Core).Login(
+                        MicrosoftAuth.ConfiguredClientId,
+                        (value, url) => Dispatcher.UIThread.Post(async () =>
+                        {
+                            if (ct.IsCancellationRequested || route != "accounts")
+                                return;
+                            codeText.Text = value;
+                            verificationUrl = url;
+                            codeActions.IsVisible = true;
+                            try { await CopyCode(); }
+                            catch { loginStatus.Text = Ui("Could not copy automatically. Copy the device code above manually."); }
+                            try { OpenSignIn(); }
+                            catch { loginStatus.Text = Ui("The browser did not open automatically. Use the sign-in link below."); }
+                        }),
+                        ct,
+                        stage => Dispatcher.UIThread.Post(() => loginStatus.Text = Ui(stage))
+                    );
+                    await SaveAccount(identity);
+                });
+                if (completed)
+                    await Navigate("accounts");
+                else
+                    loginStatus.Text = Ui("Sign-in canceled");
+            }
+            catch
+            {
+                loginStatus.Text = Ui("Sign-in incomplete. See the error details; browser authorization must still be verified by Xbox and Minecraft services.");
+                throw;
+            }
+        }, true);
+        add.Children.Add(Card(Stack(T("Microsoft", 16, true),
+            T("使用拥有 Minecraft 的 Microsoft 账号登录。", 12), microsoft, loginStatus, codeActions)));
+
+        var offline = Stack(T("离线身份", 16, true));
+        if (MicrosoftAuth.CanUseOffline(accounts))
+        {
+            var name = Input("", Ui("3–16 letters, numbers, or underscores"));
+            name.MaxLength = 16;
+            offline.Children.Add(Field("Offline player name", name));
+            offline.Children.Add(Btn("Add offline account", async () =>
+            {
+                await SaveAccount(Account.Offline(name.Text?.Trim() ?? ""));
+                await Navigate("accounts");
+            }));
+        }
+        else
+            offline.Children.Add(T(MicrosoftAuth.OfflineLockedMessage, 12));
+
+        var server = Input("", "https://example.com/api/yggdrasil/");
+        var preset = Btn("LittleSkin", () =>
+        {
+            server.Text = "https://littleskin.cn/api/yggdrasil";
+            return Task.CompletedTask;
+        });
+        var login = Input("", Ui("Username or email"));
+        var password = Input();
+        password.PasswordChar = '●';
+        var external = Stack(T("External sign-in (authlib-injector)", 16, true));
+        var unlocked = MicrosoftAuth.CanUseExternal(accounts);
+        if (!unlocked)
+            external.Children.Add(T(MicrosoftAuth.ExternalLockedMessage, 12));
+        var fields = Stack(
+            Field("Authentication server", AccountColumns(server, preset, 0, rightAlign: true)),
+            Field("External account", login),
+            Field("Password", password),
+            Btn("Sign in to external account", async () =>
+            {
+                MicrosoftAuth.EnsureExternalAllowed(accounts);
+                try
+                {
+                    if (await session.Run("External sign-in", async ct =>
+                    {
+                        using var auth = new ExternalAuth(session.Store.Config.Settings);
+                        var identity = await auth.Login(accounts, server.Text ?? "", login.Text ?? "", password.Text ?? "",
+                            async profiles =>
+                            {
+                                var picker = Choice(profiles);
+                                return await Dialog("Select a player profile", picker, true)
+                                    ? picker.SelectedItem as ExternalProfile : null;
+                            }, ct);
+                        await SaveAccount(identity);
+                    }))
+                        await Navigate("accounts");
+                }
+                finally { password.Text = ""; }
+            }, true)
+        );
+        fields.IsEnabled = unlocked;
+        external.Children.Add(fields);
+        add.Children.Add(AccountColumns(Card(external), Card(offline), 620));
+        return Stack(saved, add);
+    }
+
+    static Grid AccountColumns(Control left, Control right, double narrowWidth, bool rightAlign = false)
+    {
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions(rightAlign ? "*,Auto" : "*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto"),
+            ColumnSpacing = 12,
+        };
+        left.VerticalAlignment = VerticalAlignment.Top;
+        right.VerticalAlignment = rightAlign ? VerticalAlignment.Center : VerticalAlignment.Top;
+        grid.Children.Add(left);
+        grid.Children.Add(right);
+        void Arrange(bool narrow)
+        {
+            grid.RowSpacing = narrow ? 12 : 0;
+            Grid.SetColumnSpan(left, narrow ? 2 : 1);
+            Grid.SetColumnSpan(right, narrow ? 2 : 1);
+            Grid.SetColumn(right, narrow ? 0 : 1);
+            Grid.SetRow(right, narrow ? 1 : 0);
+            right.HorizontalAlignment = rightAlign
+                ? narrow ? HorizontalAlignment.Left : HorizontalAlignment.Right
+                : HorizontalAlignment.Stretch;
+        }
+        Arrange(false);
+        grid.SizeChanged += (_, e) => Arrange(e.NewSize.Width < narrowWidth);
+        return grid;
     }
 
     Control LogsPage()
