@@ -228,14 +228,26 @@ public sealed partial class MainWindow
                 .Single(combo => combo.Name == "InstanceLayout");
             if (instanceLayout.SelectedIndex != 1)
                 throw new IOException("WinUI tile layout was not restored by Avalonia.");
-            instanceLayout.SelectedIndex = 0;
-            await Task.Delay(50);
-            instanceLayout.SelectedIndex = 1;
-            await Task.Delay(100);
-            if (new Store(session.Store.Root).Config.Settings.InstanceView != "tile")
+            async Task WaitForSavedInstanceLayout(string expected)
+            {
+                var elapsed = System.Diagnostics.Stopwatch.StartNew();
+                string actual;
+                do
+                {
+                    actual = new Store(session.Store.Root).Config.Settings.InstanceView;
+                    if (actual == expected)
+                        return;
+                    await Task.Delay(25);
+                } while (elapsed.Elapsed < TimeSpan.FromSeconds(5));
+
                 throw new IOException(
-                    "Avalonia saved a different instance layout value from WinUI."
+                    $"Avalonia instance layout did not persist as '{expected}'; saved value was '{actual}'."
                 );
+            }
+            instanceLayout.SelectedIndex = 0;
+            await WaitForSavedInstanceLayout("list");
+            instanceLayout.SelectedIndex = 1;
+            await WaitForSavedInstanceLayout("tile");
             session.Store.Config.Settings.InstanceView = savedLayout;
             checks.Add("PASS instance layout reads and writes the shared WinUI tile setting");
             await VerifyGameDownloadSteps(checks);
