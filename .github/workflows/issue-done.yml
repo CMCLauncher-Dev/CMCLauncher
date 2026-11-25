@@ -1,0 +1,29 @@
+name: Mark completed issues Done
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  update-labels:
+    if: github.event.issue.state_reason == 'completed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep category labels and add Done
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const issue = { ...context.repo, issue_number: context.issue.number };
+            const { data } = await github.rest.issues.get(issue);
+            if (data.state !== 'closed' || data.state_reason !== 'completed') return;
+
+            const categories = new Set(['- BUG', '- Feat', '- Opt']);
+            const labels = data.labels.map(label => label.name);
+            const nextLabels = labels.filter(label => categories.has(label));
+            nextLabels.push('Done');
+
+            if (labels.length === nextLabels.length && nextLabels.every(label => labels.includes(label))) return;
+            await github.rest.issues.setLabels({ ...issue, labels: nextLabels });
