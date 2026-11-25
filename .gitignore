@@ -14,3 +14,4 @@ test-extract/
 scripts/clean-project.ps1
 # Visual Studio local caches and workspace state
 **/.vs/
+Video/

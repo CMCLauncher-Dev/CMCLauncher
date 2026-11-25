@@ -93,8 +93,8 @@ public sealed partial class MainWindow
                 ? new Thickness(11 * menuScale, 2 * menuScale, 8 * menuScale, 2 * menuScale)
                 : new Thickness(10 * menuScale, 3 * menuScale, 8 * menuScale, 3 * menuScale);
             visual.Label.FontSize = 14 * fontScale;
-            visual.Icon.Width = 16 * fontScale;
-            visual.Icon.Height = (key == "root:more" ? 5 : 16) * fontScale;
+            visual.Icon.Width = 18 * fontScale;
+            visual.Icon.Height = (key == "root:more" ? 5 : 18) * fontScale;
         }
         RefreshTaskNavigation();
     }
@@ -267,17 +267,21 @@ public sealed partial class MainWindow
         SyncNavigation(false, true);
     }
 
-    global::Avalonia.Controls.Shapes.Path NavigationIcon(string path) =>
-        new()
-        {
-            Data = Geometry.Parse(path),
-            Width = 16,
-            Height = 16,
-            Stretch = Stretch.Uniform,
-            Stroke = Foreground,
-            StrokeThickness = 1.5,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
+global::Avalonia.Controls.Shapes.Path NavigationIcon(string path) =>
+    new()
+    {
+        Data = Geometry.Parse(path),
+        Width = 18,
+        Height = 18,
+        Stretch = Stretch.Uniform,
+        Stroke = Foreground,
+        StrokeThickness = 1.5,
+        StrokeJoin = PenLineJoin.Round,
+        StrokeLineCap = PenLineCap.Round,
+        UseLayoutRounding = true,
+        HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center,
+    };
 
     Button NavigationButton(
         string title,
