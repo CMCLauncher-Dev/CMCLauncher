@@ -520,6 +520,7 @@ public sealed partial class MainWindow : Window
             scaling.LayoutTransform = new ScaleTransform(settings.UiScale, settings.UiScale);
             Resources["SystemAccentColor"] = ((SolidColorBrush)Accent).Color;
             Resources["SystemControlHighlightAccentBrush"] = Accent;
+#if WINDOWS81
             if (
                 Application
                     .Current?.Styles.OfType<global::Avalonia.Themes.Fluent.FluentTheme>()
@@ -555,6 +556,13 @@ public sealed partial class MainWindow : Window
                     fluent.Palettes[variant] = palette;
                 }
             }
+#else
+            var fluent = Application.Current?.Styles
+                .OfType<global::FluentAvalonia.Styling.FluentAvaloniaTheme>()
+                .FirstOrDefault();
+            if (fluent is not null)
+                fluent.CustomAccentColor = ((SolidColorBrush)Accent).Color;
+#endif
 
             sidebar.BorderBrush = new SolidColorBrush(
                 Color.Parse(

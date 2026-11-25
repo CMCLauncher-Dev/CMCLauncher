@@ -19,6 +19,7 @@ public static class AboutAcknowledgements
         new(".NET", "https://github.com/dotnet/runtime", "dotnet.png"),
         new("WinUI 3", "https://github.com/microsoft/microsoft-ui-xaml", "winui.png"),
         new("Avalonia", "https://github.com/AvaloniaUI/Avalonia", "avalonia.png"),
+        new("FluentAvalonia", "https://github.com/amwx/FluentAvalonia", "avalonia.png"),
         new("AngleSharp", "https://github.com/AngleSharp/AngleSharp", "anglesharp.png"),
         new("Markdig", "https://github.com/xoofx/markdig", "frp.png"),
         new("frp", "https://github.com/fatedier/frp", "frp.png"),

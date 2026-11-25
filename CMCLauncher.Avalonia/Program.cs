@@ -1,7 +1,11 @@
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+#if WINDOWS81
 using Avalonia.Themes.Fluent;
+#else
+using FluentAvalonia.Styling;
+#endif
 using CMCLauncher.Avalonia.Views;
 
 namespace CMCLauncher.Avalonia;
@@ -112,6 +116,7 @@ public sealed class App : Application
 {
     public override void Initialize()
     {
+#if WINDOWS81
         Styles.Add(new FluentTheme());
         Styles.Add(new global::Avalonia.Markup.Xaml.Styling.StyleInclude(
             new Uri("avares://CMCLauncher.Avalonia/")
@@ -119,6 +124,9 @@ public sealed class App : Application
         {
             Source = new Uri("avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"),
         });
+#else
+        Styles.Add(new FluentAvaloniaTheme());
+#endif
     }
 
     public override void OnFrameworkInitializationCompleted()
