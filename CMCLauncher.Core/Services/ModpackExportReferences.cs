@@ -55,9 +55,7 @@ public static class ModpackExportReferences
     {
         ct.ThrowIfCancellationRequested();
         var recordsPath = Path.Combine(root, ".craft-mods-native.json");
-        var records = File.Exists(recordsPath)
-            ? JsonNode.Parse(await File.ReadAllTextAsync(recordsPath, ct))
-            : null;
+        var records = await ModrinthService.ReadModRecords(recordsPath, ct);
         var tracked =
             relative.StartsWith("mods/", StringComparison.Ordinal)
             && relative.EndsWith(".jar", StringComparison.OrdinalIgnoreCase)

@@ -117,6 +117,27 @@ public sealed class ModrinthService(LauncherCore core, Store store)
     readonly SemaphoreSlim filterCatalogLock = new(1, 1);
 
     // 只缓存完整的标签目录；失败不缓存，下次可以重新获取。
+    internal static async Task<JsonArray> ReadModRecords(string path, CancellationToken ct)
+    {
+        try
+        {
+            if (
+                JsonNode.Parse(await System.IO.File.ReadAllTextAsync(path, ct)) is JsonArray records
+                && records.All(record =>
+                    record is JsonObject && !string.IsNullOrWhiteSpace(record.S("file"))
+                )
+            )
+                return records;
+        }
+        catch (Exception ex)
+            when (ex
+                    is System.Text.Json.JsonException
+                        or FileNotFoundException
+                        or DirectoryNotFoundException
+            ) { }
+        return new JsonArray();
+    }
+
     public async Task<CommunityFilterCatalog> FilterCatalog(CancellationToken ct)
     {
         await filterCatalogLock.WaitAsync(ct);
@@ -537,9 +558,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
                         );
                 }
             }
-            var records = System.IO.File.Exists(record)
-                ? JsonNode.Parse(await System.IO.File.ReadAllTextAsync(record, ct))!
-                : new JsonArray();
+            var records = await ReadModRecords(record, ct);
             await Store.AtomicJson(
                 Path.Combine(stage, ".craft-mods-native.json"),
                 new JsonArray(
@@ -712,9 +731,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
         var game = store.GameDirectory(instance);
         var modRoot = ContentManager.Folder(game, "mod");
         var recordFile = Path.Combine(game, ".craft-mods-native.json");
-        var records = File.Exists(recordFile)
-            ? JsonNode.Parse(await File.ReadAllTextAsync(recordFile, ct))!.AsArray()
-            : new JsonArray();
+        var records = await ReadModRecords(recordFile, ct);
         var installedFiles = ContentManager
             .List(game, "mod")
             .Select(item => ContentManager.Locate(game, "mod", null, item.File))

@@ -481,7 +481,7 @@ public sealed class CurseForgeCommunityService : IDisposable
         var recordsFile = Path.Combine(store.GameDirectory(instance), ".craft-mods-native.json");
         if (!System.IO.File.Exists(recordsFile))
             return null;
-        var records = JsonNode.Parse(await System.IO.File.ReadAllTextAsync(recordsFile, ct));
+        var records = await ModrinthService.ReadModRecords(recordsFile, ct);
         var record = records
             .Items()
             .FirstOrDefault(r => r.S("file") == file && IsProject(r.S("project")));
@@ -683,11 +683,7 @@ public sealed class CurseForgeCommunityService : IDisposable
                     store.GameDirectory(instance),
                     ".craft-mods-native.json"
                 );
-                var records = System.IO.File.Exists(recordFile)
-                    ? JsonNode
-                        .Parse(await System.IO.File.ReadAllTextAsync(recordFile, ct))!
-                        .AsArray()
-                    : new JsonArray();
+                var records = await ModrinthService.ReadModRecords(recordFile, ct);
                 records.Add(
                     new JsonObject
                     {

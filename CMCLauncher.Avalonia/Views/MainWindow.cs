@@ -265,8 +265,16 @@ public sealed partial class MainWindow : Window
                     if (arguments[0] == "--verify-datapack-ui") await VerifyDataPackUi();
                     else await VerifyUi();
                 }
-                else if (session.Store.Config.Settings.MinecraftDirectorySetupPending)
-                    await FirstRun();
+                else
+                {
+                    if (session.Store.RecoveredSettingsPath is { } backup)
+                        await Dialog("Launcher settings recovered", Stack(
+                            T("The settings file was damaged. Default settings are now in use. The original file is saved at:"),
+                            new SelectableTextBlock { Text = backup, TextWrapping = TextWrapping.Wrap }
+                        ), false);
+                    if (session.Store.Config.Settings.MinecraftDirectorySetupPending)
+                        await FirstRun();
+                }
                 if (!Verifying) await ShowStartupOptionsRecoveries();
                 if (!Verifying && session.Store.Config.Settings.CheckLauncherUpdates)
                     _ = CheckDesktopUpdates(false);

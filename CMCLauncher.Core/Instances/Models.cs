@@ -270,20 +270,62 @@ public sealed class Store
             ?? DefaultRoot(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
         System.IO.Directory.CreateDirectory(Library);
         var file = Path.Combine(Root, "settings.json");
-        var firstRun = !File.Exists(file);
-        Config = firstRun
-            ? new()
-            : JsonSerializer.Deserialize<Configuration>(File.ReadAllText(file), JsonOptions)
-                ?? throw new Exception("配置为空");
-        if (firstRun)
+        Configuration? config = null;
+        if (File.Exists(file))
+        {
+            try
+            {
+                config = JsonSerializer.Deserialize<Configuration>(
+                    File.ReadAllText(file),
+                    JsonOptions
+                );
+                if (
+                    config?.Settings == null
+                    || config.Instances == null
+                    || config.Accounts == null
+                    || config.MinecraftDirectories == null
+                    || config.Instances.Any(x => x == null)
+                    || config.Accounts.Any(x => x == null)
+                    || config.MinecraftDirectories.Any(x => x == null)
+                )
+                    throw new JsonException("Invalid launcher configuration.");
+            }
+            catch (JsonException)
+            {
+                var backup = Path.Combine(
+                    Root,
+                    $"settings.corrupt-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.json"
+                );
+                File.Move(file, backup);
+                RecoveredSettingsPath = backup;
+                config = null;
+            }
+        }
+        Config = config ?? new();
+        if (config == null)
         {
             Config.Settings.MinecraftDirectorySetupPending = true;
-            // 首次启动：根据系统 UI 语言选择对应的界面语言。
             Config.Settings.LauncherLanguage = InterfaceLanguageForSystem();
         }
-        if (new MinecraftDirectoryManager(this).RegisterDefaultLibrary())
-            File.WriteAllText(file, JsonSerializer.Serialize(Config, JsonOptions));
+        if (
+            new MinecraftDirectoryManager(this).RegisterDefaultLibrary()
+            || RecoveredSettingsPath != null
+        )
+        {
+            var pending = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllText(pending, JsonSerializer.Serialize(Config, JsonOptions));
+                File.Move(pending, file, overwrite: true);
+            }
+            finally
+            {
+                File.Delete(pending);
+            }
+        }
     }
+
+    public string? RecoveredSettingsPath { get; }
 
     internal static string DefaultRoot(string appData)
     {
@@ -326,9 +368,18 @@ public sealed class Store
         }
         if (File.Exists(settings))
         {
-            var config = JsonNode.Parse(File.ReadAllText(settings));
-            Rewrite(config);
-            File.WriteAllText(pending, config!.ToJsonString(JsonOptions));
+            try
+            {
+                if (JsonNode.Parse(File.ReadAllText(settings)) is JsonObject config)
+                {
+                    Rewrite(config);
+                    File.WriteAllText(pending, config.ToJsonString(JsonOptions));
+                }
+            }
+            catch (JsonException)
+            {
+                // The store will quarantine the original file after the directory is migrated.
+            }
         }
         try
         {

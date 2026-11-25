@@ -2,6 +2,8 @@
   "code": "zh_cn",
   "displayName": "简体中文",
   "strings": {
+    "Launcher settings recovered": "已恢复启动器设置",
+    "The settings file was damaged. Default settings are now in use. The original file is saved at:": "设置文件已损坏，现已使用默认设置。原文件保存在以下位置：",
     "Choose instances to transfer": "选择要转移的实例",
     "Select one or more instances. Expand each card to choose its content.": "可勾选多个实例。展开卡片可分别选择要转移的内容。",
     "No instances available to transfer.": "没有可转移的实例。",

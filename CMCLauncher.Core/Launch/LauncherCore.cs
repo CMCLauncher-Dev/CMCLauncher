@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -340,13 +341,23 @@ public sealed partial class LauncherCore : IDisposable
     }
 
     // 文件下载 — 分块流式下载 + 哈希校验 + 进度事件 + .part 临时文件
-    public async Task Download(
+    public Task Download(
         string url,
         string target,
         string? hash = null,
         string algorithm = "sha1",
         long? size = null,
         CancellationToken ct = default
+    ) => DownloadChecked(url, target, hash, algorithm, size, ct);
+
+    async Task DownloadChecked(
+        string url,
+        string target,
+        string? hash,
+        string algorithm,
+        long? size,
+        CancellationToken ct,
+        Func<string, CancellationToken, Task<bool>>? validate = null
     )
     {
         // Shared libraries/assets can be requested concurrently, including by separate core instances.
@@ -357,7 +368,7 @@ public sealed partial class LauncherCore : IDisposable
         await gate.WaitAsync(ct);
         try
         {
-            await DownloadUnlocked(url, target, hash, algorithm, size, ct);
+            await DownloadUnlocked(url, target, hash, algorithm, size, ct, validate);
         }
         finally
         {
@@ -368,10 +379,11 @@ public sealed partial class LauncherCore : IDisposable
     async Task DownloadUnlocked(
         string url,
         string target,
-        string? hash = null,
-        string algorithm = "sha1",
-        long? size = null,
-        CancellationToken ct = default
+        string? hash,
+        string algorithm,
+        long? size,
+        CancellationToken ct,
+        Func<string, CancellationToken, Task<bool>>? validate
     )
     {
         async Task<bool> Valid()
@@ -380,6 +392,8 @@ public sealed partial class LauncherCore : IDisposable
                 return false;
             var info = new FileInfo(target);
             if (size.HasValue && info.Length != size)
+                return false;
+            if (validate != null && !await validate(target, ct))
                 return false;
             if (string.IsNullOrWhiteSpace(hash))
                 return true;
@@ -462,13 +476,19 @@ public sealed partial class LauncherCore : IDisposable
                     FileOptions.Asynchronous | FileOptions.SequentialScan
                 );
                 var bytes =
-                    algorithm == "sha512" ? await StreamHash.ComputeAsync(SHA512.Create(), stream, ct)
-                    : algorithm == "sha256" ? await StreamHash.ComputeAsync(SHA256.Create(), stream, ct)
+                    algorithm == "sha512"
+                        ? await StreamHash.ComputeAsync(SHA512.Create(), stream, ct)
+                    : algorithm == "sha256"
+                        ? await StreamHash.ComputeAsync(SHA256.Create(), stream, ct)
                     : await StreamHash.ComputeAsync(SHA1.Create(), stream, ct);
                 if (!Convert.ToHexString(bytes).Equals(hash, StringComparison.OrdinalIgnoreCase))
                     throw new Exception("文件哈希校验失败");
             }
-            // 大小和哈希都通过后才替换目标，失败时 finally 只清理本次临时文件。
+            // 校验通过后才替换目标，失败时只清理本次临时文件。
+            if (validate != null && !await validate(temp, ct))
+                throw new InvalidDataException(
+                    "Downloaded metadata is not valid JSON: " + Path.GetFileName(target)
+                );
             ct.ThrowIfCancellationRequested();
             File.Move(temp, target, true);
             DownloadProgress?.Invoke(100);
@@ -498,12 +518,50 @@ public sealed partial class LauncherCore : IDisposable
             .ToList();
     }
 
+    static async Task<JsonObject?> ReadMetadata(string path, CancellationToken ct)
+    {
+        try
+        {
+            return JsonNode.Parse(await File.ReadAllTextAsync(path, ct)) as JsonObject;
+        }
+        catch (Exception ex)
+            when (ex is JsonException or FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    async Task<JsonObject> DownloadMetadata(
+        string url,
+        string file,
+        CancellationToken ct,
+        string? hash = null,
+        long? size = null,
+        Func<JsonObject, bool>? shape = null
+    )
+    {
+        await DownloadChecked(
+            url,
+            file,
+            hash,
+            "sha1",
+            size,
+            ct,
+            async (path, token) =>
+                await ReadMetadata(path, token) is { } value && (shape == null || shape(value))
+        );
+        return await ReadMetadata(file, ct)
+            ?? throw new InvalidDataException("Cannot read metadata: " + Path.GetFileName(file));
+    }
+
+    static bool IsAssetIndex(JsonObject index) => index["objects"] is JsonObject;
+
     // 获取 vanilla 版本 JSON（首次从 Mojang 下载并缓存）
     async Task<JsonNode> Vanilla(string id, string storage, CancellationToken ct)
     {
         var file = Store.SafePath(storage, $"versions/{id}/{id}.json");
-        if (File.Exists(file))
-            return JsonNode.Parse(await File.ReadAllTextAsync(file, ct))!;
+        if (await ReadMetadata(file, ct) is { } cached)
+            return cached;
         var manifest = await Json(
             "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json",
             ct
@@ -511,8 +569,7 @@ public sealed partial class LauncherCore : IDisposable
         var entry =
             manifest["versions"].Items().FirstOrDefault(v => v.S("id") == id)
             ?? throw new Exception("找不到游戏版本：" + id);
-        await Download(entry.S("url"), file, entry.S("sha1"), ct: ct);
-        return JsonNode.Parse(await File.ReadAllTextAsync(file, ct))!;
+        return await DownloadMetadata(entry.S("url"), file, ct, entry.S("sha1"));
     }
 
     // 合并父子版本 JSON — 用于加载器继承 vanilla 基版本的 libraries 和 arguments
@@ -579,10 +636,7 @@ public sealed partial class LauncherCore : IDisposable
         seen ??= [];
         if (!seen.Add(id) || seen.Count > 10)
             throw new Exception("版本继承循环");
-        var file = Store.SafePath(storage, $"versions/{id}/{id}.json");
-        var version = File.Exists(file)
-            ? JsonNode.Parse(await File.ReadAllTextAsync(file, ct))!
-            : await Vanilla(id, storage, ct);
+        var version = await Vanilla(id, storage, ct);
         return version.S("inheritsFrom") is { Length: > 0 } parent
             ? Merge(await Resolve(parent, storage, ct, seen), version)
             : version;
@@ -723,7 +777,7 @@ public sealed partial class LauncherCore : IDisposable
                 storage,
                 $"versions/{instance.VersionId}/{instance.VersionId}.json"
             );
-            if (File.Exists(original))
+            if (await ReadMetadata(original, ct) != null)
                 return await Resolve(instance.VersionId, storage, ct);
             // The installer profile may have been removed after exporting the complete isolated profile.
             // Use only this instance's directory; another instance can use a different loader build.
@@ -738,7 +792,7 @@ public sealed partial class LauncherCore : IDisposable
             {
                 var id = Path.GetFileName(game);
                 var local = Store.SafePath(game, id + ".json");
-                if (File.Exists(local))
+                if (await ReadMetadata(local, ct) != null)
                 {
                     var isolatedProfile = await Resolve(id, storage, ct);
                     var detected = IdentifyLoader(isolatedProfile);
@@ -758,7 +812,7 @@ public sealed partial class LauncherCore : IDisposable
                 }
             }
             throw new FileNotFoundException(
-                "The installed loader profile is missing. Repair this version: "
+                "The installed loader profile is missing or invalid. Repair this version: "
                     + instance.VersionId,
                 original
             );
@@ -786,13 +840,11 @@ public sealed partial class LauncherCore : IDisposable
             storage,
             $"profiles/fabric-{instance.GameVersion}-{instance.LoaderVersion}.json"
         );
-        var profile = File.Exists(file)
-            ? JsonNode.Parse(await File.ReadAllTextAsync(file, ct))!
-            : await Json(
-                $"https://meta.fabricmc.net/v2/versions/loader/{Uri.EscapeDataString(instance.GameVersion)}/{Uri.EscapeDataString(instance.LoaderVersion)}/profile/json",
-                ct
-            );
-        await Store.AtomicJson(file, profile);
+        var profile = await DownloadMetadata(
+            $"https://meta.fabricmc.net/v2/versions/loader/{Uri.EscapeDataString(instance.GameVersion)}/{Uri.EscapeDataString(instance.LoaderVersion)}/profile/json",
+            file,
+            ct
+        );
         return Merge(version, profile);
     }
 
@@ -1201,14 +1253,14 @@ public sealed partial class LauncherCore : IDisposable
         if (version["assetIndex"] is JsonNode asset)
         {
             var indexPath = Store.SafePath(storage, "assets/indexes/" + asset.S("id") + ".json");
-            await Download(
+            var index = await DownloadMetadata(
                 asset.S("url"),
                 indexPath,
+                ct,
                 asset.S("sha1"),
-                size: asset.Int("size"),
-                ct: ct
+                asset.Int("size"),
+                IsAssetIndex
             );
-            var index = JsonNode.Parse(await File.ReadAllTextAsync(indexPath, ct))!;
             var objects = index["objects"]!.AsObject().ToArray();
             int finished = 0;
             await DownloadMany(
@@ -1425,8 +1477,14 @@ public sealed partial class LauncherCore : IDisposable
         if (version["assetIndex"] is JsonNode asset)
         {
             var file = Store.SafePath(storage, "assets/indexes/" + asset.S("id") + ".json");
-            await Download(asset.S("url"), file, asset.S("sha1"), size: asset.Int("size"), ct: ct);
-            index = JsonNode.Parse(await File.ReadAllTextAsync(file, ct));
+            index = await DownloadMetadata(
+                asset.S("url"),
+                file,
+                ct,
+                asset.S("sha1"),
+                asset.Int("size"),
+                IsAssetIndex
+            );
             var objects = index!["objects"]!.AsObject().ToArray();
             int finished = 0;
             await DownloadMany(

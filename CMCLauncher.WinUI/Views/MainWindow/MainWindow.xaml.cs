@@ -248,6 +248,19 @@ public sealed partial class MainWindow : Window
             if (!startupUpdateChecked && args.Length == 0)
             {
                 startupUpdateChecked = true;
+                if (store.RecoveredSettingsPath is { } backup)
+                {
+                    var message = Text("The settings file was damaged. Default settings are now in use. The original file is saved at:");
+                    message.Text += "\n\n" + backup;
+                    message.IsTextSelectionEnabled = true;
+                    await new ContentDialog
+                    {
+                        XamlRoot = Content.XamlRoot,
+                        Title = Ui("Launcher settings recovered"),
+                        Content = message,
+                        CloseButtonText = Ui("OK"),
+                    }.ShowAsync();
+                }
                 if (store.Config.Settings.MinecraftDirectorySetupPending)
                     await SetupMinecraftDirectory();
                 await ShowStartupOptionsRecoveries();
