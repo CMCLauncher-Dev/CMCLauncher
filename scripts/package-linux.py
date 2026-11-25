@@ -40,9 +40,9 @@ def desktop_files(root):
     target = root / "usr/share/applications/cmclauncher.desktop"
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(REPO / "packaging/linux/cmclauncher.desktop", target)
-    icon = root / "usr/share/icons/hicolor/1024x1024/apps/cmclauncher.png"
+    icon = root / "usr/share/icons/hicolor/256x256/apps/cmclauncher.png"
     icon.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(REPO / "CMCLauncher.WinUI/assets/cmc-logo.png", icon)
+    shutil.copy2(REPO / "packaging/linux/cmclauncher.png", icon)
 
 
 def native_tree(publish, root):
@@ -104,7 +104,7 @@ cp -a {root}/. %{{buildroot}}/
 /opt/cmclauncher
 /usr/bin/cmclauncher
 /usr/share/applications/cmclauncher.desktop
-/usr/share/icons/hicolor/1024x1024/apps/cmclauncher.png
+/usr/share/icons/hicolor/256x256/apps/cmclauncher.png
 """)
     # .NET bundles are already built; stripping/debug extraction can damage their metadata.
     run("rpmbuild", "-bb", spec, "--define", f"_topdir {top}", "--define", "__os_install_post %{nil}", "--define", "debug_package %{nil}")
@@ -204,7 +204,7 @@ def appimage(publish, work, output):
     shutil.copy2(REPO / "packaging/linux/AppRun", appdir / "AppRun")
     (appdir / "AppRun").chmod(0o755)
     shutil.copy2(appdir / "usr/share/applications/cmclauncher.desktop", appdir / "cmclauncher.desktop")
-    shutil.copy2(REPO / "CMCLauncher.WinUI/assets/cmc-logo.png", appdir / "cmclauncher.png")
+    shutil.copy2(REPO / "packaging/linux/cmclauncher.png", appdir / "cmclauncher.png")
     shutil.copy2(appdir / "cmclauncher.png", appdir / ".DirIcon")
     write(appdir / "usr/bin/cmclauncher", '#!/bin/sh\nexec "$(dirname "$0")/../lib/cmclauncher/CMCLauncher.Avalonia" "$@"\n', True)
     bundle_libraries(appdir)

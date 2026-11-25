@@ -57,6 +57,7 @@
     <Error Text="Windows releases use CMCLauncher.WinUI. Publish Avalonia for Linux or macOS." />
   </Target>
   <ItemGroup>
+    <AvaloniaResource Include="../packaging/linux/cmclauncher.png" Link="assets/linux/cmclauncher.png" />
     <Content Include="../CMCLauncher.WinUI/assets/cmc-logo.png" Link="assets/cmc-logo.png" CopyToOutputDirectory="PreserveNewest" />
     <Content
       Include="../CMCLauncher.WinUI/assets/about/*.png"

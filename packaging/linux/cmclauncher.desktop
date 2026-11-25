@@ -7,4 +7,4 @@ Exec=cmclauncher
 Icon=cmclauncher
 Terminal=false
 Categories=Game;
-StartupWMClass=CMCLauncher.Avalonia
+StartupWMClass=cmclauncher

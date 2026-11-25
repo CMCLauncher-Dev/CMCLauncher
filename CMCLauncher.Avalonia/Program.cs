@@ -1,17 +1,19 @@
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using CMCLauncher.Avalonia.Views;
 #if WINDOWS81
 using Avalonia.Themes.Fluent;
 #else
 using FluentAvalonia.Styling;
 #endif
-using CMCLauncher.Avalonia.Views;
 
 namespace CMCLauncher.Avalonia;
 
 internal static class Program
 {
+    internal const string LinuxDesktopId = "cmclauncher";
+
     public static string[] Arguments { get; private set; } = [];
 
     [STAThread]
@@ -108,8 +110,13 @@ internal static class Program
         BuildApp().StartWithClassicDesktopLifetime(args);
     }
 
-    public static AppBuilder BuildApp() =>
-        AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().LogToTrace();
+    public static AppBuilder BuildApp()
+    {
+        var builder = AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().LogToTrace();
+        if (OperatingSystem.IsLinux())
+            builder.With(new X11PlatformOptions { WmClass = LinuxDesktopId });
+        return builder;
+    }
 }
 
 public sealed class App : Application
@@ -118,12 +125,16 @@ public sealed class App : Application
     {
 #if WINDOWS81
         Styles.Add(new FluentTheme());
-        Styles.Add(new global::Avalonia.Markup.Xaml.Styling.StyleInclude(
-            new Uri("avares://CMCLauncher.Avalonia/")
-        )
-        {
-            Source = new Uri("avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"),
-        });
+        Styles.Add(
+            new global::Avalonia.Markup.Xaml.Styling.StyleInclude(
+                new Uri("avares://CMCLauncher.Avalonia/")
+            )
+            {
+                Source = new Uri(
+                    "avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"
+                ),
+            }
+        );
 #else
         Styles.Add(new FluentAvaloniaTheme());
 #endif

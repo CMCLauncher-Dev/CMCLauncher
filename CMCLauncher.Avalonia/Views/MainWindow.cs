@@ -136,6 +136,13 @@ public sealed partial class MainWindow : Window
         ConfigureScrollBars();
         ConfigureControlAppearance();
         Title = "CMCLauncher";
+        if (OperatingSystem.IsLinux())
+        {
+            using var icon = global::Avalonia.Platform.AssetLoader.Open(
+                new Uri("avares://CMCLauncher.Avalonia/assets/linux/cmclauncher.png")
+            );
+            Icon = new WindowIcon(icon);
+        }
         MinWidth = 850;
         MinHeight = 600;
         Width = Math.Clamp(session.Store.Config.Settings.WindowWidth, 850, 2400);

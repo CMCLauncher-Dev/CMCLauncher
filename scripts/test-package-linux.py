@@ -2,6 +2,7 @@
 
 import importlib.util
 import os
+import struct
 from pathlib import Path
 import tempfile
 import unittest
@@ -55,7 +56,13 @@ class LinuxPackageTests(unittest.TestCase):
                 if os.name != "nt":
                     self.assertTrue(launcher.stat().st_mode & 0o111)
                 self.assertTrue((tree / "opt/cmclauncher/LICENSE").is_file())
-                self.assertIn("Exec=cmclauncher", (tree / "usr/share/applications/cmclauncher.desktop").read_text())
+                desktop = tree / "usr/share/applications/cmclauncher.desktop"
+                fields = desktop.read_text().splitlines()
+                self.assertIn("Exec=cmclauncher", fields)
+                self.assertIn(f"StartupWMClass={desktop.stem}", fields)
+                self.assertIn(f"Icon={desktop.stem}", fields)
+                icon = tree / f"usr/share/icons/hicolor/256x256/apps/{desktop.stem}.png"
+                self.assertEqual(struct.unpack(">II", icon.read_bytes()[16:24]), (256, 256))
             self.assertTrue((output / "CMCLauncher-Avalonia-linux-x64.rpm").is_file())
 
 
