@@ -65,6 +65,7 @@ public sealed partial class MainWindow
             ("Terracotta", "Create or join a Minecraft LAN room.", "terracotta", "\uE716"),
             ("MinecraftPFP", "Create a profile picture from a Minecraft skin and export it as PNG.", "minecraft-pfp", "\uE91B"),
             ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator", "\uE7B8"),
+            ("Instance transfer", "Transfer Minecraft instances between devices.", "instance-transfer", "\uE8AB"),
             ("Command generator", "Build Minecraft Java Edition commands with a live preview.", "command-generator", "\uE756"),
         })
         {

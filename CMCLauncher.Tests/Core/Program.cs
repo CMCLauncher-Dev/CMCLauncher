@@ -581,6 +581,7 @@ try
     await TerracottaTests.Run(root);
     await DesktopUpdateTests.Run(root);
     await ModpackExportTests.Run(root);
+    await InstanceTransferTests.Run(Path.Combine(root, "instance-transfer"));
     Console.WriteLine(
         "PASS modpack export metadata, selected content, traversal and cancellation protection"
     );

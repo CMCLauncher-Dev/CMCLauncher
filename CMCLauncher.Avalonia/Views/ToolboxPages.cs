@@ -18,6 +18,7 @@ public sealed partial class MainWindow
             ("Terracotta", "Create or join a Minecraft LAN room.", "terracotta", "M12,3 L21,8 V16 L12,21 L3,16 V8 Z M3,8 L12,13 L21,8 M12,13 V21"),
             ("MinecraftPFP", "Create a profile picture from a Minecraft skin and export it as PNG.", "pfp", "M3,4 H21 V20 H3 Z M4,17 L9,12 L13,16 L16,13 L20,17 M7,8 H9"),
             ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator", "M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M9,12 H16 M9,16 H16"),
+            ("Instance transfer", "Transfer Minecraft instances between devices.", "instance-transfer", "M3,8 H21 M16,3 L21,8 L16,13 M21,16 H3 M8,11 L3,16 L8,21"),
             ("Command generator", "Build Minecraft Java Edition commands with a live preview.", "command-generator", "M3,5 H21 V19 H3 Z M7,9 L10,12 L7,15 M12,15 H17"),
         })
         {

@@ -320,7 +320,7 @@ public sealed partial class MainWindow
                 or "terracotta"
                 or "minecraft-pfp"
                 or "datapack-generator"
-                or "command-generator"
+                or "command-generator" or "instance-transfer"
             ? Visibility.Visible
             : Visibility.Collapsed;
         PageHeader.ColumnSpacing = PageBackButton.Visibility == Visibility.Visible ? 10 : 0;
@@ -328,7 +328,7 @@ public sealed partial class MainWindow
             PageBackButton,
             Ui(
                 page is "resource-detail" or "blueprint-detail" ? "返回列表"
-                : page is "frpc" or "terracotta" or "minecraft-pfp" or "datapack-generator" or "command-generator" ? "Back to toolbox"
+                : page is "frpc" or "terracotta" or "minecraft-pfp" or "datapack-generator" or "command-generator" or "instance-transfer" ? "Back to toolbox"
                 : "返回主页"
             )
         );
@@ -352,7 +352,7 @@ public sealed partial class MainWindow
     {
         if (page is "resource-detail" or "blueprint-detail")
             page = resourceReturnPage;
-        else if (page is "frpc" or "terracotta" or "minecraft-pfp" or "datapack-generator" or "command-generator")
+        else if (page is "frpc" or "terracotta" or "minecraft-pfp" or "datapack-generator" or "command-generator" or "instance-transfer")
             page = "toolbox";
         else if (page is "modpack-export")
             page = "version-settings";
