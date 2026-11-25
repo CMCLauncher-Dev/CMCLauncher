@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.ComponentModel;
 using System.Text;
 using CMCLauncher.Platform;
@@ -240,6 +241,44 @@ public sealed class LinuxLauncherPlatform : LauncherPlatform
         }
             .Where(Directory.Exists)
             .SelectMany(p => Directory.EnumerateDirectories(p));
+
+    public override Task<bool> OpenDirectory(string path) => Task.Run(() =>
+    {
+        var directory = Path.GetFullPath(path);
+        var uri = new Uri(directory).AbsoluteUri.Replace("'", "%27", StringComparison.Ordinal);
+        try
+        {
+            PlatformCommand.Execute("gdbus",
+                ["call", "--session", "--timeout", "5", "--dest", "org.freedesktop.FileManager1",
+                 "--object-path", "/org/freedesktop/FileManager1",
+                 "--method", "org.freedesktop.FileManager1.ShowFolders", $"['{uri}']", "''"]);
+            return true;
+        }
+        catch (Exception ex) when (ex is Win32Exception or IOException or TimeoutException)
+        {
+            // Call a file manager directly when the desktop does not export FileManager1.
+            // A generic URI opener can route a misconfigured directory association to this launcher.
+        }
+
+        var kde = (Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP") ?? "")
+            .Split(':').Contains("KDE", StringComparer.OrdinalIgnoreCase);
+        var managers = kde
+            ? new[] { "dolphin", "nautilus", "thunar", "nemo", "pcmanfm-qt", "pcmanfm" }
+            : new[] { "nautilus", "thunar", "nemo", "pcmanfm-qt", "pcmanfm", "dolphin" };
+        foreach (var manager in managers)
+        {
+            var request = new ProcessStartInfo(manager) { UseShellExecute = false };
+            request.ArgumentList.Add(directory);
+            try
+            {
+                using var process = Process.Start(PlatformCommand.SystemEnvironment(request));
+                if (process != null && (!process.WaitForExit(200) || process.ExitCode == 0))
+                    return true;
+            }
+            catch (Win32Exception) { }
+        }
+        return false;
+    });
 
     public override Task MoveToTrash(string path) =>
         Task.Run(() => PlatformCommand.Execute("gio", ["trash", Path.GetFullPath(path)]));

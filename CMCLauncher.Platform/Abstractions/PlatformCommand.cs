@@ -15,6 +15,11 @@ public static class PlatformCommand
             else
                 info.Environment["LD_LIBRARY_PATH"] = original;
             info.Environment.Remove("CMCLAUNCHER_ORIGINAL_LD_LIBRARY_PATH");
+            // AppImage runtime state belongs to the launcher wrapper. Child Java and
+            // desktop tools must start as normal system processes.
+            if (info.Environment.ContainsKey("APPIMAGE"))
+                foreach (var key in new[] { "APPIMAGE", "APPDIR", "ARGV0", "OWD", "APPIMAGE_EXTRACT_AND_RUN" })
+                    info.Environment.Remove(key);
         }
         return info;
     }

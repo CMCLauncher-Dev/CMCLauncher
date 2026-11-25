@@ -75,6 +75,14 @@ try
         throw new Exception("A wallet write without a readable value was accepted.");
     }
     catch (IOException ex) when (ex.Message == "Could not verify the login saved in KDE Wallet.") { }
+    var nonexistentProcess = int.MaxValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    Check(
+        CMCLauncher.Platform.GameExitWatchdog.Handle(
+            ["--watch-game-exit", nonexistentProcess, "0", nonexistentProcess, "0",
+                Path.Combine(root, "must-not-restart"), "", root, Path.Combine(root, "watchdog.ack")]
+        ),
+        "a watchdog with stale process identities exits without restarting the launcher"
+    );
     Device("card0", "0x1002", "0x73df", "42");
     Device("card1", "0x8086", "0x46a6", null);
     Device("card2", "0x10de", "0x2684", "101");

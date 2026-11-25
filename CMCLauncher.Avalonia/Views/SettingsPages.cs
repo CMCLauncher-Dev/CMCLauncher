@@ -1,3 +1,4 @@
+using Avalonia.Platform.Storage;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
@@ -1361,12 +1362,14 @@ public sealed partial class MainWindow
         toolbar.Children.Add(refresh);
         var folder = Btn(
             "Open log folder",
-            () =>
+            async () =>
             {
-                var path = Path.Combine(session.Store.Root, "logs");
-                Directory.CreateDirectory(path);
-                Open(path);
-                return Task.CompletedTask;
+                var directory = Directory.CreateDirectory(Path.Combine(session.Store.Root, "logs"));
+                var opened = OperatingSystem.IsLinux()
+                    ? await LauncherPlatform.Current.OpenDirectory(directory.FullName)
+                    : await Launcher.LaunchDirectoryInfoAsync(directory);
+                if (!opened)
+                    throw new IOException(Ui("Could not open the log folder."));
             }
         );
         Grid.SetColumn(folder, 2);

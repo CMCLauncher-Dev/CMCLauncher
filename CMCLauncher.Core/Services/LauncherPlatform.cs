@@ -17,6 +17,8 @@ public class LauncherPlatform : CMCLauncher.Platform.PlatformEnvironment
             );
     }
 
+    public virtual Task<bool> OpenDirectory(string path) => Task.FromResult(false);
+
     public virtual bool SupportsMemoryOptimization => false;
 
     public virtual MemoryOptimizationResult OptimizeMemory(CancellationToken ct) => default;

@@ -133,7 +133,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
         Modrinth.Status += Stage;
         CurseForge.Status += Stage;
         Frpc.Output += message => Log("FRPC", message);
-        Log("INFO", "Avalonia frontend started");
+        Log("INFO", $"Avalonia frontend started (PID {Environment.ProcessId})");
     }
 
     public string Ui(string key) => Locales.Translate(Store.Config.Settings.LauncherLanguage, key);
@@ -323,20 +323,23 @@ public sealed class LauncherSession : ObservableState, IDisposable
         await Save();
         game = await Core.Launch(instance, identity, CredentialVault.Read(identity), ct);
         instance.LastPlayed = DateTime.Now;
-        await Save();
-        var host = HostExecutable;
-        var assembly = Path.GetFileNameWithoutExtension(host)
-            .Equals("dotnet", StringComparison.OrdinalIgnoreCase)
-            ? typeof(Program).Assembly.Location
-            : null;
+        Log("INFO", $"Game JVM started (PID {game.Id})");
         Action? acknowledgeExit = null;
-        try
+        // Linux tracks the JVM directly. A separate launcher process must not
+        // reopen the UI after a renderer failure or a visibility change.
+        if (!OperatingSystem.IsLinux())
         {
-            acknowledgeExit = CMCLauncher.Platform.GameExitWatchdog.Start(game, host, assembly);
-        }
-        catch (Exception ex)
-        {
-            Log("WARN", "Could not start the independent game-exit monitor: " + ex.Message);
+            var host = HostExecutable;
+            var assembly = Path.GetFileNameWithoutExtension(host).Equals("dotnet", StringComparison.OrdinalIgnoreCase)
+                ? typeof(Program).Assembly.Location : null;
+            try
+            {
+                acknowledgeExit = CMCLauncher.Platform.GameExitWatchdog.Start(game, host, assembly);
+            }
+            catch (Exception ex)
+            {
+                Log("WARN", "Could not start the independent game-exit monitor: " + ex.Message);
+            }
         }
 
         var launched = game;
@@ -371,6 +374,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
             });
         });
         Changed(nameof(GameRunning));
+        await Save();
     }
 
     public void Dispose()

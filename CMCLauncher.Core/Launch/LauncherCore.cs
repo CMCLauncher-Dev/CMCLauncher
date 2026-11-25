@@ -543,22 +543,12 @@ public sealed partial class LauncherCore : IDisposable
         );
         if (clientJar.Length > 0)
             merged["jar"] = clientJar;
-        // 同一依赖的版本冲突由子配置优先解决，classifier 和扩展名不同的包仍分别保留。
-        var names = new HashSet<string>();
+        // Keep conditional and native variants until the target platform is known.
+        var variants = new HashSet<(string Coordinate, string? Rules, string? Natives)>();
         var libs = new JsonArray();
         foreach (var lib in child["libraries"].Items().Concat(parent["libraries"].Items()))
-        {
-            var coordinate = lib.S("name").Split('@');
-            var parts = coordinate[0].Split(':');
-            var key =
-                string.Join(':', parts.Take(2))
-                + ":"
-                + (parts.Length > 3 ? parts[3] : "")
-                + "@"
-                + (coordinate.Length > 1 ? coordinate[1] : "jar");
-            if (names.Add(key))
+            if (variants.Add((LibraryCoordinateKey(lib), lib["rules"]?.ToJsonString(), lib["natives"]?.ToJsonString())))
                 libs.Add(lib.DeepClone());
-        }
         merged["libraries"] = libs;
         merged["arguments"] = new JsonObject();
         foreach (var kind in new[] { "game", "jvm" })

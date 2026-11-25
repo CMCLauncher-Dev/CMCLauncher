@@ -166,11 +166,18 @@ try
     var child = new System.Diagnostics.ProcessStartInfo("java");
     child.Environment["LD_LIBRARY_PATH"] = "/tmp/appimage/usr/lib";
     child.Environment["CMCLAUNCHER_ORIGINAL_LD_LIBRARY_PATH"] = "/system/custom/lib";
+    child.Environment["APPIMAGE"] = "/tmp/CMCLauncher.AppImage";
+    child.Environment["APPDIR"] = "/tmp/appimage";
+    child.Environment["ARGV0"] = "CMCLauncher.AppImage";
+    child.Environment["OWD"] = "/home/player";
+    child.Environment["APPIMAGE_EXTRACT_AND_RUN"] = "1";
     CMCLauncher.Platform.PlatformCommand.SystemEnvironment(child);
     Check(
         child.Environment["LD_LIBRARY_PATH"] == "/system/custom/lib"
-            && !child.Environment.ContainsKey("CMCLAUNCHER_ORIGINAL_LD_LIBRARY_PATH"),
-        "AppImage libraries do not leak into child processes"
+            && !child.Environment.ContainsKey("CMCLAUNCHER_ORIGINAL_LD_LIBRARY_PATH")
+            && new[] { "APPIMAGE", "APPDIR", "ARGV0", "OWD", "APPIMAGE_EXTRACT_AND_RUN" }
+                .All(key => !child.Environment.ContainsKey(key)),
+        "AppImage libraries and runtime variables do not leak into child processes"
     );
     var assembly = typeof(LauncherCore).Assembly;
     Check(assembly.GetName().Name == "CMCLauncher.Core", "standalone core assembly");
@@ -515,6 +522,40 @@ try
         ),
         "foreign OS libraries are excluded"
     );
+    var legacyLwjglProfile = JsonNode.Parse("""
+        {
+          "libraries": [
+            {"name":"org.lwjgl:lwjgl:3.2.1","rules":[{"action":"allow","os":{"name":"osx"}}],
+              "downloads":{"artifact":{"path":"lwjgl-3.2.1.jar"}}},
+            {"name":"org.lwjgl:lwjgl:3.2.2","rules":[{"action":"allow"},{"action":"disallow","os":{"name":"osx"}}],
+              "downloads":{"artifact":{"path":"lwjgl-3.2.2.jar"}}},
+            {"name":"org.lwjgl:lwjgl:3.2.1","rules":[{"action":"allow","os":{"name":"osx"}}],
+              "natives":{"osx":"natives-macos"},"downloads":{"classifiers":{"natives-macos":{"path":"lwjgl-macos.jar"}}}},
+            {"name":"org.lwjgl:lwjgl:3.2.2","rules":[{"action":"allow"},{"action":"disallow","os":{"name":"osx"}}],
+              "natives":{"linux":"natives-linux"},"downloads":{"classifiers":{"natives-linux":{"path":"lwjgl-linux.jar"}}}}
+          ]
+        }
+        """)!;
+    var previousLibraryPlatform = LauncherPlatform.Current;
+    try
+    {
+        LauncherPlatform.Current = new LibraryPlatform("linux");
+        foreach (var version in new[] { legacyLwjglProfile, LauncherCore.Merge(legacyLwjglProfile, new JsonObject()) })
+        {
+            var selectedLibraries = LauncherCore.EffectiveLibraries(version);
+            Check(
+                selectedLibraries.Count == 2
+                    && selectedLibraries.All(lib => lib["name"]?.ToString() == "org.lwjgl:lwjgl:3.2.2")
+                    && selectedLibraries.Any(lib => lib["downloads"]?["artifact"]?["path"]?.ToString() == "lwjgl-3.2.2.jar")
+                    && selectedLibraries.Any(lib => lib["downloads"]?["classifiers"]?["natives-linux"]?["path"]?.ToString() == "lwjgl-linux.jar"),
+                "Minecraft 1.18 retains the Linux LWJGL classpath and native archive after platform filtering"
+            );
+        }
+    }
+    finally
+    {
+        LauncherPlatform.Current = previousLibraryPlatform;
+    }
     var javaRoot = Path.Combine(root, "jdk");
     Directory.CreateDirectory(Path.Combine(javaRoot, "bin"));
     Check(
@@ -558,4 +599,8 @@ finally
 sealed class MemoryPlatform : LauncherPlatform
 {
     public override (long TotalMb, long AvailableMb)? PhysicalMemory() => (8192, 4096);
+}
+sealed class LibraryPlatform(string osName) : LauncherPlatform
+{
+    public override string MinecraftOsName => osName;
 }

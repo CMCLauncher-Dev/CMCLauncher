@@ -5,26 +5,25 @@ namespace CMCLauncher;
 
 public sealed partial class LauncherCore
 {
-    // 计算版本 JSON 中实际生效的库列表：
-    // 按 Maven 坐标（group:artifact[:classifier]@extension）去重，
-    // 并过滤掉不满足平台 rules 的库。
+    static string LibraryCoordinateKey(JsonNode lib)
+    {
+        var coordinate = lib.S("name").Split('@');
+        var parts = coordinate[0].Split(':');
+        return string.Join(':', parts.Take(2))
+            + ":" + (parts.Length > 3 ? parts[3] : "")
+            + "@" + (coordinate.Length > 1 ? coordinate[1] : "jar");
+    }
+
+    static string NativeClassifier(JsonNode lib) =>
+        lib["natives"]?.S(MinecraftPlatform.OsName)
+            .Replace("${arch}", Environment.Is64BitProcess ? "64" : "32") ?? "";
+
+    // Select the platform first. Some manifests list the same coordinate for
+    // multiple OSes, then repeat it to declare a separate native archive.
     internal static IReadOnlyList<JsonNode> EffectiveLibraries(JsonNode version) =>
-        version["libraries"]
-            .Items()
-            .DistinctBy(
-                lib =>
-                {
-                    var coordinate = lib.S("name").Split('@');
-                    var parts = coordinate[0].Split(':');
-                    return string.Join(':', parts.Take(2))
-                        + ":"
-                        + (parts.Length > 3 ? parts[3] : "")
-                        + "@"
-                        + (coordinate.Length > 1 ? coordinate[1] : "jar");
-                },
-                StringComparer.Ordinal
-            )
+        version["libraries"].Items()
             .Where(lib => Allowed(lib["rules"]))
+            .DistinctBy(lib => (LibraryCoordinateKey(lib), NativeClassifier(lib)))
             .ToArray();
 
     // 预下载与启动共用同一套库准备逻辑：
@@ -44,16 +43,25 @@ public sealed partial class LauncherCore
         // nativeFiles[index] 记录第 index 个库的 natives 文件与解压排除项。
         var classpath = new string?[libraries.Count];
         var nativeFiles = new (string File, string[] Exclusions)?[libraries.Count];
+        var artifactKeys = new HashSet<string>(StringComparer.Ordinal);
+        var downloads = libraries.Select((lib, index) =>
+        {
+            var key = LibraryCoordinateKey(lib);
+            var classifier = NativeClassifier(lib);
+            var artifact = lib["downloads"]?["artifact"];
+            var includeArtifact = (artifact != null || lib["downloads"] == null) && artifactKeys.Add(key);
+            var native = classifier.Length > 0 ? lib["downloads"]?["classifiers"]?[classifier] : null;
+            return (lib, index, includeArtifact, artifact, native);
+        }).ToArray();
         var done = 0;
         await DownloadMany(
-            libraries.Select((lib, index) => (lib, index)),
+            downloads,
             async (item, token) =>
             {
-                var (lib, index) = item;
+                var (lib, index, includeArtifact, artifact, native) = item;
                 // 下载 classpath 构件：优先使用 downloads.artifact，
                 // 否则由 Maven 坐标推导路径与 URL。
-                var artifact = lib["downloads"]?["artifact"];
-                if (artifact != null || lib["downloads"] == null)
+                if (includeArtifact)
                 {
                     var relative = artifact?.S("path") ?? Maven(lib.S("name"));
                     var file = Store.SafePath(storage, "libraries/" + relative);
@@ -71,13 +79,7 @@ public sealed partial class LauncherCore
                 }
                 // 下载当前平台的 natives 库（按操作系统名选择 classifier，
                 // 并将 ${arch} 替换为 64/32）。
-                var classifier = lib["natives"]
-                    ?.S(MinecraftPlatform.OsName)
-                    .Replace("${arch}", Environment.Is64BitProcess ? "64" : "32");
-                if (
-                    classifier is { Length: > 0 }
-                    && lib["downloads"]?["classifiers"]?[classifier] is JsonNode native
-                )
+                if (native != null)
                 {
                     var file = Store.SafePath(storage, "libraries/" + native.S("path"));
                     await Download(

@@ -10,6 +10,10 @@ public static class GameExitWatchdog
     public static Action Start(Process game, string executable, string? assembly = null)
     {
         using var owner = Process.GetCurrentProcess();
+        var ownerStart = StartIdentity(owner);
+        var gameStart = StartIdentity(game);
+        if (ownerStart == null || gameStart == null)
+            return static () => { };
         var acknowledgment = Path.Combine(Path.GetTempPath(), $"cmcl-game-exit-{Guid.NewGuid():N}.ack");
         var info = new ProcessStartInfo(Environment.ProcessPath ?? executable)
         {
@@ -24,9 +28,9 @@ public static class GameExitWatchdog
             {
                 Switch,
                 owner.Id.ToString(CultureInfo.InvariantCulture),
-                owner.StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture),
+                ownerStart.Value.ToString(CultureInfo.InvariantCulture),
                 game.Id.ToString(CultureInfo.InvariantCulture),
-                game.StartTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture),
+                gameStart.Value.ToString(CultureInfo.InvariantCulture),
                 executable,
                 assembly ?? "",
                 AppContext.BaseDirectory,
@@ -50,6 +54,10 @@ public static class GameExitWatchdog
         var ownerStart = long.Parse(args[2], CultureInfo.InvariantCulture);
         var gameId = int.Parse(args[3], CultureInfo.InvariantCulture);
         var gameStart = long.Parse(args[4], CultureInfo.InvariantCulture);
+        // A watchdog that could not establish both identities at startup cannot
+        // distinguish a stale PID from a newly launched game. Leave the UI alone.
+        if (!Matches(gameId, gameStart) || !Matches(ownerId, ownerStart))
+            return true;
         while (Matches(gameId, gameStart))
             Thread.Sleep(250);
         var deadline = Stopwatch.StartNew();
@@ -87,12 +95,41 @@ public static class GameExitWatchdog
         return true;
     }
 
+    static long? StartIdentity(Process process)
+    {
+        if (process.HasExited)
+            return null;
+        if (!OperatingSystem.IsLinux())
+            return process.StartTime.ToUniversalTime().Ticks;
+
+        // Linux exposes the same start tick to both processes. Converting it to
+        // a wall-clock time can use different boot-time estimates in each host.
+        try
+        {
+            var stat = File.ReadAllText($"/proc/{process.Id}/stat");
+            // The command name is parenthesized and may itself contain spaces or ')'.
+            var endOfName = stat.LastIndexOf(')');
+            if (endOfName < 0)
+                return null;
+            var fields = stat[(endOfName + 1)..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            // The suffix begins at field 3 (state); field 22 is starttime.
+            if (fields.Length <= 19 || fields[0] is "Z" or "X" or "x")
+                return null;
+            if (long.TryParse(fields[19], NumberStyles.None, CultureInfo.InvariantCulture, out var ticks))
+                return ticks;
+        }
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
+
+        return null;
+    }
+
     static bool Matches(int id, long started)
     {
         try
         {
             using var process = Process.GetProcessById(id);
-            return !process.HasExited && process.StartTime.ToUniversalTime().Ticks == started;
+            return StartIdentity(process) == started;
         }
         catch (ArgumentException)
         {
