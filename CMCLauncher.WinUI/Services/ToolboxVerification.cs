@@ -13,7 +13,19 @@ public sealed partial class MainWindow
         expandedNavigation = "more";
         await RenderAsync();
         var canOptimize = LauncherPlatform.Current.SupportsMemoryOptimization;
-        check(themeCards.Count == (canOptimize ? 6 : 5), "toolbox presents independent tool cards");
+        string[] tools =
+        [
+            "frpc",
+            "terracotta",
+            "minecraft-pfp",
+            "datapack-generator",
+            "instance-transfer",
+            "command-generator",
+        ];
+        check(
+            themeCards.Count == tools.Length + (canOptimize ? 1 : 0),
+            "toolbox presents independent tool cards"
+        );
         if (canOptimize)
             check(
                 PageBody.Children.FirstOrDefault() is Border { Tag: "toolbox-small-tools" } utilities
@@ -37,7 +49,13 @@ public sealed partial class MainWindow
             .OfType<Button>()
             .Where(b => b.Tag is string tag && tag.StartsWith("toolbox-open:", StringComparison.Ordinal))
             .ToArray();
-        check(open.Length == 5, "each tool card is a single navigation button");
+        check(
+            open.Length == tools.Length
+                && tools.All(route =>
+                    open.Count(button => Equals(button.Tag, "toolbox-open:" + route)) == 1
+                ),
+            "each tool card is a single navigation button"
+        );
         (
             (IInvokeProvider)new ButtonAutomationPeer(open.Single(b => Equals(b.Tag, "toolbox-open:terracotta"))).GetPattern(PatternInterface.Invoke)
         ).Invoke();

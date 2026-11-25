@@ -98,7 +98,7 @@ public sealed partial class MainWindow
             }
             catch (Exception ex)
             {
-                status.Text = Ui("Transfer failed.") + " " + ex.Message;
+                status.Text = Ui("Transfer failed.") + " " + Ui(ex.Message);
             }
             finally
             {
@@ -175,7 +175,12 @@ public sealed partial class MainWindow
                 )>();
             foreach (var instance in session.Store.Config.Instances)
             {
-                var include = new CheckBox { VerticalAlignment = VerticalAlignment.Center };
+                var error = InstanceTransfer.SelectionError(instance);
+                var include = new CheckBox
+                {
+                    VerticalAlignment = VerticalAlignment.Center,
+                    IsEnabled = error == null,
+                };
                 global::Avalonia.Automation.AutomationProperties.SetName(include, instance.Name);
                 var options = new StackPanel { Spacing = 6 };
                 var choices = InstanceTransfer
@@ -203,6 +208,15 @@ public sealed partial class MainWindow
                 row.Children.Add(include);
                 Grid.SetColumn(expander, 1);
                 row.Children.Add(expander);
+                if (error != null)
+                {
+                    row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    var warning = T(error);
+                    Grid.SetRow(warning, 1);
+                    Grid.SetColumn(warning, 1);
+                    row.Children.Add(warning);
+                }
                 content.Children.Add(Card(row));
                 selections.Add((instance, include, choices));
             }
@@ -281,6 +295,7 @@ public sealed partial class MainWindow
                                 )
                             );
                         });
+                        content.Children.Remove(pending);
                     },
                     primary: true
                 )
@@ -371,7 +386,7 @@ public sealed partial class MainWindow
                 catch (OperationCanceledException) when (operation.IsCancellationRequested) { }
                 catch (Exception ex)
                 {
-                    scanState.Text = Ui("Device scan failed.") + " " + ex.Message;
+                    scanState.Text = Ui("Device scan failed.") + " " + Ui(ex.Message);
                 }
                 finally
                 {

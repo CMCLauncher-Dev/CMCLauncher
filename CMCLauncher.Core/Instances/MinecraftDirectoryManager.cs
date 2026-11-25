@@ -99,7 +99,7 @@ public sealed class MinecraftDirectoryManager(Store store)
                 && File.ReadAllText(System.IO.Path.Combine(record.Path, Marker))
                     == record.OwnershipId
                 && !Inside(store.Root, record.Path)
-                && !store.Config.Instances.Any(i =>
+                && !store.AllInstances.Any(i =>
                     i.ImportRoot != null
                     && (
                         Inside(i.ImportRoot, record.Path)
@@ -314,7 +314,7 @@ public sealed class MinecraftDirectoryManager(Store store)
             ct.ThrowIfCancellationRequested();
             var oldDefault = store.Config.Settings.MinecraftRoot;
             var paths = store
-                .Config.Instances.Select(i =>
+                .AllInstances.Select(i =>
                     (Instance: i, i.Directory, i.StorageRoot, i.ImportRoot, i.IconPath)
                 )
                 .ToArray();

@@ -299,16 +299,19 @@ public sealed partial class MainWindow
                 ["custom"] = "Manual proxy",
             }
         );
-        Labels(
-            gameLanguage,
-            new()
+        gameLanguage.ItemTemplate = new global::Avalonia.Controls.Templates.FuncDataTemplate<string>(
+            (code, _) => new TextBlock
             {
-                ["auto"] = "context.settingspage.system_default",
-                ["zh_cn"] = "Simplified Chinese",
-                ["zh_tw"] = "Traditional Chinese",
-                ["en_us"] = "English",
-                ["ja_jp"] = "Japanese",
-                ["preserve"] = "context.settingspage.keep_current",
+                Text = code switch
+                {
+                    "auto" => Ui("context.settingspage.system_default"),
+                    "zh_cn" => "简体中文",
+                    "zh_tw" => "繁體中文",
+                    "en_us" => "English",
+                    "ja_jp" => "日本語",
+                    "preserve" => Ui("context.settingspage.keep_current"),
+                    _ => code,
+                },
             }
         );
         var saveGate = new SemaphoreSlim(1, 1);

@@ -272,6 +272,18 @@ public sealed partial class MainWindow : Window
                             T("The settings file was damaged. Default settings are now in use. The original file is saved at:"),
                             new SelectableTextBlock { Text = backup, TextWrapping = TextWrapping.Wrap }
                         ), false);
+                    if (session.Store.NewlyHiddenImportedInstances.Count is > 0 and var count
+                        && await Dialog(
+                            "Unavailable imported instances",
+                            new TextBlock
+                            {
+                                Text = string.Format(Ui("{0} imported instance(s) were hidden because their version files could not be read. Remove their launcher records? Game files are kept."), count),
+                                TextWrapping = TextWrapping.Wrap,
+                            },
+                            true,
+                            confirmLabel: "Remove records"
+                        ))
+                        await session.Store.ForgetHiddenImportedInstances();
                     if (session.Store.Config.Settings.MinecraftDirectorySetupPending)
                         await FirstRun();
                 }

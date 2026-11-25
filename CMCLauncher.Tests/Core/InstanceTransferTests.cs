@@ -10,6 +10,20 @@ static class InstanceTransferTests
         using var core = new LauncherCore(receiver);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
+        var stale = new Instance
+        {
+            Name = "Better MTR 1.20.1 Fabric",
+            GameVersion = "Better MTR 1.20.1 Fabric",
+            Loader = "fabric",
+            ImportRoot = sender.Library,
+            VersionId = "Better MTR 1.20.1 Fabric",
+        };
+        if (
+            InstanceTransfer.SelectionError(stale)
+            != "The imported version file is missing. Repair or reimport this instance."
+        )
+            throw new Exception("Stale import was not diagnosed before pairing.");
+
         // Install from a cached vanilla profile, without external downloads.
         const string version = "1.21.1";
         var cached = Path.Combine(receiver.MinecraftRoot, "versions", version);
@@ -19,7 +33,12 @@ static class InstanceTransferTests
             """{"id":"1.21.1","libraries":[]}"""
         );
 
-        var instance = new Instance { Name = "Transfer sample", GameVersion = version };
+        var instance = new Instance
+        {
+            Name = " Transfer sample ",
+            GameVersion = version,
+            LoaderVersion = "",
+        };
         var game = sender.GameDirectory(instance);
         Directory.CreateDirectory(Path.Combine(game, "saves", "world"));
         Directory.CreateDirectory(Path.Combine(game, "mods"));

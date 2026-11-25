@@ -55,15 +55,9 @@ public static class InstanceTransfer
         var profiles = selections
             .Select(selection =>
             {
-                var instance = selection.Instance;
-                var profile = new Profile(
-                    instance.Name,
-                    instance.Description,
-                    instance.GameVersion,
-                    instance.Loader,
-                    instance.LoaderVersion
-                );
-                Validate(profile);
+                var profile = CreateProfile(selection.Instance);
+                if (SelectionError(selection.Instance) is { } error)
+                    throw new InvalidDataException(profile.Name + ": " + error);
                 return profile;
             })
             .ToArray();
@@ -578,19 +572,67 @@ public static class InstanceTransfer
         }
     }
 
+    static Profile CreateProfile(Instance instance) =>
+        new(
+            instance.Name?.Trim() ?? "",
+            instance.Description,
+            instance.GameVersion?.Trim() ?? "",
+            instance.Loader,
+            string.IsNullOrWhiteSpace(instance.LoaderVersion) || instance.Loader == "vanilla"
+                ? null
+                : instance.LoaderVersion.Trim()
+        );
+
+    public static string? SelectionError(Instance instance)
+    {
+        var error = ProfileError(CreateProfile(instance));
+        if (error != null && instance.ImportRoot is { } root && instance.VersionId is { } id)
+        {
+            try
+            {
+                if (!File.Exists(Store.SafePath(root, $"versions/{id}/{id}.json")))
+                    return "The imported version file is missing. Repair or reimport this instance.";
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                return "The imported version file cannot be accessed. Repair or reimport this instance.";
+            }
+        }
+        return error;
+    }
+
     static void Validate(Profile profile)
+    {
+        if (ProfileError(profile) is { } error)
+            throw new InvalidDataException(error);
+    }
+
+    static string? ProfileError(Profile profile)
     {
         if (
             string.IsNullOrWhiteSpace(profile.Name)
             || profile.Name.Length > 150
             || profile.Name != profile.Name.Trim()
             || profile.Name.IndexOfAny("/\\:*?\"<>|".ToCharArray()) >= 0
-            || !IsVersion(profile.GameVersion)
-            || profile.Loader is not ("vanilla" or "fabric" or "forge" or "neoforge")
-            || (profile.LoaderVersion != null && !IsVersion(profile.LoaderVersion))
+            || profile.Name.EndsWith('.')
+            || profile.Name.Any(char.IsControl)
+            || Regex.IsMatch(
+                profile.Name,
+                @"\A(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|\z)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant
+            )
+        )
+            return "The instance name cannot be used on the receiving device.";
+        if (!IsVersion(profile.GameVersion))
+            return "This instance has no valid Minecraft version. Repair or reimport it.";
+        if (profile.Loader is not ("vanilla" or "fabric" or "forge" or "neoforge"))
+            return "This instance uses a loader that instance transfer does not support.";
+        if (
+            (profile.LoaderVersion != null && !IsVersion(profile.LoaderVersion))
             || (profile.Loader is "forge" or "neoforge" && profile.LoaderVersion == null)
         )
-            throw new InvalidDataException("Unsupported instance name, game version or loader.");
+            return "This instance has no valid loader version. Repair or reimport it.";
+        return null;
     }
 
     static bool IsVersion(string? version) =>

@@ -35,7 +35,7 @@ public sealed partial class LauncherCore
             if (File.GetAttributes(folder).HasFlag(FileAttributes.ReparsePoint))
                 continue;
             if (
-                store.Config.Instances.Any(i =>
+                store.AllInstances.Any(i =>
                     string.Equals(
                         i.ImportRoot == null ? null : Path.GetFullPath(i.ImportRoot),
                         root,

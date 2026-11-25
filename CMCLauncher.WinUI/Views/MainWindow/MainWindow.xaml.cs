@@ -261,6 +261,22 @@ public sealed partial class MainWindow : Window
                         CloseButtonText = Ui("OK"),
                     }.ShowAsync();
                 }
+                if (store.NewlyHiddenImportedInstances.Count is > 0 and var count)
+                {
+                    var message = Text("");
+                    message.Text = string.Format(Ui("{0} imported instance(s) were hidden because their version files could not be read. Remove their launcher records? Game files are kept."), count);
+                    var dialog = new ContentDialog
+                    {
+                        XamlRoot = Content.XamlRoot,
+                        Title = Ui("Unavailable imported instances"),
+                        Content = message,
+                        PrimaryButtonText = Ui("Remove records"),
+                        CloseButtonText = Ui("Keep hidden"),
+                        DefaultButton = ContentDialogButton.Close,
+                    };
+                    if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+                        await store.ForgetHiddenImportedInstances();
+                }
                 if (store.Config.Settings.MinecraftDirectorySetupPending)
                     await SetupMinecraftDirectory();
                 await ShowStartupOptionsRecoveries();

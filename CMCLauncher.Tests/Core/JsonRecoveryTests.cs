@@ -90,8 +90,54 @@ static class JsonRecoveryTests
         )
             throw new Exception("Repaired metadata was not persisted and reused.");
 
+        await CheckHiddenImports(Path.Combine(root, "hidden-imports"));
+
         Console.WriteLine(
             "PASS corrupted settings, mod records and vanilla, Fabric and asset metadata cache recovery"
+        );
+    }
+
+    static async Task CheckHiddenImports(string root)
+    {
+        var store = new Store(root);
+        var imported = new Instance
+        {
+            Name = "Imported",
+            ImportRoot = store.Library,
+            VersionId = "Imported",
+        };
+        var managed = new Instance { Name = "Managed", GameVersion = "1.21.1" };
+        store.Config.Instances.AddRange([imported, managed]);
+        await store.Save();
+        var hidden = new Store(root);
+        if (
+            hidden.Config.Instances.Single().Id != managed.Id
+            || hidden.NewlyHiddenImportedInstances.Single().Id != imported.Id
+            || new Store(root).NewlyHiddenImportedInstances.Count != 0
+        )
+            throw new Exception(
+                "Unavailable imported instances were not hidden from the active list."
+            );
+
+        var profile = Store.SafePath(store.Library, "versions/Imported/Imported.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(profile)!);
+        await File.WriteAllTextAsync(profile, """{"id":"Imported"}""");
+        var restored = new Store(root);
+        if (restored.Config.Instances.All(x => x.Id != imported.Id))
+            throw new Exception("A repaired imported instance did not return to the active list.");
+
+        await File.WriteAllTextAsync(profile, "{");
+        hidden = new Store(root);
+        if (hidden.NewlyHiddenImportedInstances.Single().Id != imported.Id)
+            throw new Exception("A malformed local profile was not detected.");
+        await hidden.ForgetHiddenImportedInstances();
+        if (
+            new Store(root).Config.HiddenImportedInstances.Count != 0
+            || await File.ReadAllTextAsync(profile) != "{"
+        )
+            throw new Exception("Removing unavailable records did not preserve their game files.");
+        Console.WriteLine(
+            "PASS unavailable imported instances are hidden, restored or forgotten without deleting game files"
         );
     }
 

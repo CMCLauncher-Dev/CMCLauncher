@@ -232,6 +232,7 @@ public sealed class Configuration
 {
     public Settings Settings { get; set; } = new();
     public List<Instance> Instances { get; set; } = [];
+    public List<Instance> HiddenImportedInstances { get; set; } = [];
     public List<Account> Accounts { get; set; } = [];
     public List<MinecraftDirectory> MinecraftDirectories { get; set; } = [];
     public string? SelectedAccount { get; set; }
@@ -282,6 +283,8 @@ public sealed class Store
                 if (
                     config?.Settings == null
                     || config.Instances == null
+                    || config.HiddenImportedInstances == null
+                    || config.HiddenImportedInstances.Any(x => x == null)
                     || config.Accounts == null
                     || config.MinecraftDirectories == null
                     || config.Instances.Any(x => x == null)
@@ -307,8 +310,25 @@ public sealed class Store
             Config.Settings.MinecraftDirectorySetupPending = true;
             Config.Settings.LauncherLanguage = InterfaceLanguageForSystem();
         }
+        var restored = Config.HiddenImportedInstances.Where(HasReadableImportedVersion).ToArray();
+        foreach (var instance in restored)
+        {
+            Config.HiddenImportedInstances.Remove(instance);
+            if (!Config.Instances.Any(active => active.Id == instance.Id))
+                Config.Instances.Add(instance);
+        }
+        NewlyHiddenImportedInstances = Config.Instances
+            .Where(instance => instance.ImportRoot != null && !HasReadableImportedVersion(instance))
+            .ToArray();
+        foreach (var instance in NewlyHiddenImportedInstances)
+        {
+            Config.Instances.Remove(instance);
+            Config.HiddenImportedInstances.Add(instance);
+        }
         if (
             new MinecraftDirectoryManager(this).RegisterDefaultLibrary()
+            || NewlyHiddenImportedInstances.Count > 0
+            || restored.Length > 0
             || RecoveredSettingsPath != null
         )
         {
@@ -326,6 +346,64 @@ public sealed class Store
     }
 
     public string? RecoveredSettingsPath { get; }
+    public IReadOnlyList<Instance> NewlyHiddenImportedInstances { get; }
+    internal IEnumerable<Instance> AllInstances => Config.Instances.Concat(Config.HiddenImportedInstances);
+
+    static bool HasReadableImportedVersion(Instance instance)
+    {
+        if (instance.ImportRoot is not { } root || string.IsNullOrWhiteSpace(instance.VersionId))
+            return false;
+        try
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var id = instance.VersionId;
+            while (seen.Count < 10 && seen.Add(id))
+            {
+                var path = SafePath(root, $"versions/{id}/{id}.json");
+                using var json = JsonDocument.Parse(File.ReadAllText(path));
+                if (json.RootElement.ValueKind != JsonValueKind.Object)
+                    return false;
+                if (!json.RootElement.TryGetProperty("inheritsFrom", out var parent)
+                    || parent.ValueKind == JsonValueKind.Null)
+                    return true;
+                if (parent.ValueKind != JsonValueKind.String)
+                    return false;
+                id = parent.GetString()!;
+                if (string.IsNullOrEmpty(id))
+                    return true;
+                // A missing parent may be fetched when launching a valid local profile.
+                if (!File.Exists(SafePath(root, $"versions/{id}/{id}.json")))
+                    return id.All(c => (c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9') || c is '.' or '_' or '-' or '+');
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return false;
+        }
+        return false;
+    }
+
+    public async Task ForgetHiddenImportedInstances()
+    {
+        var removed = Config.HiddenImportedInstances.Where(NewlyHiddenImportedInstances.Contains).ToArray();
+        if (removed.Length == 0)
+            return;
+        var selected = Config.SelectedInstanceId;
+        foreach (var instance in removed)
+            Config.HiddenImportedInstances.Remove(instance);
+        if (removed.Any(instance => instance.Id == selected))
+            Config.SelectedInstanceId = null;
+        try
+        {
+            await Save();
+        }
+        catch
+        {
+            Config.HiddenImportedInstances.AddRange(removed);
+            Config.SelectedInstanceId = selected;
+            throw;
+        }
+    }
 
     internal static string DefaultRoot(string appData)
     {

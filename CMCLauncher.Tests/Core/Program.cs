@@ -508,6 +508,20 @@ try
     );
     var languages = new LocalizationCatalog(Path.Combine(root, "locales"));
     Check(
+        languages.Languages.Select(language => language.Code).SequenceEqual(
+            new[] { "en_us", "zh_cn", "zh_wy", "ar_sa", "es_es", "fr_fr", "ja_jp", "ru_ru", "en_bs", "lo_ls" }
+        )
+            && languages.Languages.Single(language => language.Code == "en_bs").DisplayName
+                == languages.Translate("en_bs", "Upside-down English"),
+        "language list groups Chinese variants and places novelty languages last"
+    );
+    Check(
+        languages.Translate("en_bs", "Launcher settings") == "sƃuᴉʇʇǝs ɹǝɥɔunɐ˥"
+            && languages.Format("en_bs", "Test {0:N0}\nhttps://example.com", 42)
+                == "ʇsǝ⊥ 42\nhttps://example.com",
+        "upside-down English rotates letters while preserving format arguments and URLs"
+    );
+    Check(
         languages.Languages.Any(l => l.Code == "en_us")
             && languages.Languages.Any(l => l.Code == "zh_cn"),
         "embedded locale packs belong to core"

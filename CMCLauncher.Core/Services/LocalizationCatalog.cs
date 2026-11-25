@@ -59,15 +59,17 @@ public sealed class LocalizationCatalog
         Reload();
     }
 
-    // 可用语言列表（en_us、zh_cn 置顶，其余按代码排序）。
+    // 常用语言置顶，后续按语言代码排列，趣味语言收在列表末尾。
     public IReadOnlyList<InterfaceLanguage> Languages =>
         packs
             .Values.OrderBy(p =>
                 p.Code == "en_us" ? 0
                 : p.Code == "zh_cn" ? 1
-                : 2
+                : p.Code is "zh_tw" or "zh_wy" ? 2
+                : p.Code is "en_bs" or "lo_ls" ? 4
+                : 3
             )
-            .ThenBy(p => p.Code)
+            .ThenBy(p => p.Code, StringComparer.Ordinal)
             .Select(p => new InterfaceLanguage(p.Code, p.DisplayName))
             .ToArray();
 
@@ -234,11 +236,14 @@ public sealed class LocalizationCatalog
                 if (key.StartsWith(prefix.Source, StringComparison.Ordinal))
                     return prefix.Target + key[prefix.Source.Length..];
         }
-        return
+        var english =
             packs.TryGetValue("en_us", out var fallback)
             && fallback.Strings.TryGetValue(key, out var original)
             ? original
             : key;
+        return language.Equals("en_bs", StringComparison.OrdinalIgnoreCase)
+            ? UpsideDownEnglish.Transform(english)
+            : english;
     }
 
     // 翻译并按目标语言文化格式化占位符；格式错误时回退英文模板，仍失败则返回 key。

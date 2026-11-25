@@ -40,10 +40,10 @@ public sealed class SettingsPage : CMCPage
             ItemsSource = new[]
             {
                 Ui("context.settingspage.system_default"),
-                Ui("Simplified Chinese"),
-                Ui("Traditional Chinese"),
+                "简体中文",
+                "繁體中文",
                 "English",
-                Ui("Japanese"),
+                "日本語",
                 Ui("context.settingspage.keep_current"),
             },
             SelectedIndex = settings.GameLanguage switch
@@ -534,10 +534,10 @@ public sealed class SettingsPage : CMCPage
             ItemsSource = new[]
             {
                 Ui("context.settingspage.system_default"),
-                Ui("Simplified Chinese"),
-                Ui("Traditional Chinese"),
+                "简体中文",
+                "繁體中文",
                 "English",
-                Ui("Japanese"),
+                "日本語",
                 Ui("context.settingspage.keep_current"),
             },
             SelectedIndex = language.SelectedIndex,
