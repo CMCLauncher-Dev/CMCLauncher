@@ -86,6 +86,7 @@ public sealed partial class MainWindow
 
     Task GameInstallOptions(string gameVersion)
     {
+        SetPageBack(() => Navigate("downloads"));
         pageTitle.Text = Ui("Install options") + " · Minecraft " + gameVersion;
         var name = Input(gameVersion);
         var loader = Choice(new[] { "vanilla", "fabric", "forge", "neoforge", "quilt" });
@@ -99,7 +100,6 @@ public sealed partial class MainWindow
         retry = Btn("Retry loader lookup", async () => await LoadBuilds());
         retry.IsVisible = false;
         var body = Stack(
-            Row(Btn("Back", () => Navigate("downloads"))),
             Field("Instance name", name),
             Field("Loader", loader),
             buildField,
@@ -717,7 +717,8 @@ public sealed partial class MainWindow
     {
         var revision = ++generation;
         pageTitle.Text = item.Name;
-        var host = Stack(Btn("Back", () => Navigate(returnRoute)), T("Loading…"));
+        SetPageBack(() => Navigate(returnRoute));
+        var host = Stack(T("Loading…"));
         pageContent.Content = host;
         var ct = navigationRequest?.Token ?? default;
         using var request = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -778,7 +779,6 @@ public sealed partial class MainWindow
         if (revision != generation)
             return;
         host.Children.Clear();
-        host.Children.Add(Btn("Back", () => Navigate(returnRoute)));
         host.Children.Add(
             Card(
                 Stack(

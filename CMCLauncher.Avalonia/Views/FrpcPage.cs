@@ -344,7 +344,6 @@ public sealed partial class MainWindow
             });
         UpdateOutput();
         var body = Stack(
-            Btn("Back to toolbox", () => Navigate("toolbox")),
             Btn("Manage downloaded clients", () => Navigate("settings")),
             Card(configs),
             Card(create),

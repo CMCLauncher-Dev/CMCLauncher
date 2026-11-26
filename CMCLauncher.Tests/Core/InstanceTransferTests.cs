@@ -177,6 +177,8 @@ static class InstanceTransferTests
             var saved = new Store(receiver.Root).Config.Instances;
             if (
                 imported.Id == instance.Id
+                || Path.GetFileName(destination) != imported.Id
+                || !saved.Single(x => x.Id == imported.Id).TransferredFromDevice
                 || await File.ReadAllTextAsync(
                     Path.Combine(destination, "saves", "world", "level.dat")
                 ) != "world"
@@ -208,6 +210,18 @@ static class InstanceTransferTests
             }
             catch (OperationCanceledException) when (timeout.IsCancellationRequested) { }
         }
+        var forge = new Instance
+        {
+            GameVersion = "1.20.1",
+            Loader = "forge",
+            LoaderVersion = "47.4.0",
+        };
+        if (LauncherCore.TransferredLoaderBuild(forge) != "1.20.1-47.4.0")
+            throw new Exception("A short Forge version must expand to its Maven build.");
+        forge.LoaderVersion = "1.20.1-47.4.0";
+        if (LauncherCore.TransferredLoaderBuild(forge) != "1.20.1-47.4.0")
+            throw new Exception("A complete Forge build must not be prefixed twice.");
+        Console.WriteLine("PASS transferred Forge build normalization");
         await VerifyFailedImportReceipt(sender, receiver, instance);
     }
 

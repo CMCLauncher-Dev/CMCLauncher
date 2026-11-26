@@ -21,7 +21,6 @@ public sealed partial class MainWindow
         var root = session.Store.GameDirectory(instance);
         var body = Stack(
             Row(
-                Btn("Back", InstanceSettings),
                 Btn(
                     "Import",
                     async () =>
@@ -569,7 +568,8 @@ public sealed partial class MainWindow
             updates.Children.Add(T("No compatible updates found."));
         foreach (var failure in failures)
             updates.Children.Add(T(failure, 12));
-        pageContent.Content = Stack(Btn("Back", () => ContentPage(instance, "mod")), updates);
+        SetPageBack(() => ContentPage(instance, "mod"));
+        pageContent.Content = updates;
     }
 
     async Task WorldsPage(Instance instance)
@@ -577,7 +577,6 @@ public sealed partial class MainWindow
         var game = session.Store.GameDirectory(instance);
         var body = Stack(
             Row(
-                Btn("Back", InstanceSettings),
                 Btn("World backups", () => WorldBackupsPage(instance)),
                 Btn(
                     "Import world ZIP",
@@ -682,7 +681,6 @@ public sealed partial class MainWindow
         }
         var body = Stack(
             Row(
-                Btn("Back", InstanceSettings),
                 Btn(
                     "Import",
                     async () =>
@@ -848,7 +846,7 @@ public sealed partial class MainWindow
         var version = Input("1.0.0");
         var format = Choice(new[] { "Modrinth (.mrpack)", "CurseForge (.zip)" });
         var resources = new CheckBox { Content = Ui("Include resource files"), IsChecked = true };
-        body.Children.Add(Row(Btn("Back", InstanceSettings)));
+        SetPageBack(InstanceSettings);
         var identity = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("*,160"),

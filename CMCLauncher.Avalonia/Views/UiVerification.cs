@@ -79,6 +79,16 @@ public sealed partial class MainWindow
             gameCatalog = [new("1.21.1", "release")];
             session.Store.Config.Settings.LauncherLanguage = "en_us";
             BuildNavigation();
+            await Navigate("instance-transfer");
+            if (pageBack.Child is not Button transferBack
+                || transferBack.Content is not global::Avalonia.Controls.Shapes.Path
+                || transferBack.Parent is not Border { Parent: Grid header }
+                || Grid.GetColumn(header.Children[1]) != 1)
+                throw new IOException("Instance transfer needs an arrow beside its page title.");
+            transferBack.RaiseEvent(new global::Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            if (route != "toolbox" || pageBack.Child != null)
+                throw new IOException("Instance transfer back should return to the toolbox and clear the arrow.");
+            checks.Add("PASS instance transfer header back arrow returns to the toolbox");
             var instance = new Instance
             {
                 Id = "ui-fixture",

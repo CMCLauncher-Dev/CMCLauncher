@@ -280,7 +280,8 @@ public sealed partial class MainWindow
     {
         var revision = ++generation;
         pageTitle.Text = entry.Title;
-        var host = Stack(Btn("Back", () => Navigate("blueprints")), T("Loading…"));
+        SetPageBack(() => Navigate("blueprints"));
+        var host = Stack(T("Loading…"));
         pageContent.Content = host;
         var ct = navigationRequest?.Token ?? default;
         if (source == "cms")
@@ -292,7 +293,6 @@ public sealed partial class MainWindow
         if (revision != generation)
             return;
         host.Children.Clear();
-        host.Children.Add(Btn("Back", () => Navigate("blueprints")));
         var header = new Grid
         {
             ColumnDefinitions = new ColumnDefinitions("140,*"),

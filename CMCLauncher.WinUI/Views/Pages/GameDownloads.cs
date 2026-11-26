@@ -525,23 +525,58 @@ public sealed partial class MainWindow
     }
 
     // 从 Modrinth 应用及 MultiMC/Prism 系 fork 复制迁移实例；复制式迁移不依赖原启动器。
-    async Task MigrateForeignLauncher()
+    async Task MigrateForeignLauncher(bool fromDirectoryDrawer = false)
     {
+        if (dialogOpen)
+            return;
+        var source = new ComboBox
+        {
+            Header = Ui("Source launcher"),
+            ItemsSource = new[] { "PCL / HMCL / Minecraft", "Modrinth App", "Prism / MultiMC / PolyMC" },
+            PlaceholderText = Ui("Select the source launcher"),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = Ui("Migrate other launchers"),
+            Content = source,
+            PrimaryButtonText = Ui("Next"),
+            CloseButtonText = Ui("Cancel"),
+            IsPrimaryButtonEnabled = false,
+        };
+        source.SelectionChanged += (_, _) => dialog.IsPrimaryButtonEnabled = source.SelectedIndex >= 0;
+        dialogOpen = true;
+        try
+        {
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                return;
+        }
+        finally
+        {
+            dialogOpen = false;
+        }
         var folder = await PickMinecraftFolder();
         if (folder == null)
             return;
+        if (source.SelectedIndex == 0)
+        {
+            await SetMinecraftFolder(folder, selectDefault: !fromDirectoryDrawer);
+            if (fromDirectoryDrawer)
+                await RefreshMinecraftDirectoryDrawer();
+            else
+            {
+                page = "instances";
+                await RenderAsync();
+            }
+            return;
+        }
+        var format = source.SelectedIndex == 1 ? ForeignLauncherFormat.Modrinth : ForeignLauncherFormat.MultiMC;
         await Run(async ct =>
         {
-            var scan = core.ScanForeignInstances(folder, ct, AddLog);
+            var scan = await Task.Run(() => core.ScanForeignInstances(folder, ct, AddLog, format), ct);
             if (scan.Instances.Count == 0)
-            {
-                Report(
-                    Ui(
-                        "未在该目录发现可迁移的实例，请选择 ModrinthApp 或 MultiMC/Prism 启动器根目录"
-                    )
-                );
-                return;
-            }
+                throw new IOException(Ui("No instances match the selected launcher format in this folder."));
             var (migrated, skipped) = await core.MigrateForeignInstances(
                 scan.Instances,
                 ct,
@@ -570,7 +605,12 @@ public sealed partial class MainWindow
                 message += UiFormat("，其中 {0} 个需在下载游戏页安装对应加载器", manual);
             Report(message);
         });
-        page = "instances";
-        Render();
+        if (fromDirectoryDrawer)
+            await RefreshMinecraftDirectoryDrawer();
+        else
+        {
+            page = "instances";
+            await RenderAsync();
+        }
     }
 }

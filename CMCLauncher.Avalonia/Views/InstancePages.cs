@@ -309,20 +309,9 @@ public sealed partial class MainWindow
             Stack(
                 Row(
                     directory,
+                    Btn("Manage Minecraft directories", () => OpenMinecraftDirectoryDrawer()),
                     Btn("Download game", () => Navigate("downloads")),
-                    Btn("Import modpack", ImportPack),
-                    Btn("Manage Minecraft directories", () => DirectoriesPage()),
-                    Btn(
-                        "Scan versions",
-                        () =>
-                            ImportLocalFrom(
-                                directory.SelectedIndex > 0
-                                    ? directory.SelectedItem?.ToString()
-                                    : session.Store.MinecraftRoot
-                            )
-                    ),
-                    Btn("Import local instances", ImportLocal),
-                    Btn("Migrate other launchers", MigrateForeign)
+                    Btn("Import modpack", ImportPack)
                 ),
                 filterBar,
                 results
@@ -332,7 +321,7 @@ public sealed partial class MainWindow
 
     Task ImportLocal() => ImportLocalFrom(null);
 
-    async Task ImportLocalFrom(string? directory)
+    async Task ImportLocalFrom(string? directory, bool fromDirectoryDrawer = false)
     {
         var path = directory ?? await Folder();
         if (path == null)
@@ -342,30 +331,65 @@ public sealed partial class MainWindow
             async ct =>
             {
                 var scan = await session.Core.ScanLocalInstances(path, ct);
-                foreach (var instance in scan.Instances)
-                    if (
-                        !session.Store.Config.Instances.Any(i =>
-                            Path.GetFullPath(session.Store.GameDirectory(i))
-                            == Path.GetFullPath(session.Store.GameDirectory(instance))
-                        )
-                    )
-                        session.Store.Config.Instances.Add(instance);
-                await session.Save();
+                var store = session.Store;
+                var registered = new MinecraftDirectory { Path = scan.Root };
+                var addDirectory = !store.Config.MinecraftDirectories.Any(item =>
+                    string.Equals(Path.GetFullPath(item.Path), Path.GetFullPath(scan.Root), StringComparison.OrdinalIgnoreCase));
+                if (addDirectory)
+                    store.Config.MinecraftDirectories.Add(registered);
+                store.Config.Instances.AddRange(scan.Instances);
+                try
+                {
+                    await session.Save();
+                }
+                catch
+                {
+                    if (addDirectory)
+                        store.Config.MinecraftDirectories.Remove(registered);
+                    foreach (var instance in scan.Instances)
+                        store.Config.Instances.Remove(instance);
+                    throw;
+                }
+
             }
         );
-        await Navigate("instances");
+        if (fromDirectoryDrawer)
+            await RefreshMinecraftDirectoryDrawer();
+        else
+            await Navigate("instances");
     }
 
     async Task MigrateForeign()
     {
+        var source = new ComboBox
+        {
+            ItemsSource = new[] { "PCL / HMCL / Minecraft", "Modrinth App", "Prism / MultiMC / PolyMC" },
+            PlaceholderText = Ui("Select the source launcher"),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        if (!await Dialog("Migrate other launchers", Field("Source launcher", source), true, confirmLabel: "Next"))
+            return;
+        if (source.SelectedIndex < 0)
+        {
+            ShowToast(Ui("Select the source launcher"));
+            return;
+        }
         var path = await Folder();
         if (path == null)
             return;
+        if (source.SelectedIndex == 0)
+        {
+            await ImportLocalFrom(path, fromDirectoryDrawer: true);
+            return;
+        }
+        var format = source.SelectedIndex == 1 ? ForeignLauncherFormat.Modrinth : ForeignLauncherFormat.MultiMC;
         await session.Run(
             "Migrate other launchers",
             async ct =>
             {
-                var scan = await Task.Run(() => session.Core.ScanForeignInstances(path, ct), ct);
+                var scan = await Task.Run(() => session.Core.ScanForeignInstances(path, ct, format: format), ct);
+                if (scan.Instances.Count == 0)
+                    throw new IOException(Ui("No instances match the selected launcher format in this folder."));
                 var migrated = await session.Core.MigrateForeignInstances(scan.Instances, ct);
                 session.Store.Config.Instances.AddRange(migrated.Migrated);
                 foreach (var skipped in migrated.Skipped)
@@ -373,7 +397,7 @@ public sealed partial class MainWindow
                 await session.Save();
             }
         );
-        await Navigate("instances");
+        await RefreshMinecraftDirectoryDrawer();
     }
 
     async Task ImportPack()
@@ -597,55 +621,70 @@ public sealed partial class MainWindow
 
     Task Trash(string path) => LauncherPlatform.Current.MoveToTrash(path);
 
-    Task DirectoriesPage()
+    async Task<string?> ChooseMinecraftDestination(string title, string? source = null, bool keepSource = false)
+    {
+        var path = Input("", "Enter a new directory that does not exist yet");
+        var fields = Stack();
+        if (source != null)
+        {
+            fields.Children.Add(T(source));
+            fields.Children.Add(T(keepSource ? "Copy this directory and use the copy for recognized instances. The source is kept." : "Close other launchers first. Files will be copied and verified before the old directory is removed."));
+        }
+        fields.Children.Add(Field(source == null ? "New directory path" : "Migration destination", path));
+        fields.Children.Add(Btn("Choose parent folder", async () =>
+        {
+            if (await Folder() is { } parent)
+                path.Text = Path.Combine(parent, ".minecraft");
+        }));
+        if (!await Dialog(title, fields, true, confirmLabel: source == null ? "Create directory" : "Migrate directory"))
+            return null;
+        if (string.IsNullOrWhiteSpace(path.Text))
+        {
+            ShowToast(Ui("Enter a new directory that does not exist yet"));
+            return null;
+        }
+        return path.Text.Trim();
+    }
+
+    Task OpenMinecraftDirectoryDrawer(ScrollViewer? existingScroll = null)
     {
         var manager = new MinecraftDirectoryManager(session.Store);
         var body = Stack(
             Row(
-                Btn("Back", () => Navigate("instances")),
                 Btn(
                     "Create directory",
                     async () =>
                     {
-                        var path = Input("", "New directory path");
-                        if (!await Dialog("Create directory", path, true))
+                        session.EnsureFilesIdle();
+                        if (await ChooseMinecraftDestination("Create directory") is not { } destination)
                             return;
-                        await session.Run(
-                            "Create directory",
-                            async _ =>
-                            {
-                                await manager.Create(path.Text!);
-                                await manager.Select(path.Text!);
-                            }
-                        );
-                        await DirectoriesPage();
+                        session.EnsureFilesIdle();
+                        if (!await session.Run("Create directory", _ => manager.Create(destination)))
+                            return;
+                        await RefreshMinecraftDirectoryDrawer();
                     }
                 ),
-                Btn(
-                    "Use existing directory",
-                    async () =>
-                    {
-                        var path = await Folder();
-                        if (path != null)
-                        {
-                            await manager.Select(path);
-                            await DirectoriesPage();
-                        }
-                    }
-                )
+                Btn("Migrate other launchers", MigrateForeign)
             )
         );
         foreach (var record in manager.List())
         {
+            var current = string.Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(record.Path)),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(session.Store.MinecraftRoot)),
+                StringComparison.OrdinalIgnoreCase
+            );
             var buttons = Row(
                 Btn(
                     "Use for new installations",
                     async () =>
                     {
+                        session.EnsureFilesIdle();
                         await manager.Select(record.Path);
-                        await DirectoriesPage();
+                        await RefreshMinecraftDirectoryDrawer();
                     }
                 ),
+                Btn("Scan versions", () => ImportLocalFrom(record.Path, fromDirectoryDrawer: true)),
                 Btn(
                     "Open folder",
                     () =>
@@ -655,45 +694,93 @@ public sealed partial class MainWindow
                     }
                 )
             );
-            if (manager.CanMigrate(record))
+            var keepSource = !manager.CanMigrate(record);
+            if (!keepSource || manager.CanCopyForMigration(record))
             {
                 var migrate = Btn(
                         "Migrate directory",
                         async () =>
                         {
                             session.EnsureFilesIdle();
-                            var path = Input("", "Choose a new destination that does not exist");
-                            var destination = Stack(
-                                Field("Migration destination", path),
-                                Btn(
-                                    "Choose parent folder",
-                                    async () =>
-                                    {
-                                        var parent = await Folder();
-                                        if (parent != null)
-                                            path.Text = Path.Combine(parent, ".minecraft");
-                                    }
-                                )
-                            );
-                            if (!await Dialog("Migrate directory", destination, true))
+                            if (await ChooseMinecraftDestination("Migrate this Minecraft directory?", record.Path, keepSource) is not { } destination)
                                 return;
-                            await session.Run(
-                                "Migrate directory",
-                                async ct =>
-                                {
-                                    await manager.Migrate(record, path.Text!, ct);
-                                }
-                            );
-                            await DirectoriesPage();
+                            session.EnsureFilesIdle();
+                            var cleaned = false;
+                            if (!await session.Run("Migrate directory", async ct =>
+                                cleaned = await manager.Migrate(record, destination, ct, keepSource)))
+                                return;
+                            await RefreshMinecraftDirectoryDrawer();
+                            if (!cleaned)
+                                ShowToast(Ui("Migration finished, but some old files could not be removed. The new directory is active."));
                         }
                     );
                 migrate.Margin = buttons.Children[0].Margin;
                 buttons.Children.Add(migrate);
             }
-            body.Children.Add(Card(Stack(T(record.Path, 14, true), buttons)));
+            if (manager.CanRemove(record))
+                buttons.Children.Add(DangerButton("Remove directory", async () =>
+                {
+                    session.EnsureFilesIdle();
+                    var trash = new CheckBox { Content = Ui("Also move the folder to the recycle bin"), IsVisible = manager.CanTrash(record) };
+                    if (!await Dialog("Remove directory", Stack(T(record.Path), trash), true, danger: true, confirmLabel: "Remove"))
+                        return;
+                    session.EnsureFilesIdle();
+                    await manager.Remove(record, trash.IsChecked == true);
+                    await RefreshMinecraftDirectoryDrawer();
+                }));
+            buttons.Children[0].IsEnabled = !current && Directory.Exists(record.Path);
+            body.Children.Add(Card(Stack(
+                T(record.Path, 14, true),
+                T(current ? "Default installation directory" : "Registered Minecraft directory", 12),
+                buttons
+            )));
         }
-        pageContent.Content = body;
+        if (existingScroll != null)
+        {
+            var offset = existingScroll.Offset;
+            existingScroll.Content = body;
+            existingScroll.Offset = offset;
+            return Task.CompletedTask;
+        }
+        var close = Btn("Close", () =>
+        {
+            drawer.IsPaneOpen = false;
+            return Task.CompletedTask;
+        });
+        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 10 };
+        var title = T("Manage Minecraft directories", 20, true);
+        title.VerticalAlignment = VerticalAlignment.Center;
+        header.Children.Add(title);
+        Grid.SetColumn(close, 1);
+        header.Children.Add(close);
+
+        var pane = new Grid
+        {
+            RowDefinitions = new RowDefinitions("Auto,*"),
+            RowSpacing = 12,
+            Margin = new Thickness(16),
+        };
+        pane.Children.Add(header);
+        var scroll = new ScrollViewer { Content = body };
+        pane.Tag = scroll;
+        Grid.SetRow(scroll, 1);
+        pane.Children.Add(scroll);
+        drawer.OpenPaneLength = Math.Clamp(ClientSize.Width - 32, 280, 540);
+        drawer.Pane = pane;
+        drawer.IsPaneOpen = true;
+        close.Focus();
         return Task.CompletedTask;
+    }
+
+    async Task RefreshMinecraftDirectoryDrawer()
+    {
+        if (route != "instances")
+            return;
+        var pane = drawer.IsPaneOpen ? drawer.Pane as Grid : null;
+        var scroll = pane?.Tag as ScrollViewer;
+        await Navigate("instances", preserveDirectoryDrawer: scroll != null);
+        if (scroll != null && drawer.IsPaneOpen && ReferenceEquals(drawer.Pane, pane))
+            await OpenMinecraftDirectoryDrawer(scroll);
     }
 
     async Task FirstRun()

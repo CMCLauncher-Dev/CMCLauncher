@@ -134,6 +134,30 @@ static class MinecraftDirectoryTests
         store.Config.Instances.Add(new Instance { ImportRoot = destination });
         Check(!manager.CanMigrate(record), "Imported root became migratable");
         store.Config.Instances.RemoveAt(store.Config.Instances.Count - 1);
+        var externalRoot = Path.Combine(root, "recognized-external");
+        var externalVersion = Path.Combine(externalRoot, "versions", "recognized");
+        Directory.CreateDirectory(externalVersion);
+        await File.WriteAllTextAsync(Path.Combine(externalVersion, "recognized.json"), """{"id":"recognized"}""");
+        var externalRecord = new MinecraftDirectory { Path = externalRoot };
+        store.Config.MinecraftDirectories.Add(externalRecord);
+        var imported = new Instance { Name = "Recognized", ImportRoot = externalRoot, VersionId = "recognized" };
+        store.Config.Instances.Add(imported);
+        Check(manager.CanCopyForMigration(externalRecord) && !manager.CanRemove(externalRecord), "Recognized external installations must allow copy migration and protect in-use paths");
+        var externalCopy = Path.Combine(root, "recognized-copy");
+        Check(await manager.Migrate(externalRecord, externalCopy, CancellationToken.None, keepSource: true), "External directory copy did not complete");
+        Check(
+            imported.ImportRoot == externalCopy && Directory.Exists(externalVersion)
+                && File.Exists(Path.Combine(externalCopy, "versions", "recognized", "recognized.json")),
+            "Copy migration did not preserve the source and redirect the recognized instance"
+        );
+
+        var removable = Path.Combine(root, "removable");
+        await manager.Create(removable);
+        var unused = manager.List().Single(item => item.Path == removable);
+        Check(manager.CanTrash(unused), "An unused owned directory should allow recycling");
+        await manager.Remove(unused, moveToTrash: false);
+        Check(Directory.Exists(removable) && !manager.List().Any(item => item.Path == removable), "Removing a directory record deleted files or left the entry visible");
+
         // Force configuration replacement to fail after copying; paths and source must roll back.
         var settingsFile = Path.Combine(store.Root, "settings.json");
         File.Delete(settingsFile);

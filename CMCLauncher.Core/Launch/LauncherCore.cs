@@ -780,9 +780,7 @@ public sealed partial class LauncherCore : IDisposable
             {
                 if (instance.PendingTransferredLoaderSetup)
                 {
-                    var build = instance.Loader == "forge"
-                        ? LoaderBuildPrefix(instance.GameVersion, instance.Loader) + instance.LoaderVersion
-                        : instance.LoaderVersion ?? "";
+                    var build = TransferredLoaderBuild(instance);
                     await InstallLoader(instance, build, ct);
                     instance.PendingTransferredLoaderSetup = false;
                     try { await store.Save(); }
@@ -931,6 +929,44 @@ public sealed partial class LauncherCore : IDisposable
         return gameVersion + ".";
     }
 
+    internal static string TransferredLoaderBuild(Instance instance)
+    {
+        var build = instance.LoaderVersion ?? "";
+        var prefix = LoaderBuildPrefix(instance.GameVersion, instance.Loader);
+        return instance.Loader == "forge" && !build.StartsWith(prefix, StringComparison.Ordinal)
+            ? prefix + build
+            : build;
+    }
+
+    async Task<string> MatchInstanceJava(Instance instance, int required, CancellationToken ct)
+    {
+        try
+        {
+            return await JavaManager.Match(store, required, ct);
+        }
+        catch (FileNotFoundException) when (CanPrepareTransferredJava(instance))
+        {
+            Status?.Invoke($"Downloading Java {required}");
+            var runtime = await JavaManager.Download(this, store, required, ct, stage => Status?.Invoke(stage));
+            JavaManager.Register(store.Config.Settings, runtime);
+            await store.Save();
+            return runtime.Path;
+        }
+    }
+
+    bool CanPrepareTransferredJava(Instance instance)
+    {
+        if (instance.TransferredFromDevice || instance.PendingTransferredLoaderSetup)
+            return true;
+        // Earlier transfers registered isolated directories before writing a local version profile.
+        if (instance.ImportRoot != null || instance.Directory == null || instance.StorageRoot == null)
+            return false;
+        var directory = store.GameDirectory(instance);
+        var versions = Path.Combine(store.StorageDirectory(instance), "versions");
+        return string.Equals(Path.GetDirectoryName(directory), versions, StringComparison.OrdinalIgnoreCase)
+            && !File.Exists(Path.Combine(directory, Path.GetFileName(directory) + ".json"));
+    }
+
     // 下载并运行 Forge/NeoForge 安装器，安装完成后更新实例的 VersionId 和 LoaderVersion。
     public async Task<Instance> InstallLoader(Instance instance, string build, CancellationToken ct)
     {
@@ -982,8 +1018,8 @@ public sealed partial class LauncherCore : IDisposable
         var profiles = Path.Combine(storage, "launcher_profiles.json");
         if (!File.Exists(profiles))
             await Store.AtomicJson(profiles, new JsonObject { ["profiles"] = new JsonObject() });
-        var java = await JavaManager.Match(
-            store,
+        var java = await MatchInstanceJava(
+            instance,
             JavaManager.RequiredMajor(
                 instance.GameVersion,
                 baseProfile["javaVersion"].Int("majorVersion")
@@ -1452,7 +1488,7 @@ public sealed partial class LauncherCore : IDisposable
             instance.GameVersion,
             version["javaVersion"].Int("majorVersion")
         );
-        var java = await JavaManager.Match(store, requiredJava, ct);
+        var java = await MatchInstanceJava(instance, requiredJava, ct);
         Status?.Invoke($"自动匹配 Java {requiredJava}：{java}");
         // CVE-2026-114938 (Java4Shell)：识别受影响运行时，稍后自动注入官方缓解参数。
         // 识别失败（进程无法运行等）不应阻断游戏启动。

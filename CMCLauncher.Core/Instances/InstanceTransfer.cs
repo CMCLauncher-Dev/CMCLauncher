@@ -534,6 +534,7 @@ public static class InstanceTransfer
             }
 
             var imported = new List<Instance>();
+            var batchNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 for (var index = 0; index < profiles.Length; index++)
@@ -543,6 +544,7 @@ public static class InstanceTransfer
                         await Import(
                             store,
                             profiles[index],
+                            batchNames,
                             entries[prefix],
                             prefix,
                             installing,
@@ -598,6 +600,7 @@ public static class InstanceTransfer
     static async Task<Instance> Import(
         Store store,
         Profile profile,
+        HashSet<string> batchNames,
         IReadOnlyList<ZipArchiveEntry> entries,
         string prefix,
         Action installing,
@@ -612,6 +615,7 @@ public static class InstanceTransfer
             Loader = profile.Loader,
             LoaderVersion = profile.LoaderVersion,
             PendingTransferredLoaderSetup = profile.Loader is "forge" or "neoforge",
+            TransferredFromDevice = true,
             StorageRoot = store.MinecraftRoot,
         };
         var versions = Store.SafePath(instance.StorageRoot, "versions");
@@ -625,8 +629,12 @@ public static class InstanceTransfer
             {
                 try
                 {
-                    store.EnsureUniqueInstanceName(instance);
-                    break;
+                    if (!batchNames.Contains(instance.Name))
+                    {
+                        store.EnsureUniqueInstanceName(instance);
+                        break;
+                    }
+                    instance.Name = $"{profile.Name} ({suffix})";
                 }
                 catch
                     when (Directory.Exists(Store.SafePath(versions, instance.Name))
@@ -638,9 +646,10 @@ public static class InstanceTransfer
                     instance.Name = $"{profile.Name} ({suffix})";
                 }
             }
-            store.PrepareIsolatedInstance(instance);
+            instance.Directory = Store.SafePath(versions, instance.Id);
             ct.ThrowIfCancellationRequested();
             Directory.Move(stage, store.GameDirectory(instance));
+            batchNames.Add(instance.Name);
             return instance;
         }
         finally

@@ -103,6 +103,31 @@ public sealed partial class MainWindow
         );
         await SwitchLanguage("zh_cn");
         await VerifyToolboxUi(Check, directory);
+        page = "instances";
+        await RenderAsync();
+        OpenMinecraftDirectoryDrawer(directoryDrawerOpener!);
+        var drawerBody = CommunityFilterDrawerBody.Content;
+        var closedDuringRefresh = false;
+        var drawerRegistration = CommunityFilterDrawer.RegisterPropertyChangedCallback(
+            SplitView.IsPaneOpenProperty,
+            (_, _) => closedDuringRefresh |= !CommunityFilterDrawer.IsPaneOpen
+        );
+        try
+        {
+            await RefreshMinecraftDirectoryDrawer();
+            Check(
+                CommunityFilterDrawer.IsPaneOpen && !closedDuringRefresh
+                    && !ReferenceEquals(drawerBody, CommunityFilterDrawerBody.Content)
+                    && CommunityFilterDrawerBody.Content is StackPanel directoryBody
+                    && !Descendants(directoryBody).OfType<Expander>().Any(),
+                "Minecraft directory actions refresh the open drawer without closing it"
+            );
+        }
+        finally
+        {
+            CommunityFilterDrawer.UnregisterPropertyChangedCallback(SplitView.IsPaneOpenProperty, drawerRegistration);
+            CloseCommunityFilterDrawer();
+        }
         await VerifyInterfaceLayout(Check, directory);
         store.Config.Settings.Theme = "light";
         store.Config.Settings.ColorPreset = "native";

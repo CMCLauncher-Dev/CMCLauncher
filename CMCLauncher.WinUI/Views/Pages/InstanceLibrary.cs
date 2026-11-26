@@ -64,7 +64,12 @@ public sealed partial class MainWindow
         );
         directoryRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         directoryRow.Children.Add(directories);
+        directoryDrawerOpener = Action(
+            "Manage Minecraft directories",
+            (sender, _) => OpenMinecraftDirectoryDrawer((Button)sender)
+        );
         var directoryActions = Buttons(
+            directoryDrawerOpener,
             Action(
                 "下载游戏",
                 (_, _) =>
@@ -78,35 +83,6 @@ public sealed partial class MainWindow
         Grid.SetColumn(directoryActions, 1);
         directoryRow.Children.Add(directoryActions);
         PageBody.Children.Add(directoryRow);
-        var directoryTools = new Expander
-        {
-            Header = Ui("Manage Minecraft directories"),
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-        };
-        directoryTools.Expanding += (_, _) =>
-        {
-            if (directoryTools.Content != null)
-                return;
-            var tools = MinecraftDirectoriesBody();
-            tools.Children.Add(
-                Buttons(
-                    Action(
-                        "Scan versions",
-                        async (_, _) =>
-                        {
-                            await SetMinecraftFolder(store.MinecraftRoot);
-                            Render();
-                        }
-                    ),
-                    Action("Open folder", (_, _) => OpenFolder(store.MinecraftRoot)),
-                    Action("Set folder", async (_, _) => await ImportLocal()),
-                    Action("迁移其它启动器", async (_, _) => await MigrateForeignLauncher())
-                )
-            );
-            directoryTools.Content = tools;
-        };
-        PageBody.Children.Add(directoryTools);
         var query = new TextBox { Text = instanceQuery };
         query.KeyDown += (_, e) =>
         {
@@ -791,7 +767,7 @@ public sealed partial class MainWindow
     }
 
     // 扫描只登记已有版本，不移动原目录；单个损坏版本不会中断其他版本导入。
-    async Task SetMinecraftFolder(string path)
+    async Task SetMinecraftFolder(string path, bool selectDefault = true)
     {
         await Run(async ct =>
         {
@@ -812,7 +788,8 @@ public sealed partial class MainWindow
                 : null;
             if (addedDirectory != null)
                 store.Config.MinecraftDirectories.Add(addedDirectory);
-            store.Config.Settings.MinecraftRoot = root;
+            if (selectDefault)
+                store.Config.Settings.MinecraftRoot = root;
             store.Config.Instances.AddRange(pending);
             try
             {
@@ -828,7 +805,7 @@ public sealed partial class MainWindow
                 throw;
             }
             Report(
-                UiFormat("Minecraft folder set, found {0} new versions", pending.Count)
+                UiFormat(selectDefault ? "Minecraft folder set, found {0} new versions" : "Found {0} new versions", pending.Count)
                     + (
                         failed > 0
                             ? UiFormat(

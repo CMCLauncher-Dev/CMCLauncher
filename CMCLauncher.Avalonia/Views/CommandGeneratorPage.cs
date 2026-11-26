@@ -400,7 +400,6 @@ public sealed partial class MainWindow
             catalogStatus
         );
         return Stack(
-            Btn("Back to toolbox", () => Navigate("toolbox")),
             Card(Stack(T("Command setup", 16, true), toolbar, filters, consoleFormat, syntax, catalogStatus)),
             editorLayout,
             catalogEditor,

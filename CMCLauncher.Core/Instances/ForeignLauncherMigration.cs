@@ -20,6 +20,8 @@ public sealed record ForeignInstance(
 }
 
 // 扫描结果：根目录路径、发现的实例列表（按 Minecraft 目录去重）与解析失败的目录数。
+public enum ForeignLauncherFormat { Modrinth, MultiMC }
+
 public sealed record ForeignScan(string Root, IReadOnlyList<ForeignInstance> Instances, int Failed);
 
 public sealed partial class LauncherCore
@@ -199,7 +201,8 @@ public sealed partial class LauncherCore
     public ForeignScan ScanForeignInstances(
         string path,
         CancellationToken ct = default,
-        Action<string>? diagnostic = null
+        Action<string>? diagnostic = null,
+        ForeignLauncherFormat? format = null
     )
     {
         path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
@@ -207,7 +210,13 @@ public sealed partial class LauncherCore
             throw new DirectoryNotFoundException(path);
         var instances = new List<ForeignInstance>();
         var failed = 0;
-        foreach (var style in new[] { "instances", "profiles" })
+        string[] styles = format switch
+        {
+            ForeignLauncherFormat.Modrinth => ["profiles"],
+            ForeignLauncherFormat.MultiMC => ["instances"],
+            _ => ["instances", "profiles"],
+        };
+        foreach (var style in styles)
         {
             var root = Directory.Exists(Path.Combine(path, style))
                 ? Path.Combine(path, style)
@@ -224,11 +233,9 @@ public sealed partial class LauncherCore
                 {
                     var candidate =
                         style == "instances"
-                            ? Directory.Exists(Path.Combine(folder, "mmc-pack.json"))
+                            ? File.Exists(Path.Combine(folder, "mmc-pack.json")) || File.Exists(Path.Combine(folder, "instance.cfg"))
                                 ? ScanMmcInstance(folder)
-                                : File.Exists(Path.Combine(folder, "instance.cfg"))
-                                    ? ScanMmcInstance(folder)
-                                    : null
+                                : null
                             : ScanModrinthInstance(folder);
                     if (candidate != null)
                         instances.Add(candidate);

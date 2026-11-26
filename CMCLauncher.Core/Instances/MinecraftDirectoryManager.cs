@@ -113,6 +113,67 @@ public sealed class MinecraftDirectoryManager(Store store)
         }
     }
 
+    public bool CanCopyForMigration(MinecraftDirectory record) =>
+        Directory.Exists(record.Path)
+        && !Inside(store.Root, record.Path)
+        && store.Config.Instances.Any(instance =>
+            Same(store.StorageDirectory(instance), record.Path)
+        );
+
+    public bool CanRemove(MinecraftDirectory record) =>
+        store.Config.MinecraftDirectories.Contains(record)
+        && !Same(record.Path, store.Library)
+        && !Same(record.Path, store.MinecraftRoot)
+        && !store.AllInstances.Any(instance =>
+            Inside(store.StorageDirectory(instance), record.Path)
+            || Inside(store.GameDirectory(instance), record.Path)
+        );
+
+    public bool CanTrash(MinecraftDirectory record) =>
+        CanRemove(record)
+        && CanMigrate(record)
+        && !List().Any(other => !Same(other.Path, record.Path) && Inside(other.Path, record.Path));
+
+    public async Task Remove(MinecraftDirectory record, bool moveToTrash)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            if (!CanRemove(record) || (moveToTrash && !CanTrash(record)))
+                throw new InvalidOperationException("This directory cannot be removed.");
+            if (moveToTrash)
+                NoLinks(record.Path);
+            var index = store.Config.MinecraftDirectories.IndexOf(record);
+            store.Config.MinecraftDirectories.RemoveAt(index);
+            try
+            {
+                await store.Save();
+            }
+            catch
+            {
+                store.Config.MinecraftDirectories.Insert(index, record);
+                throw;
+            }
+            if (moveToTrash)
+            {
+                try
+                {
+                    await LauncherPlatform.Current.MoveToTrash(record.Path);
+                }
+                catch
+                {
+                    store.Config.MinecraftDirectories.Insert(index, record);
+                    await store.Save();
+                    throw;
+                }
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     // 校验路径及其所有父级均非符号链接/重解析点（链接目录不可管理或迁移）。
     static void NoLinks(string path)
     {
@@ -181,7 +242,8 @@ public sealed class MinecraftDirectoryManager(Store store)
     public async Task<bool> Migrate(
         MinecraftDirectory record,
         string destination,
-        CancellationToken ct
+        CancellationToken ct,
+        bool keepSource = false
     )
     {
         await gate.WaitAsync(ct);
@@ -189,7 +251,7 @@ public sealed class MinecraftDirectoryManager(Store store)
         bool committed = false;
         try
         {
-            if (!CanMigrate(record))
+            if (keepSource ? !CanCopyForMigration(record) : !CanMigrate(record))
                 throw new InvalidOperationException(
                     "Only directories created by CMCLauncher can be migrated. Imported directories stay in place."
                 );
@@ -282,7 +344,10 @@ public sealed class MinecraftDirectoryManager(Store store)
             {
                 NoLinks(file);
                 await using var input = File.OpenRead(file);
-                if (!copiedHashes[file].SequenceEqual(await StreamHash.ComputeAsync(SHA256.Create(), input, ct)))
+                if (
+                    !copiedHashes[file]
+                        .SequenceEqual(await StreamHash.ComputeAsync(SHA256.Create(), input, ct))
+                )
                     throw new IOException(
                         "The source changed during migration. Close other launchers and retry."
                     );
@@ -329,7 +394,16 @@ public sealed class MinecraftDirectoryManager(Store store)
                     : path;
             Directory.Move(stage, destination);
             stage = destination;
-            record.Path = destination;
+            var copiedRecord = new MinecraftDirectory { Path = destination };
+            var previousRecordIndex = store.Config.MinecraftDirectories.IndexOf(record);
+            if (keepSource)
+            {
+                if (previousRecordIndex >= 0)
+                    store.Config.MinecraftDirectories.RemoveAt(previousRecordIndex);
+                store.Config.MinecraftDirectories.Add(copiedRecord);
+            }
+            else
+                record.Path = destination;
             foreach (var item in paths)
             {
                 var i = item.Instance;
@@ -338,6 +412,7 @@ public sealed class MinecraftDirectoryManager(Store store)
                     i.StorageRoot = destination;
                 else
                     i.StorageRoot = Remap(i.StorageRoot);
+                i.ImportRoot = Remap(i.ImportRoot);
                 i.Directory = Remap(i.Directory);
                 i.IconPath = Remap(i.IconPath);
             }
@@ -350,7 +425,14 @@ public sealed class MinecraftDirectoryManager(Store store)
             }
             catch
             {
-                record.Path = source;
+                if (keepSource)
+                {
+                    store.Config.MinecraftDirectories.Remove(copiedRecord);
+                    if (previousRecordIndex >= 0)
+                        store.Config.MinecraftDirectories.Insert(previousRecordIndex, record);
+                }
+                else
+                    record.Path = source;
                 store.Config.Settings.MinecraftRoot = oldDefault;
                 foreach (var item in paths)
                 {
@@ -361,6 +443,8 @@ public sealed class MinecraftDirectoryManager(Store store)
                 }
                 throw;
             }
+            if (keepSource)
+                return true;
             // 清理失败时仍保留一份有效的迁移副本，旧源目录保持原样。
             try
             {

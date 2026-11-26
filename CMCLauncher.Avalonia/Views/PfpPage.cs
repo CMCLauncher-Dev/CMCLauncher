@@ -316,7 +316,7 @@ public sealed partial class MainWindow
             Grid.SetColumn(options, wide ? 1 : 0);
             Grid.SetRow(options, wide ? 0 : 1);
         };
-        var body = Stack(Btn("Back to toolbox", () => Navigate("toolbox")), layout);
+        var body = Stack(layout);
         async Task RefreshSafely()
         {
             try

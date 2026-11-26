@@ -173,6 +173,7 @@ public sealed class Instance
     public string Loader { get; set; } = "vanilla";
     public string? LoaderVersion { get; set; }
     public bool PendingTransferredLoaderSetup { get; set; }
+    public bool TransferredFromDevice { get; set; }
     public string? ImportRoot { get; set; }
     public string? Directory { get; set; }
     public string? VersionId { get; set; }

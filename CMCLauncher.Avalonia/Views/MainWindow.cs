@@ -29,6 +29,7 @@ public sealed partial class MainWindow : Window
         OpenPaneLength = 440,
     };
     readonly StackPanel navigation = new() { Spacing = 3 };
+    readonly Border pageBack = new();
     readonly Grid pageHeader = new() { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
     readonly TextBlock pageTitle = new() { FontSize = 26, FontWeight = FontWeight.SemiBold };
     readonly TranslateTransform toastOffset = new();
@@ -176,7 +177,14 @@ public sealed partial class MainWindow : Window
             RowDefinitions = new RowDefinitions("Auto,*"),
             Margin = new Thickness(28, 22),
         };
-        pageHeader.Children.Add(Stack(pageTitle, pageSubtitle));
+        var heading = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        var titles = Stack(pageTitle, pageSubtitle);
+        pageTitle.TextTrimming = TextTrimming.CharacterEllipsis;
+        pageBack.VerticalAlignment = VerticalAlignment.Top;
+        Grid.SetColumn(titles, 1);
+        heading.Children.Add(pageBack);
+        heading.Children.Add(titles);
+        pageHeader.Children.Add(heading);
         body.Children.Add(pageHeader);
         var scroll = new ScrollViewer
         {
@@ -359,7 +367,7 @@ public sealed partial class MainWindow : Window
         settings.WindowHeight = (int)Height;
     }
 
-    async Task Navigate(string target)
+    async Task Navigate(string target, bool preserveDirectoryDrawer = false)
     {
         if (target == "tasks")
         {
@@ -425,7 +433,8 @@ public sealed partial class MainWindow : Window
         navigationRequest?.Cancel();
         navigationRequest?.Dispose();
         navigationRequest = new();
-        drawer.IsPaneOpen = false;
+        if (!preserveDirectoryDrawer)
+            drawer.IsPaneOpen = false;
         var token = navigationRequest.Token;
         var revision = ++generation;
         route = target;
@@ -433,6 +442,13 @@ public sealed partial class MainWindow : Window
         SyncNavigation(expandForRoute: true);
         if (pageHeader.Children.Count > 1)
             pageHeader.Children.RemoveAt(1);
+        SetPageBack(target switch
+        {
+            "instances" => () => Navigate("home"),
+            "frpc" or "pfp" or "terracotta" or "datapack-generator" or "command-generator" or "instance-transfer" =>
+                () => Navigate("toolbox"),
+            _ => null,
+        });
         if (target == "home")
         {
             var customize = HomeCustomizeAction();
@@ -767,6 +783,27 @@ public sealed partial class MainWindow : Window
         Button,
         Func<bool>
     > buttonAvailability = new();
+
+    void SetPageBack(Func<Task>? action)
+    {
+        pageBack.Child = null;
+        if (action == null)
+            return;
+        if (pageHeader.Children.Count > 1)
+            pageHeader.Children.RemoveAt(1);
+
+        var button = Btn("Back", action);
+        button.Name = "PageBackButton";
+        button.Content = NavigationIcon("M19,12 H5 M12,5 L5,12 L12,19");
+        button.MinWidth = button.MinHeight;
+        button.Padding = new Thickness(0);
+        button.HorizontalContentAlignment = HorizontalAlignment.Center;
+        button.VerticalContentAlignment = VerticalAlignment.Center;
+        button.Margin = new Thickness(0, 0, 12, 0);
+        ToolTip.SetTip(button, Ui("Back"));
+        global::Avalonia.Automation.AutomationProperties.SetName(button, Ui("Back"));
+        pageBack.Child = button;
+    }
 
     Button Btn(string title, Func<Task> action, bool primary = false)
     {

@@ -28,8 +28,8 @@ public sealed partial class MainWindow
     {
         var root = BackupDirectory(instance);
         Directory.CreateDirectory(root);
+        SetPageBack(() => WorldsPage(instance));
         var body = Stack(
-            Btn("Back", () => WorldsPage(instance)),
             Btn(
                 "Open folder",
                 () =>

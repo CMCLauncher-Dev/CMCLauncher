@@ -140,7 +140,6 @@ public sealed partial class MainWindow
         if (client.Installed == null)
         {
             return Stack(
-                Btn("Back to toolbox", () => Navigate("toolbox")),
                 Card(
                     Stack(
                         T("Terracotta is not downloaded.", 18, true),
@@ -295,7 +294,6 @@ public sealed partial class MainWindow
         var statusCard = Card(ready);
         statusCard.Padding = new global::Avalonia.Thickness(12, 10);
         var body = Stack(
-            Btn("Back to toolbox", () => Navigate("toolbox")),
             T("Multiplayer lobby", 20, true),
             statusCard,
             membersCard

@@ -143,7 +143,7 @@ public static partial class JavaManager
         }
         if (newer != null)
             return newer;
-        throw new Exception(
+        throw new FileNotFoundException(
             $"此游戏需要 Java {required} 或更高版本，未找到匹配环境。请到设置 → Java 管理导入、扫描或下载 Java {required}。"
         );
     }

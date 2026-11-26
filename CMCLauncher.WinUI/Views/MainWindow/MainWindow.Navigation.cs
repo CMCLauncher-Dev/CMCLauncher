@@ -354,14 +354,15 @@ public sealed partial class MainWindow
     }
 
     // 每次渲染使用新的正文容器，旧异步请求不能把结果挂到新页面上。
-    async Task RenderAsync()
+    async Task RenderAsync(bool preserveDirectoryDrawer = false)
     {
         RuntimeLog.Debug(
             $"Render page={page}; section={kind}; generation={renderVersion + 1}; instance={selected?.Id ?? "none"}"
         );
         // 离开页面时取消搜索，同时用代次挡住未及时响应取消的结果。
         activePopconfirm?.Hide();
-        ClearCommunityFilterDrawer();
+        if (!preserveDirectoryDrawer)
+            ClearCommunityFilterDrawer();
         var generation = ++renderVersion;
         await importedMetadataLoad;
         if (generation != renderVersion)

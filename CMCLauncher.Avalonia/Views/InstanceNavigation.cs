@@ -71,14 +71,7 @@ public sealed partial class MainWindow
             schematics.Tag = "instance-tab:schematics";
             tabs.Children.Add(schematics);
         }
-        if (content is StackPanel stack && stack.Children.FirstOrDefault() is WrapPanel toolbar)
-            foreach (
-                var back in toolbar
-                    .Children.OfType<Button>()
-                    .Where(b => b.Content?.ToString() == Ui("Back"))
-                    .ToArray()
-            )
-                toolbar.Children.Remove(back);
+        SetPageBack(() => Navigate("instances"));
         pageTitle.Text = Ui("版本设置") + " · " + instance.Name;
         pageContent.Content = Stack(tabs, content);
         route = "instance-settings";

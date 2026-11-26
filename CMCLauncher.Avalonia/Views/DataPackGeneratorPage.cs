@@ -251,6 +251,6 @@ public sealed partial class MainWindow
             openOutput.IsVisible = false;
         }
         Update();
-        return Stack(Btn("Back to toolbox", () => Navigate("toolbox")), Card(body));
+        return Card(body);
     }
 }

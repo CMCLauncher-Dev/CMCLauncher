@@ -93,6 +93,18 @@ static class ForeignLauncherMigrationTests
         var adventure = modrinthScan.Instances[0];
         Check(adventure.Name == "Adventure" && adventure.Loader == "fabric", "Modrinth metadata resolved");
 
+        await WriteModrinthInstance(prism, "Mixed profile", "1.20.1", "fabric-loader", "0.15.11");
+        File.Delete(Path.Combine(prism, "instances", "Stone Age", "instance.cfg"));
+        Check(
+            core.ScanForeignInstances(prism, format: ForeignLauncherFormat.MultiMC).Instances.Count == 2,
+            "Selected Prism format finds mmc-pack-only profiles and excludes Modrinth profiles"
+        );
+        Check(
+            core.ScanForeignInstances(prism, format: ForeignLauncherFormat.Modrinth).Instances.Single().Name
+                == "Mixed profile",
+            "Selected Modrinth format excludes Prism profiles"
+        );
+
         var (migrated, skipped) = await core.MigrateForeignInstances(
             [fabric, forge, adventure]
         );
