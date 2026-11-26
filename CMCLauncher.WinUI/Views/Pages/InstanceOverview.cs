@@ -144,7 +144,7 @@ public sealed partial class MainWindow
                 row.Children.Add(Text(server.Address, 13));
                 row.Children.Add(Action("Copy address", (_, _) =>
                 {
-                    if (!DesktopClipboard.TrySetText(server.Address, out var error))
+                    if (!DesktopClipboard.TrySetText(WinRT.Interop.WindowNative.GetWindowHandle(this), server.Address, out var error))
                         throw new IOException(error);
                 }));
                 servers.Children.Add(CompactCard(row));

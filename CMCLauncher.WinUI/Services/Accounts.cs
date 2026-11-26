@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -56,6 +56,7 @@ public sealed partial class MainWindow
                                 (code, url) =>
                                 {
                                     var copied = DesktopClipboard.TrySetText(
+                                        WinRT.Interop.WindowNative.GetWindowHandle(this),
                                         code,
                                         out var copyError
                                     );
@@ -69,7 +70,7 @@ public sealed partial class MainWindow
                                         );
                                         void CopyCode()
                                         {
-                                            if (DesktopClipboard.TrySetText(code, out var failure))
+                                            if (DesktopClipboard.TrySetText(WinRT.Interop.WindowNative.GetWindowHandle(this), code, out var failure))
                                             {
                                                 loginStatus.Text = Ui(
                                                     "Device code copied. Paste it in your browser to continue."

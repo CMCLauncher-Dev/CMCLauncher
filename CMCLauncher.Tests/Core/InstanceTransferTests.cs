@@ -55,22 +55,73 @@ static class InstanceTransferTests
         var ready = new TaskCompletionSource<(string Address, string Code)>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
+        var verification = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var approved = false;
         var sending = InstanceTransfer.Send(
             sender,
             [new(instance, ["saves", "options.txt"]), new(second, ["mods"])],
             false,
             (addresses, code) => ready.TrySetResult((addresses, code)),
-            timeout.Token
+            timeout.Token,
+            async (_, senderVerification, ct) =>
+            {
+                if (await verification.Task.WaitAsync(ct) != senderVerification)
+                    throw new Exception(
+                        "The sender and receiver displayed different verification codes."
+                    );
+                if (receiver.Config.Instances.Count != 0)
+                    throw new Exception("The receiver imported content before approval.");
+                return approved;
+            }
         );
         try
         {
             var (addresses, code) = await ready.Task.WaitAsync(timeout.Token);
             var port = addresses.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0].Split(':')[1];
-            var batch = await InstanceTransfer.Receive(
+            var endpoint = "127.0.0.1:" + port;
+            var wrongCode = (code[0] == '0' ? "1" : "0") + code[1..];
+            try
+            {
+                await InstanceTransfer.Receive(
+                    receiver,
+                    core,
+                    endpoint,
+                    wrongCode,
+                    () => { },
+                    timeout.Token
+                );
+                throw new Exception("The receiver accepted a pairing code for a different sender.");
+            }
+            catch (IOException ex)
+                when (ex.Message
+                    == "The pairing code does not match this sender. Copy its current pairing code."
+                ) { }
+
+            try
+            {
+                await InstanceTransfer.RequestReceive(
+                    receiver,
+                    core,
+                    endpoint,
+                    value => verification.TrySetResult(value),
+                    () => { },
+                    timeout.Token
+                );
+                throw new Exception("A declined request was allowed to receive data.");
+            }
+            catch (IOException ex)
+                when (ex.Message == "The sending device declined the connection request.") { }
+            verification = new TaskCompletionSource<string>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
+            approved = true;
+            var batch = await InstanceTransfer.RequestReceive(
                 receiver,
                 core,
-                "127.0.0.1:" + port,
-                "  " + code.Replace("-", " – " + Environment.NewLine).ToLowerInvariant() + "  ",
+                endpoint,
+                value => verification.TrySetResult(value),
                 () => { },
                 timeout.Token
             );

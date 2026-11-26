@@ -245,7 +245,7 @@ public sealed partial class MainWindow
                         }
                         Stage(
                             "Pair the devices",
-                            "Enter this pairing code on the receiving device.",
+                            "Select this device on the receiving device to send a connection request.",
                             () => SendSelection(local)
                         );
                         var pending = Text("Preparing instance transfer…");
@@ -258,7 +258,7 @@ public sealed partial class MainWindow
                                         store,
                                         selected,
                                         local,
-                                        (address, code) =>
+                                        (address, _) =>
                                         {
                                             DispatcherQueue.TryEnqueue(() =>
                                             {
@@ -275,49 +275,13 @@ public sealed partial class MainWindow
                                                         IsReadOnly = true,
                                                     }
                                                 );
-                                                content.Children.Add(
-                                                    Text("Pairing code", 16, true)
-                                                );
-                                                var codeRow = new Grid { ColumnSpacing = 8 };
-                                                codeRow.ColumnDefinitions.Add(
-                                                    new ColumnDefinition
-                                                    {
-                                                        Width = new GridLength(
-                                                            1,
-                                                            GridUnitType.Star
-                                                        ),
-                                                    }
-                                                );
-                                                codeRow.ColumnDefinitions.Add(
-                                                    new ColumnDefinition { Width = GridLength.Auto }
-                                                );
-                                                codeRow.Children.Add(
-                                                    new TextBox { Text = code, IsReadOnly = true }
-                                                );
-                                                var copy = Button(
-                                                    "Copy",
-                                                    () =>
-                                                    {
-                                                        if (
-                                                            !DesktopClipboard.TrySetText(
-                                                                code,
-                                                                out var failure
-                                                            )
-                                                        )
-                                                            throw new IOException(failure);
-                                                        ShowToast(Ui("Copied"));
-                                                        return Task.CompletedTask;
-                                                    }
-                                                );
-                                                Grid.SetColumn(copy, 1);
-                                                codeRow.Children.Add(copy);
-                                                content.Children.Add(codeRow);
                                                 status.Text = Ui(
                                                     "Waiting for the receiving device…"
                                                 );
                                             });
                                         },
-                                        ct
+                                        ct,
+                                        ConfirmConnection
                                     ),
                                 ct
                             );
@@ -369,12 +333,10 @@ public sealed partial class MainWindow
             hotspot.Children.Add(
                 Text("Connect both devices to the same hotspot in system Wi-Fi settings.")
             );
-            hotspot.Children.Add(
-                Text("Use the address and pairing code shown on the sending device.")
-            );
+            hotspot.Children.Add(Text("Use the address shown on the sending device."));
             hotspot.Children.Add(
                 Button(
-                    "Enter connection details",
+                    "Enter sender address",
                     () =>
                     {
                         ReceivePairing(false);
@@ -431,47 +393,87 @@ public sealed partial class MainWindow
             }
         }
 
-        void ReceivePairing(bool local, string? selectedAddress = null, string? enteredCode = null)
+        async Task<bool> ConfirmConnection(string peer, string verification, CancellationToken ct)
+        {
+            var decision = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
+            StackPanel? request = null;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (ct.IsCancellationRequested)
+                    return;
+                request = new StackPanel { Spacing = 8 };
+                request.Children.Add(Text("Connection request", 16, true));
+                request.Children.Add(new TextBlock { Text = peer });
+                request.Children.Add(
+                    Text("Confirm only if this verification code matches the receiving device.")
+                );
+                request.Children.Add(new TextBlock { Text = verification, FontSize = 20 });
+                request.Children.Add(
+                    Button(
+                        "Confirm connection",
+                        () =>
+                        {
+                            decision.TrySetResult(true);
+                            return Task.CompletedTask;
+                        },
+                        primary: true
+                    )
+                );
+                request.Children.Add(
+                    Button(
+                        "Decline connection",
+                        () =>
+                        {
+                            decision.TrySetResult(false);
+                            return Task.CompletedTask;
+                        }
+                    )
+                );
+                content.Children.Add(request);
+            });
+
+            try
+            {
+                return await decision.Task.WaitAsync(ct);
+            }
+            finally
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (request != null)
+                        content.Children.Remove(request);
+                });
+            }
+        }
+
+        void ReceivePairing(bool local, string? selectedAddress = null)
         {
             Stage(
                 "Pair the devices",
                 local
-                    ? "Enter the pairing code shown on the sending device."
-                    : "Enter the address and pairing code shown on the sending device.",
+                    ? "Request a connection and confirm it on the sending device."
+                    : "Enter the sender address, then request a connection.",
                 () => Connection(false)
             );
             var address = new TextBox { PlaceholderText = Ui("Sender address (IPv4:port)") };
-            var code = new TextBox { PlaceholderText = Ui("Pairing code") };
             address.Text = selectedAddress ?? "";
-            code.Text = enteredCode ?? "";
             var receive = Button(
-                "Receive instance",
+                "Request connection",
                 async () =>
                 {
                     if (active != null)
                         return;
-                    if (
-                        string.IsNullOrWhiteSpace(address.Text)
-                        || string.IsNullOrWhiteSpace(code.Text)
-                    )
+                    if (string.IsNullOrWhiteSpace(address.Text))
                     {
-                        status.Text = Ui("Enter the sender address and pairing code.");
-                        return;
-                    }
-                    if (
-                        !InstanceTransfer.TryNormalizePairingCode(code.Text, out var normalizedCode)
-                    )
-                    {
-                        status.Text = Ui(
-                            "Copy the full pairing code from the sending device and try again."
-                        );
-                        code.Focus(FocusState.Programmatic);
+                        status.Text = Ui("Enter the sender address.");
                         return;
                     }
                     Stage(
                         "Transferring instance",
                         "Keep both devices connected until the transfer finishes.",
-                        () => ReceivePairing(local, address.Text, code.Text)
+                        () => ReceivePairing(local, address.Text)
                     );
                     content.Children.Add(
                         Text(
@@ -480,12 +482,21 @@ public sealed partial class MainWindow
                     );
                     await Run(async ct =>
                     {
-                        status.Text = Ui("Receiving instance data…");
-                        var imported = await InstanceTransfer.Receive(
+                        status.Text = Ui("Connecting to the sending device…");
+                        var imported = await InstanceTransfer.RequestReceive(
                             store,
                             core,
                             address.Text,
-                            normalizedCode,
+                            verification =>
+                            {
+                                status.Text = Ui("Waiting for confirmation on the sending device…");
+                                content.Children.Add(
+                                    Text("Compare this verification code with the sending device.")
+                                );
+                                content.Children.Add(
+                                    new TextBlock { Text = verification, FontSize = 20 }
+                                );
+                            },
                             () => status.Text = Ui("Installing Minecraft and importing content…"),
                             ct
                         );
@@ -499,7 +510,6 @@ public sealed partial class MainWindow
             );
 
             content.Children.Add(address);
-            content.Children.Add(code);
             content.Children.Add(receive);
         }
 

@@ -16,6 +16,7 @@ public static class InstanceTransfer
     const int DiscoveryPort = 45837;
     const long MaxArchiveBytes = 64L * 1024 * 1024 * 1024;
     static readonly byte[] DiscoveryRequest = "CMCLauncher.InstanceTransfer.1?"u8.ToArray();
+    static readonly byte[] ConnectionRequest = "CMC.PairRequest1"u8.ToArray();
     const string Manifest = "instance.json";
     const string BatchManifest = "instances.json";
     const int MaxManifestBytes = 1024 * 1024;
@@ -47,7 +48,8 @@ public static class InstanceTransfer
         IReadOnlyList<Selection> selections,
         bool discoverable,
         Action<string, string> ready,
-        CancellationToken ct
+        CancellationToken ct,
+        Func<string, string, CancellationToken, Task<bool>>? confirm = null
     )
     {
         if (selections.Count == 0)
@@ -150,7 +152,32 @@ public static class InstanceTransfer
                         );
                         var supplied = new byte[secret.Length];
                         await ReadExactly(stream, supplied, handshake.Token);
-                        if (!CryptographicOperations.FixedTimeEquals(supplied, secret))
+                        if (confirm != null && supplied.AsSpan().SequenceEqual(ConnectionRequest))
+                        {
+                            var nonce = new byte[32];
+                            await ReadExactly(stream, nonce, handshake.Token);
+                            using var approval = CancellationTokenSource.CreateLinkedTokenSource(
+                                ct
+                            );
+                            approval.CancelAfter(TimeSpan.FromSeconds(60));
+                            var verification = ConnectionVerification(
+                                certificate.GetCertHash(HashAlgorithmName.SHA256),
+                                nonce
+                            );
+                            var approved = await confirm(
+                                    client.Client.RemoteEndPoint!.ToString()!,
+                                    verification,
+                                    approval.Token
+                                )
+                                .WaitAsync(approval.Token);
+                            await stream.WriteAsync(
+                                new byte[] { approved ? (byte)1 : (byte)0 },
+                                approval.Token
+                            );
+                            if (!approved)
+                                continue;
+                        }
+                        else if (!CryptographicOperations.FixedTimeEquals(supplied, secret))
                             continue;
                         var size = new byte[sizeof(long)];
                         BinaryPrimitives.WriteInt64BigEndian(size, payload.Length);
@@ -278,6 +305,12 @@ public static class InstanceTransfer
         return devices.OrderBy(x => x).ToArray();
     }
 
+    static bool TryParseEndpoint(string address, out IPEndPoint? endpoint) =>
+        IPEndPoint.TryParse(address, out endpoint)
+        && endpoint.AddressFamily == AddressFamily.InterNetwork
+        && endpoint.Port != 0
+        && address.Contains(':');
+
     public static bool TryNormalizePairingCode(string? code, out string normalized)
     {
         normalized = string.Concat(
@@ -299,33 +332,90 @@ public static class InstanceTransfer
         return normalized.Length == 64 && normalized.All(Uri.IsHexDigit);
     }
 
-    public static async Task<IReadOnlyList<Instance>> Receive(
+    public static Task<IReadOnlyList<Instance>> Receive(
         Store store,
         LauncherCore core,
         string address,
         string code,
         Action installing,
         CancellationToken ct
+    ) => ReceiveCore(store, core, address, code, null, installing, ct);
+
+    public static Task<IReadOnlyList<Instance>> RequestReceive(
+        Store store,
+        LauncherCore core,
+        string address,
+        Action<string> awaitingApproval,
+        Action installing,
+        CancellationToken ct
+    ) => ReceiveCore(store, core, address, null, awaitingApproval, installing, ct);
+
+    static async Task<IReadOnlyList<Instance>> ReceiveCore(
+        Store store,
+        LauncherCore core,
+        string address,
+        string? code,
+        Action<string>? awaitingApproval,
+        Action installing,
+        CancellationToken ct
     )
     {
-        if (
-            !IPEndPoint.TryParse(address.Trim(), out var endpoint)
-            || endpoint.AddressFamily != AddressFamily.InterNetwork
-            || endpoint.Port == 0
-            || !address.Contains(':')
-        )
+        if (!TryParseEndpoint(address.Trim(), out var endpoint))
             throw new FormatException("Enter an IPv4 address and port.");
-        if (!TryNormalizePairingCode(code, out var normalized))
-            throw new FormatException(
-                "Copy the full pairing code from the sending device and try again."
-            );
-        var fingerprint = Convert.FromHexString(normalized[..32]);
-        var secret = Convert.FromHexString(normalized[32..]);
+        byte[]? fingerprint = null;
+        byte[]? secret = null;
+        if (awaitingApproval == null)
+        {
+            if (!TryNormalizePairingCode(code, out var normalized))
+                throw new FormatException(
+                    "Copy the full pairing code from the sending device and try again."
+                );
+            fingerprint = Convert.FromHexString(normalized[..32]);
+            secret = Convert.FromHexString(normalized[32..]);
+        }
         using var client = new TcpClient();
-        using var stream = await Connect(client, endpoint, fingerprint, ct);
-        await stream.WriteAsync(secret, ct);
+        using var stream = await Connect(client, endpoint!, fingerprint, ct);
         var size = new byte[sizeof(long)];
-        await ReadExactly(stream, size, ct);
+        using (var pairing = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            pairing.CancelAfter(TimeSpan.FromSeconds(awaitingApproval == null ? 10 : 65));
+            try
+            {
+                if (awaitingApproval != null)
+                {
+                    var nonce = RandomNumberGenerator.GetBytes(32);
+                    var certificateHash = stream.RemoteCertificate!.GetCertHash(
+                        HashAlgorithmName.SHA256
+                    );
+                    await stream.WriteAsync(ConnectionRequest, pairing.Token);
+                    await stream.WriteAsync(nonce, pairing.Token);
+                    awaitingApproval(ConnectionVerification(certificateHash, nonce));
+                    var decision = new byte[1];
+                    await ReadExactly(stream, decision, pairing.Token);
+                    if (decision[0] != 1)
+                        throw new IOException(
+                            "The sending device declined the connection request."
+                        );
+                }
+                else
+                    await stream.WriteAsync(secret!, pairing.Token);
+                await ReadExactly(stream, size, pairing.Token);
+            }
+            catch (EndOfStreamException ex)
+            {
+                throw new IOException(
+                    "The sender rejected pairing or disconnected. Make sure both devices use the same launcher version.",
+                    ex
+                );
+            }
+            catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+            {
+                throw new IOException(
+                    "The sender did not respond to pairing. Keep the sending page open and try again.",
+                    ex
+                );
+            }
+        }
         var length = BinaryPrimitives.ReadInt64BigEndian(size);
         if (length <= 0 || length > MaxArchiveBytes)
             throw new InvalidDataException("Invalid transfer archive size.");
@@ -504,25 +594,58 @@ public static class InstanceTransfer
         }
     }
 
+    // The sender and receiver compare a value tied to both the certificate and the request.
+    static string ConnectionVerification(byte[] certificateHash, byte[] nonce)
+    {
+        var input = new byte[certificateHash.Length + nonce.Length];
+        certificateHash.CopyTo(input, 0);
+        nonce.CopyTo(input, certificateHash.Length);
+        return Convert.ToHexString(SHA256.HashData(input).AsSpan(0, 6));
+    }
+
     static async Task<SslStream> Connect(
         TcpClient client,
         IPEndPoint endpoint,
-        byte[] fingerprint,
+        byte[]? fingerprint,
         CancellationToken ct
     )
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        await client.ConnectAsync(endpoint.Address, endpoint.Port, timeout.Token);
+        try
+        {
+            await client.ConnectAsync(endpoint.Address, endpoint.Port, timeout.Token);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw new IOException(
+                "Connection to the sender timed out. Check the address and network.",
+                ex
+            );
+        }
+        catch (SocketException ex)
+        {
+            throw new IOException(
+                "Cannot connect to the sender. Check the address, network, and firewall.",
+                ex
+            );
+        }
+        var fingerprintMismatch = false;
         var stream = new SslStream(
             client.GetStream(),
             false,
             (_, cert, _, _) =>
-                cert != null
-                && CryptographicOperations.FixedTimeEquals(
-                    fingerprint,
-                    cert.GetCertHash(HashAlgorithmName.SHA256).AsSpan(0, fingerprint.Length)
-                )
+            {
+                if (cert == null)
+                    return false;
+                fingerprintMismatch =
+                    fingerprint != null
+                    && !CryptographicOperations.FixedTimeEquals(
+                        fingerprint,
+                        cert.GetCertHash(HashAlgorithmName.SHA256).AsSpan(0, fingerprint.Length)
+                    );
+                return !fingerprintMismatch;
+            }
         );
         try
         {
@@ -531,6 +654,22 @@ public static class InstanceTransfer
                 timeout.Token
             );
             return stream;
+        }
+        catch (System.Security.Authentication.AuthenticationException ex) when (fingerprintMismatch)
+        {
+            stream.Dispose();
+            throw new IOException(
+                "The pairing code does not match this sender. Copy its current pairing code.",
+                ex
+            );
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            stream.Dispose();
+            throw new IOException(
+                "Connection to the sender timed out. Check the address and network.",
+                ex
+            );
         }
         catch
         {

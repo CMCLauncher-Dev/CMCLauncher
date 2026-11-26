@@ -34,7 +34,7 @@ internal static class DesktopClipboard
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern IntPtr GlobalFree(IntPtr memory);
 
-    public static bool TrySetText(string text, out string? error)
+    public static bool TrySetText(IntPtr owner, string text, out string? error)
     {
         error = null;
         var bytes = Encoding.Unicode.GetBytes(text + '\0');
@@ -65,7 +65,7 @@ internal static class DesktopClipboard
             // 剪贴板可能暂时被其他进程占用，做短暂重试后再报告失败。
             for (var attempt = 0; attempt < 20 && !opened; attempt++)
             {
-                opened = OpenClipboard(IntPtr.Zero);
+                opened = OpenClipboard(owner);
                 if (!opened)
                     Thread.Sleep(25);
             }

@@ -232,7 +232,7 @@ public sealed partial class MainWindow
                 var value = terracottaCode?.Text;
                 if (!terracotta.Connected || string.IsNullOrWhiteSpace(value))
                     return;
-                if (!DesktopClipboard.TrySetText(value, out var failure))
+                if (!DesktopClipboard.TrySetText(WinRT.Interop.WindowNative.GetWindowHandle(this), value, out var failure))
                     throw new IOException(failure);
                 ShowToast(Ui("Copied"));
             }

@@ -153,7 +153,7 @@ public sealed partial class MainWindow
             {
                 if (output.Text.Length == 0)
                     return;
-                if (!DesktopClipboard.TrySetText(output.Text, out var failure))
+                if (!DesktopClipboard.TrySetText(WinRT.Interop.WindowNative.GetWindowHandle(this), output.Text, out var failure))
                     throw new IOException(failure);
                 ShowToast(Ui("Copied"));
             }
