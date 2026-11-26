@@ -10,6 +10,53 @@ public sealed class LinuxLauncherPlatform : LauncherPlatform
     public static void Initialize() => Current = new LinuxLauncherPlatform();
 
     public override string MinecraftOsName => "linux";
+    public override async Task<Action?> PreventIdleSleep(CancellationToken ct)
+    {
+        var start = new ProcessStartInfo("/usr/bin/systemd-inhibit")
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+        };
+        foreach (var arg in new[] {
+            "--what=sleep:idle", "--mode=block", "--who=CMCLauncher", "--why=Receiving Minecraft instances",
+            "/bin/sh", "-c", "echo ready; exec /usr/bin/cat >/dev/null"
+        })
+            start.ArgumentList.Add(arg);
+
+        Process? process = null;
+        try
+        {
+            process = Process.Start(PlatformCommand.SystemEnvironment(start));
+            if (process == null)
+                return null;
+            if (await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(3), ct) == "ready")
+                return () => ReleaseSleepInhibitor(process);
+        }
+        catch (Exception ex) when (ex is Win32Exception or IOException or TimeoutException)
+        {
+            // Desktop or logind may deny the inhibitor. The UI reports that state.
+        }
+        catch
+        {
+            ReleaseSleepInhibitor(process);
+            throw;
+        }
+        ReleaseSleepInhibitor(process);
+        return null;
+    }
+
+    static void ReleaseSleepInhibitor(Process? process)
+    {
+        if (process == null)
+            return;
+        using (process)
+        {
+            try { process.StandardInput.Close(); }
+            catch (IOException) { }
+        }
+    }
+
     ulong lastIdle,
         lastTotal;
 

@@ -13,10 +13,12 @@ namespace CMCLauncher;
 
 public static class InstanceTransfer
 {
+    static readonly TimeSpan TransferIdleTimeout = TimeSpan.FromSeconds(30);
     const int DiscoveryPort = 45837;
     const long MaxArchiveBytes = 64L * 1024 * 1024 * 1024;
     static readonly byte[] DiscoveryRequest = "CMCLauncher.InstanceTransfer.1?"u8.ToArray();
-    static readonly byte[] ConnectionRequest = "CMC.PairRequest1"u8.ToArray();
+    static readonly byte[] LegacyConnectionRequest = "CMC.PairRequest1"u8.ToArray();
+    static readonly byte[] ConnectionRequest = "CMC.PairRequest2"u8.ToArray();
     const string Manifest = "instance.json";
     const string BatchManifest = "instances.json";
     const int MaxManifestBytes = 1024 * 1024;
@@ -49,7 +51,8 @@ public static class InstanceTransfer
         bool discoverable,
         Action<string, string> ready,
         CancellationToken ct,
-        Func<string, string, CancellationToken, Task<bool>>? confirm = null
+        Func<string, string, CancellationToken, Task<bool>>? confirm = null,
+        Action<long, long>? progress = null
     )
     {
         if (selections.Count == 0)
@@ -142,6 +145,7 @@ public static class InstanceTransfer
                 {
                     using var client = await listener.AcceptTcpClientAsync().WaitAsync(ct);
                     using var stream = new SslStream(client.GetStream());
+                    var awaitingReceipt = false;
                     try
                     {
                         using var handshake = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -152,7 +156,14 @@ public static class InstanceTransfer
                         );
                         var supplied = new byte[secret.Length];
                         await ReadExactly(stream, supplied, handshake.Token);
-                        if (confirm != null && supplied.AsSpan().SequenceEqual(ConnectionRequest))
+                        var supportsReceipt = supplied.AsSpan().SequenceEqual(ConnectionRequest);
+                        if (
+                            confirm != null
+                            && (
+                                supportsReceipt
+                                || supplied.AsSpan().SequenceEqual(LegacyConnectionRequest)
+                            )
+                        )
                         {
                             var nonce = new byte[32];
                             await ReadExactly(stream, nonce, handshake.Token);
@@ -183,11 +194,45 @@ public static class InstanceTransfer
                         BinaryPrimitives.WriteInt64BigEndian(size, payload.Length);
                         await stream.WriteAsync(size, ct);
                         payload.Position = 0;
-                        await payload.CopyToAsync(stream, ct);
+                        await CopyExactly(
+                            payload,
+                            stream,
+                            payload.Length,
+                            ct,
+                            progress,
+                            TransferIdleTimeout
+                        );
+                        if (supportsReceipt)
+                        {
+                            awaitingReceipt = true;
+                            using var receiptTimeout =
+                                CancellationTokenSource.CreateLinkedTokenSource(ct);
+                            receiptTimeout.CancelAfter(TimeSpan.FromMinutes(30));
+                            var receipt = new byte[1];
+                            try
+                            {
+                                await ReadExactly(stream, receipt, receiptTimeout.Token);
+                            }
+                            catch (Exception ex)
+                                when (!ct.IsCancellationRequested
+                                    && ex is IOException or OperationCanceledException
+                                )
+                            {
+                                throw new IOException(
+                                    "The receiving device did not confirm the import.",
+                                    ex
+                                );
+                            }
+                            if (receipt[0] != 1)
+                                throw new IOException(
+                                    "The receiving device could not import the archive."
+                                );
+                        }
                         return;
                     }
                     catch (Exception ex)
                         when (!ct.IsCancellationRequested
+                            && !awaitingReceipt
                             && ex
                                 is IOException
                                     or System.Security.Authentication.AuthenticationException
@@ -334,30 +379,29 @@ public static class InstanceTransfer
 
     public static Task<IReadOnlyList<Instance>> Receive(
         Store store,
-        LauncherCore core,
         string address,
         string code,
         Action installing,
         CancellationToken ct
-    ) => ReceiveCore(store, core, address, code, null, installing, ct);
+    ) => ReceiveCore(store, address, code, null, installing, ct, null);
 
     public static Task<IReadOnlyList<Instance>> RequestReceive(
         Store store,
-        LauncherCore core,
         string address,
         Action<string> awaitingApproval,
         Action installing,
-        CancellationToken ct
-    ) => ReceiveCore(store, core, address, null, awaitingApproval, installing, ct);
+        CancellationToken ct,
+        Action<long, long>? progress = null
+    ) => ReceiveCore(store, address, null, awaitingApproval, installing, ct, progress);
 
     static async Task<IReadOnlyList<Instance>> ReceiveCore(
         Store store,
-        LauncherCore core,
         string address,
         string? code,
         Action<string>? awaitingApproval,
         Action installing,
-        CancellationToken ct
+        CancellationToken ct,
+        Action<long, long>? progress
     )
     {
         if (!TryParseEndpoint(address.Trim(), out var endpoint))
@@ -420,6 +464,7 @@ public static class InstanceTransfer
         if (length <= 0 || length > MaxArchiveBytes)
             throw new InvalidDataException("Invalid transfer archive size.");
 
+        var archiveReceived = false;
         var file = Path.GetTempFileName();
         try
         {
@@ -429,7 +474,18 @@ public static class InstanceTransfer
                 FileAccess.ReadWrite,
                 FileShare.None
             );
-            await CopyExactly(stream, payload, length, ct);
+            try
+            {
+                await CopyExactly(stream, payload, length, ct, progress, TransferIdleTimeout);
+            }
+            catch (IOException ex) when (!ct.IsCancellationRequested)
+            {
+                throw new IOException(
+                    "Could not receive the complete archive. Check the connection and free disk space, then retry.",
+                    ex
+                );
+            }
+            archiveReceived = true;
             payload.Position = 0;
             using var zip = new ZipArchive(payload, ZipArchiveMode.Read);
             var batch = zip.GetEntry(BatchManifest);
@@ -484,9 +540,8 @@ public static class InstanceTransfer
                 {
                     var prefix = batch == null ? "" : EntryPrefix(index);
                     imported.Add(
-                        await Install(
+                        await Import(
                             store,
-                            core,
                             profiles[index],
                             entries[prefix],
                             prefix,
@@ -498,7 +553,6 @@ public static class InstanceTransfer
                 ct.ThrowIfCancellationRequested();
                 store.Config.Instances.AddRange(imported);
                 await store.Save();
-                return imported;
             }
             catch
             {
@@ -509,6 +563,15 @@ public static class InstanceTransfer
                 }
                 throw;
             }
+            if (awaitingApproval != null)
+                await SendImportReceipt(stream, true);
+            return imported;
+        }
+        catch
+        {
+            if (archiveReceived && awaitingApproval != null)
+                await SendImportReceipt(stream, false);
+            throw;
         }
         finally
         {
@@ -516,12 +579,24 @@ public static class InstanceTransfer
         }
     }
 
+    static async Task SendImportReceipt(SslStream stream, bool imported)
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await stream.WriteAsync(new byte[] { imported ? (byte)1 : (byte)0 }, timeout.Token);
+        }
+        catch (Exception ex) when (ex is IOException or OperationCanceledException)
+        {
+            // A lost receipt cannot change the receiver's import outcome.
+        }
+    }
+
     static string EntryPrefix(int index) =>
         index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/";
 
-    static async Task<Instance> Install(
+    static async Task<Instance> Import(
         Store store,
-        LauncherCore core,
         Profile profile,
         IReadOnlyList<ZipArchiveEntry> entries,
         string prefix,
@@ -536,14 +611,15 @@ public static class InstanceTransfer
             GameVersion = profile.GameVersion,
             Loader = profile.Loader,
             LoaderVersion = profile.LoaderVersion,
+            PendingTransferredLoaderSetup = profile.Loader is "forge" or "neoforge",
             StorageRoot = store.MinecraftRoot,
         };
         var versions = Store.SafePath(instance.StorageRoot, "versions");
         var stage = Store.SafePath(versions, ".transfer-" + instance.Id);
         Directory.CreateDirectory(stage);
-        string? installed = null;
         try
         {
+            installing();
             await Unpack(entries, prefix, stage, ct);
             for (var suffix = 2; ; suffix++)
             {
@@ -562,35 +638,15 @@ public static class InstanceTransfer
                     instance.Name = $"{profile.Name} ({suffix})";
                 }
             }
-            installing();
-            var build =
-                instance.Loader == "forge"
-                    ? LauncherCore.LoaderBuildPrefix(instance.GameVersion, instance.Loader)
-                        + instance.LoaderVersion
-                    : instance.LoaderVersion ?? "";
-            await core.InstallNewGame(instance, build, ct);
-            installed = store.GameDirectory(instance);
+            store.PrepareIsolatedInstance(instance);
             ct.ThrowIfCancellationRequested();
-            foreach (var item in Directory.EnumerateFileSystemEntries(stage))
-            {
-                var destination = Store.SafePath(installed, Path.GetFileName(item));
-                if (Directory.Exists(item))
-                {
-                    if (Directory.Exists(destination))
-                        Directory.Delete(destination);
-                    Directory.Move(item, destination);
-                }
-                else
-                    File.Move(item, destination, overwrite: true);
-            }
-            installed = null;
+            Directory.Move(stage, store.GameDirectory(instance));
             return instance;
         }
         finally
         {
-            if (installed != null && Directory.Exists(installed))
-                Directory.Delete(installed, recursive: true);
-            Directory.Delete(stage, recursive: true);
+            if (Directory.Exists(stage))
+                Directory.Delete(stage, recursive: true);
         }
     }
 
@@ -815,20 +871,47 @@ public static class InstanceTransfer
         Stream source,
         Stream destination,
         long length,
-        CancellationToken ct
+        CancellationToken ct,
+        Action<long, long>? progress = null,
+        TimeSpan? idleTimeout = null
     )
     {
-        var buffer = new byte[81920];
-        while (length > 0)
+        using var idle = idleTimeout.HasValue
+            ? CancellationTokenSource.CreateLinkedTokenSource(ct)
+            : null;
+        var transferToken = idle?.Token ?? ct;
+        try
         {
-            var read = await source.ReadAsync(
-                buffer.AsMemory(0, (int)Math.Min(buffer.Length, length)),
-                ct
+            var buffer = new byte[81920];
+            long transferred = 0;
+            var update = progress == null ? null : System.Diagnostics.Stopwatch.StartNew();
+            progress?.Invoke(0, length);
+            while (transferred < length)
+            {
+                if (idleTimeout is { } timeout)
+                    idle!.CancelAfter(timeout);
+                var read = await source.ReadAsync(
+                    buffer.AsMemory(0, (int)Math.Min(buffer.Length, length - transferred)),
+                    transferToken
+                );
+                if (read == 0)
+                    throw new EndOfStreamException();
+                await destination.WriteAsync(buffer.AsMemory(0, read), transferToken);
+                transferred += read;
+                if (update != null && (transferred == length || update.ElapsedMilliseconds >= 150))
+                {
+                    progress!(transferred, length);
+                    update.Restart();
+                }
+            }
+        }
+        catch (OperationCanceledException ex)
+            when (idle?.IsCancellationRequested == true && !ct.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                "No transfer progress for 30 seconds. Check the connection and retry.",
+                ex
             );
-            if (read == 0)
-                throw new EndOfStreamException();
-            await destination.WriteAsync(buffer.AsMemory(0, read), ct);
-            length -= read;
         }
     }
 }

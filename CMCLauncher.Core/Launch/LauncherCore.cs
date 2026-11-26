@@ -761,6 +761,8 @@ public sealed partial class LauncherCore : IDisposable
     }
 
     // 导入实例解析本地继承链；新建 Fabric 实例则把加载器配置叠到原版配置上。
+    readonly SemaphoreSlim transferredLoaderGate = new(1, 1);
+
     public async Task<JsonNode> VersionFor(Instance instance, CancellationToken ct)
     {
         var storage = store.StorageDirectory(instance);
@@ -770,6 +772,31 @@ public sealed partial class LauncherCore : IDisposable
             if (UpdateImportedMetadata(instance, imported))
                 await store.Save();
             return imported;
+        }
+        if (instance.PendingTransferredLoaderSetup)
+        {
+            await transferredLoaderGate.WaitAsync(ct);
+            try
+            {
+                if (instance.PendingTransferredLoaderSetup)
+                {
+                    var build = instance.Loader == "forge"
+                        ? LoaderBuildPrefix(instance.GameVersion, instance.Loader) + instance.LoaderVersion
+                        : instance.LoaderVersion ?? "";
+                    await InstallLoader(instance, build, ct);
+                    instance.PendingTransferredLoaderSetup = false;
+                    try { await store.Save(); }
+                    catch
+                    {
+                        instance.PendingTransferredLoaderSetup = true;
+                        throw;
+                    }
+                }
+            }
+            finally
+            {
+                transferredLoaderGate.Release();
+            }
         }
         if (instance.Loader is "forge" or "neoforge" && instance.VersionId is { Length: > 0 })
         {

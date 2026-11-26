@@ -10,6 +10,20 @@ public sealed partial class WindowsLauncherPlatform : LauncherPlatform
 {
     public static void Initialize() => Current = new WindowsLauncherPlatform();
 
+    // Receive invokes and releases this request on the desktop dispatcher thread.
+    const uint Continuous = 0x80000000;
+    const uint SystemRequired = 0x00000001;
+
+    [DllImport("kernel32.dll")]
+    static extern uint SetThreadExecutionState(uint flags);
+
+    public override Task<Action?> PreventIdleSleep(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var previous = SetThreadExecutionState(Continuous | SystemRequired);
+        return Task.FromResult<Action?>(previous == 0 ? null : () => SetThreadExecutionState(previous | Continuous));
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     struct Blob
     {

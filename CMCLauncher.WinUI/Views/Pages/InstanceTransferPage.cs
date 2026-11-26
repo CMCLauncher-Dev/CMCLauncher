@@ -14,7 +14,13 @@ public sealed partial class MainWindow
         var step = Text("", 19, true);
         var hint = Text("");
         var status = Text("");
-        var progress = new ProgressBar { IsIndeterminate = true };
+        var progress = new ProgressBar
+        {
+            IsIndeterminate = true,
+            Height = 8,
+            MinHeight = 8,
+            Maximum = 100,
+        };
         progress.Visibility = Visibility.Collapsed;
         var footer = new StackPanel { Spacing = 8 };
         CancellationTokenSource? active = null;
@@ -64,6 +70,9 @@ public sealed partial class MainWindow
         heading.Children.Add(hint);
         footer.Children.Add(progress);
         footer.Children.Add(status);
+        var sleepStatus = Text("Automatic sleep could not be prevented on this device.");
+        sleepStatus.Visibility = Visibility.Collapsed;
+        footer.Children.Add(sleepStatus);
         footer.Children.Add(cancel);
         footer.Children.Add(back);
         body.Children.Add(PanelCard(heading));
@@ -81,16 +90,38 @@ public sealed partial class MainWindow
             content.Children.Clear();
         }
 
-        async Task Run(Func<CancellationToken, Task> work)
+        void UpdateTransferProgress(string phase, long transferred, long total)
+        {
+            progress.IsIndeterminate = false;
+            progress.Value = total > 0 ? 100.0 * transferred / total : 0;
+            status.Text =
+                Ui(phase)
+                + " "
+                + string.Format(
+                    Ui("{0:N1}% · {1:N0} / {2:N0} bytes"),
+                    progress.Value,
+                    transferred,
+                    total
+                );
+        }
+
+        async Task Run(Func<CancellationToken, Task> work, bool keepAwake = false)
         {
             if (active != null)
                 return;
             using var operation = new CancellationTokenSource();
             active = operation;
             back.IsEnabled = false;
+            progress.IsIndeterminate = true;
+            progress.Value = 0;
             progress.Visibility = cancel.Visibility = Visibility.Visible;
+            System.Action? releaseSleep = null;
             try
             {
+                if (keepAwake)
+                    releaseSleep = await LauncherPlatform.Current.PreventIdleSleep(operation.Token);
+                sleepStatus.Visibility =
+                    keepAwake && releaseSleep == null ? Visibility.Visible : Visibility.Collapsed;
                 await work(operation.Token);
             }
             catch (OperationCanceledException) when (operation.IsCancellationRequested)
@@ -103,6 +134,8 @@ public sealed partial class MainWindow
             }
             finally
             {
+                releaseSleep?.Invoke();
+                sleepStatus.Visibility = Visibility.Collapsed;
                 active = null;
                 back.IsEnabled = true;
                 progress.Visibility = cancel.Visibility = Visibility.Collapsed;
@@ -281,7 +314,22 @@ public sealed partial class MainWindow
                                             });
                                         },
                                         ct,
-                                        ConfirmConnection
+                                        ConfirmConnection,
+                                        (transferred, total) =>
+                                            DispatcherQueue.TryEnqueue(() =>
+                                            {
+                                                if (
+                                                    active?.Token == ct
+                                                    && !ct.IsCancellationRequested
+                                                )
+                                                    UpdateTransferProgress(
+                                                        transferred == total
+                                                            ? "Waiting for the receiving device to finish importing…"
+                                                            : "Sending instance data…",
+                                                        transferred,
+                                                        total
+                                                    );
+                                            })
                                     ),
                                 ct
                             );
@@ -321,7 +369,13 @@ public sealed partial class MainWindow
 
             local.Children.Add(Text("Local network", 16, true));
             var scanState = Text("");
-            var indicator = new ProgressBar { IsIndeterminate = true };
+            var indicator = new ProgressBar
+            {
+                IsIndeterminate = true,
+                Height = 8,
+                MinHeight = 8,
+                Maximum = 100,
+            };
             var results = new StackPanel { Spacing = 6 };
             var retry = Button("Search again", Scan);
             local.Children.Add(scanState);
@@ -477,34 +531,50 @@ public sealed partial class MainWindow
                     );
                     content.Children.Add(
                         Text(
-                            "The receiver may need internet access to download Minecraft and the loader."
+                            "Minecraft and loaders download when the imported instance is first launched."
                         )
                     );
-                    await Run(async ct =>
-                    {
-                        status.Text = Ui("Connecting to the sending device…");
-                        var imported = await InstanceTransfer.RequestReceive(
-                            store,
-                            core,
-                            address.Text,
-                            verification =>
-                            {
-                                status.Text = Ui("Waiting for confirmation on the sending device…");
-                                content.Children.Add(
-                                    Text("Compare this verification code with the sending device.")
-                                );
-                                content.Children.Add(
-                                    new TextBlock { Text = verification, FontSize = 20 }
-                                );
-                            },
-                            () => status.Text = Ui("Installing Minecraft and importing content…"),
-                            ct
-                        );
-                        Complete(
-                            "Instance received.",
-                            string.Join(Environment.NewLine, imported.Select(x => x.Name))
-                        );
-                    });
+                    await Run(
+                        async ct =>
+                        {
+                            status.Text = Ui("Connecting to the sending device…");
+                            var imported = await InstanceTransfer.RequestReceive(
+                                store,
+                                address.Text,
+                                verification =>
+                                {
+                                    status.Text = Ui(
+                                        "Waiting for confirmation on the sending device…"
+                                    );
+                                    content.Children.Add(
+                                        Text(
+                                            "Compare this verification code with the sending device."
+                                        )
+                                    );
+                                    content.Children.Add(
+                                        new TextBlock { Text = verification, FontSize = 20 }
+                                    );
+                                },
+                                () =>
+                                {
+                                    progress.IsIndeterminate = true;
+                                    status.Text = Ui("Importing received instances…");
+                                },
+                                ct,
+                                (transferred, total) =>
+                                    UpdateTransferProgress(
+                                        "Receiving instance data…",
+                                        transferred,
+                                        total
+                                    )
+                            );
+                            Complete(
+                                "Instance received.",
+                                string.Join(Environment.NewLine, imported.Select(x => x.Name))
+                            );
+                        },
+                        keepAwake: true
+                    );
                 },
                 primary: true
             );

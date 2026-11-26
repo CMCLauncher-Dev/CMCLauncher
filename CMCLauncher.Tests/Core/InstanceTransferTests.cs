@@ -7,7 +7,6 @@ static class InstanceTransferTests
         var sender = new Store(Path.Combine(temporary, "sender"));
         var receiver = new Store(Path.Combine(temporary, "receiver"));
         receiver.Config.Settings.GameLanguage = "en_us";
-        using var core = new LauncherCore(receiver);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
         var stale = new Instance
@@ -24,14 +23,7 @@ static class InstanceTransferTests
         )
             throw new Exception("Stale import was not diagnosed before pairing.");
 
-        // Install from a cached vanilla profile, without external downloads.
         const string version = "1.21.1";
-        var cached = Path.Combine(receiver.MinecraftRoot, "versions", version);
-        Directory.CreateDirectory(cached);
-        await File.WriteAllTextAsync(
-            Path.Combine(cached, version + ".json"),
-            """{"id":"1.21.1","libraries":[]}"""
-        );
 
         var instance = new Instance
         {
@@ -46,7 +38,13 @@ static class InstanceTransferTests
         await File.WriteAllTextAsync(Path.Combine(game, "mods", "excluded.jar"), "mod");
         await File.WriteAllTextAsync(Path.Combine(game, "options.txt"), "lang:zh_cn");
 
-        var second = new Instance { Name = instance.Name, GameVersion = version };
+        var second = new Instance
+        {
+            Name = instance.Name,
+            GameVersion = version,
+            Loader = "neoforge",
+            LoaderVersion = "21.1.249",
+        };
         var secondGame = sender.GameDirectory(second);
         Directory.CreateDirectory(Path.Combine(secondGame, "mods"));
         await File.WriteAllTextAsync(Path.Combine(secondGame, "mods", "included.jar"), "other mod");
@@ -59,6 +57,9 @@ static class InstanceTransferTests
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         var approved = false;
+        var interrupt = false;
+        var sentProgress = new List<(long Transferred, long Total)>();
+        var receivedProgress = new List<(long Transferred, long Total)>();
         var sending = InstanceTransfer.Send(
             sender,
             [new(instance, ["saves", "options.txt"]), new(second, ["mods"])],
@@ -74,6 +75,12 @@ static class InstanceTransferTests
                 if (receiver.Config.Instances.Count != 0)
                     throw new Exception("The receiver imported content before approval.");
                 return approved;
+            },
+            (transferred, total) =>
+            {
+                if (interrupt)
+                    throw new IOException("Simulated disconnect before the archive is written.");
+                sentProgress.Add((transferred, total));
             }
         );
         try
@@ -86,7 +93,6 @@ static class InstanceTransferTests
             {
                 await InstanceTransfer.Receive(
                     receiver,
-                    core,
                     endpoint,
                     wrongCode,
                     () => { },
@@ -103,7 +109,6 @@ static class InstanceTransferTests
             {
                 await InstanceTransfer.RequestReceive(
                     receiver,
-                    core,
                     endpoint,
                     value => verification.TrySetResult(value),
                     () => { },
@@ -117,14 +122,52 @@ static class InstanceTransferTests
                 TaskCreationOptions.RunContinuationsAsynchronously
             );
             approved = true;
+            interrupt = true;
+            try
+            {
+                await InstanceTransfer.RequestReceive(
+                    receiver,
+                    endpoint,
+                    value => verification.TrySetResult(value),
+                    () => { },
+                    timeout.Token
+                );
+                throw new Exception("A truncated transfer was accepted.");
+            }
+            catch (IOException ex)
+                when (ex.Message.StartsWith(
+                        "Could not receive the complete archive.",
+                        StringComparison.Ordinal
+                    )
+                ) { }
+            if (receiver.Config.Instances.Count != 0 || sending.IsCompleted)
+                throw new Exception(
+                    "An incomplete archive must not be imported or marked as sent."
+                );
+            verification = new TaskCompletionSource<string>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
+            interrupt = false;
             var batch = await InstanceTransfer.RequestReceive(
                 receiver,
-                core,
                 endpoint,
                 value => verification.TrySetResult(value),
                 () => { },
-                timeout.Token
+                timeout.Token,
+                (transferred, total) => receivedProgress.Add((transferred, total))
             );
+            await sending;
+            var total = sentProgress.Last().Total;
+            if (
+                total <= 0
+                || sentProgress.First() != (0L, total)
+                || receivedProgress.First() != (0L, total)
+                || sentProgress.Last() != (total, total)
+                || receivedProgress.Last() != (total, total)
+            )
+                throw new Exception(
+                    "Both endpoints must report progress from zero through the full archive size."
+                );
             if (batch.Count != 2)
                 throw new Exception("Expected both selected instances in one transfer.");
             var imported = batch[0];
@@ -144,8 +187,8 @@ static class InstanceTransferTests
                     Path.Combine(otherDestination, "mods", "included.jar")
                 ) != "other mod"
                 || File.Exists(Path.Combine(otherDestination, "saves", "world", "level.dat"))
-                || await File.ReadAllTextAsync(Path.Combine(otherDestination, "options.txt"))
-                    == "not selected"
+                || File.Exists(Path.Combine(otherDestination, "options.txt"))
+                || !other.PendingTransferredLoaderSetup
                 || other.Name == imported.Name
                 || batch.Any(x => saved.All(y => y.Id != x.Id))
             )
@@ -163,6 +206,62 @@ static class InstanceTransferTests
             {
                 await sending;
             }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested) { }
+        }
+        await VerifyFailedImportReceipt(sender, receiver, instance);
+    }
+
+    static async Task VerifyFailedImportReceipt(Store sender, Store receiver, Instance instance)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var ready = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var sending = InstanceTransfer.Send(
+            sender,
+            [new(instance, ["saves"])],
+            false,
+            (addresses, _) => ready.TrySetResult(addresses),
+            timeout.Token,
+            (_, _, _) => Task.FromResult(true)
+        );
+        try
+        {
+            var addresses = await ready.Task.WaitAsync(timeout.Token);
+            var port = addresses.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0].Split(':')[1];
+            try
+            {
+                await InstanceTransfer.RequestReceive(
+                    receiver,
+                    "127.0.0.1:" + port,
+                    _ => { },
+                    () => throw new IOException("Simulated receiver import failure."),
+                    timeout.Token
+                );
+                throw new Exception("The import should fail.");
+            }
+            catch (IOException ex) when (ex.Message == "Simulated receiver import failure.") { }
+
+            try
+            {
+                await sending;
+                throw new Exception(
+                    "The sender reported success after the receiver failed to import."
+                );
+            }
+            catch (IOException ex)
+                when (ex.Message == "The receiving device could not import the archive.") { }
+            Console.WriteLine("PASS receiver import failure sends a failure receipt to the sender");
+        }
+        finally
+        {
+            timeout.Cancel();
+            // Observe the sender task if the receiver failed before the receipt check.
+            try
+            {
+                await sending;
+            }
+            catch (IOException) { }
             catch (OperationCanceledException) when (timeout.IsCancellationRequested) { }
         }
     }

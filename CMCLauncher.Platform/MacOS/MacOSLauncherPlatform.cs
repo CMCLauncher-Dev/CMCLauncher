@@ -9,6 +9,30 @@ public sealed class MacOSLauncherPlatform : LauncherPlatform
 
     public override string MinecraftOsName => "osx";
 
+    public override Task<Action?> PreventIdleSleep(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        try
+        {
+            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("/usr/bin/caffeinate", "-i")
+            {
+                UseShellExecute = false,
+            });
+            return Task.FromResult<Action?>(process == null ? null : () =>
+            {
+                using (process)
+                {
+                    try { process.Kill(); }
+                    catch (InvalidOperationException) { }
+                }
+            });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return Task.FromResult<Action?>(null);
+        }
+    }
+
     public override Task<double?> CpuUsage(CancellationToken ct) =>
         Task.Run<double?>(
             () =>
