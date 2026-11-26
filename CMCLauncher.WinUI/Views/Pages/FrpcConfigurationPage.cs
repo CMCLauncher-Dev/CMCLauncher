@@ -414,9 +414,11 @@ public sealed partial class MainWindow
                                 frpcConfigs.Owned(frpcEditorPath),
                                 ct
                             ),
-                        Ui("Verify frpc configuration")
+                        Ui("Verify frpc configuration"),
+                        backgroundKey: "frpc-process"
                     );
-                }
+                },
+                independent: true
             )
         );
         actions.Children.Add(

@@ -1581,11 +1581,11 @@ public sealed partial class LauncherCore : IDisposable
             Status?.Invoke("Optimizing memory");
             try
             {
-                var result = await Task.Run(() => platform.OptimizeMemory(ct), ct);
-                Log?.Invoke(
-                    $"Memory optimization: {result.SystemOperationsCompleted} system operations completed ({result.CompletedOperations}), "
-                    + $"available memory {result.AvailableBeforeMb} → {result.AvailableAfterMb} MiB."
-                );
+                if (await Task.Run(() => platform.OptimizeMemoryBeforeLaunch(ct), ct) is { } result)
+                    Log?.Invoke(
+                        $"Memory optimization: {result.SystemOperationsCompleted} system operations completed ({result.CompletedOperations}), "
+                        + $"available memory {result.AvailableBeforeMb} → {result.AvailableAfterMb} MiB."
+                    );
             }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or MemoryOptimizationDeclinedException)
             {

@@ -174,6 +174,21 @@ public sealed partial class WindowsLauncherPlatform
 
     static readonly object memoryOptimizationGate = new();
 
+    public override MemoryOptimizationResult? OptimizeMemoryBeforeLaunch(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!Monitor.TryEnter(memoryOptimizationGate))
+            return null;
+        try
+        {
+            return OptimizeMemory(ct);
+        }
+        finally
+        {
+            Monitor.Exit(memoryOptimizationGate);
+        }
+    }
+
     public override MemoryOptimizationResult OptimizeMemory(CancellationToken ct)
     {
         lock (memoryOptimizationGate)

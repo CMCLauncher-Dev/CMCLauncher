@@ -43,7 +43,7 @@ public sealed partial class MainWindow
             heading.VerticalAlignment = VerticalAlignment.Center;
             utilities.Children.Add(heading);
 
-            var optimize = Action("Memory optimization", (_, _) => OptimizeMemoryNow());
+            var optimize = Action("Memory optimization", (_, _) => OptimizeMemoryNow(), independent: true);
             optimize.Tag = "toolbox-optimize-memory";
             optimize.VerticalAlignment = VerticalAlignment.Center;
             var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -137,7 +137,7 @@ public sealed partial class MainWindow
             ShowToast(Ui("Optimizing memory"), InfoBarSeverity.Informational);
             result = await Task.Run(() => LauncherPlatform.Current.OptimizeMemory(ct), ct);
             ct.ThrowIfCancellationRequested();
-        }, Ui("Optimizing memory"), showSuccessToast: false);
+        }, Ui("Optimizing memory"), showSuccessToast: false, backgroundKey: "memory-optimization");
         AddLog($"Memory optimization completed: {result.CompletedOperations} · {result.AvailableBeforeMb} → {result.AvailableAfterMb} MiB");
         var message = result.AvailableGainMb is long gain && result.AvailableAfterMb is long available
             ? UiFormat("Available memory increased by {0:N0} MiB. Available now: {1:N0} MiB.", gain, available)

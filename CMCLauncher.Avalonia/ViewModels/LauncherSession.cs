@@ -38,6 +38,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
             : Environment.ProcessPath!;
     HttpClient blueprintHttp;
     public HttpClient ImageHttp => blueprintHttp;
+    readonly Dictionary<string, (OperationState Item, CancellationTokenSource Cancellation)> backgroundWork = new();
     public OperationState? Active { get; private set; }
     public bool Busy => task != null;
     public bool GameRunning => game is { HasExited: false };
@@ -196,21 +197,32 @@ public sealed class LauncherSession : ObservableState, IDisposable
     public async Task<bool> Run(
         string name,
         Func<CancellationToken, Task> operation,
-        bool showSuccessToast = true
+        bool showSuccessToast = true,
+        string? backgroundKey = null
     )
     {
-        if (Busy)
+        if (backgroundKey == null ? Busy : backgroundWork.ContainsKey(backgroundKey))
             throw new InvalidOperationException(Ui("A task is already running."));
         using var cancellation = new CancellationTokenSource();
-        task = cancellation;
-        Changed(nameof(Busy));
         var item = new OperationState(Ui(name)) { Stage = Ui("Processing…"), State = Ui("Running") };
-        Active = item;
+        if (backgroundKey == null)
+        {
+            task = cancellation;
+            Active = item;
+            Status = item.Title;
+            Progress = null;
+            Changed(nameof(Busy));
+        }
+        else
+            backgroundWork.Add(backgroundKey, (item, cancellation));
         Operations.Insert(0, item);
         while (Operations.Count > 30)
-            Operations.RemoveAt(Operations.Count - 1);
-        Status = item.Title;
-        Progress = null;
+        {
+            var oldestCompleted = Operations.LastOrDefault(work => !work.IsRunning);
+            if (oldestCompleted == null)
+                break;
+            Operations.Remove(oldestCompleted);
+        }
         try
         {
             await operation(cancellation.Token);
@@ -241,15 +253,27 @@ public sealed class LauncherSession : ObservableState, IDisposable
         finally
         {
             item.Finish();
-            task = null;
-            Active = null;
-            Progress = null;
-            Status = item.Stage;
-            Changed(nameof(Busy));
+            if (backgroundKey == null)
+            {
+                task = null;
+                Active = null;
+                Progress = null;
+                Status = item.Stage;
+                Changed(nameof(Busy));
+            }
+            else
+                backgroundWork.Remove(backgroundKey);
         }
     }
 
     public void Cancel() => task?.Cancel();
+
+    public bool CanCancel(OperationState item) => CancellationFor(item) is { IsCancellationRequested: false };
+
+    public void Cancel(OperationState item) => CancellationFor(item)?.Cancel();
+
+    CancellationTokenSource? CancellationFor(OperationState item) =>
+        Active == item ? task : backgroundWork.Values.FirstOrDefault(entry => entry.Item == item).Cancellation;
 
     public void EnsureFilesIdle()
     {
@@ -380,6 +404,8 @@ public sealed class LauncherSession : ObservableState, IDisposable
     public void Dispose()
     {
         task?.Cancel();
+        foreach (var entry in backgroundWork.Values.ToArray())
+            entry.Cancellation.Cancel();
         Terracotta.Dispose();
         Frpc.Dispose();
         Cms.Dispose();

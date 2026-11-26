@@ -116,7 +116,7 @@ public sealed partial class MainWindow
             ShowToast(Ui("Optimizing memory"));
             result = await Task.Run(() => LauncherPlatform.Current.OptimizeMemory(ct), ct);
             ct.ThrowIfCancellationRequested();
-        }, showSuccessToast: false);
+        }, showSuccessToast: false, backgroundKey: "memory-optimization");
         if (!completed)
             return;
 

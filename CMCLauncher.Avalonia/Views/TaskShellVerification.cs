@@ -76,6 +76,30 @@ public sealed partial class MainWindow
         if (!await session.Run("Recovery verification", _ => Task.CompletedTask))
             throw new IOException("A canceled task prevented the next operation from succeeding.");
         checks.Add("PASS cancellation outcome and subsequent task recovery");
+        var background = session.Run(
+            "Background verification",
+            ct => Task.Delay(Timeout.InfiniteTimeSpan, ct),
+            backgroundKey: "verification"
+        );
+        var backgroundItem = session.Operations[0];
+        try
+        {
+            if (session.Busy || !session.CanCancel(backgroundItem))
+                throw new IOException("A background task blocked foreground work.");
+            await session.Run("Foreground verification", _ =>
+            {
+                session.Cancel(backgroundItem);
+                return Task.CompletedTask;
+            });
+            if (await background || session.Busy)
+                throw new IOException("Background cancellation affected the foreground task.");
+            checks.Add("PASS background tasks can overlap foreground work and cancel independently");
+        }
+        finally
+        {
+            session.Cancel(backgroundItem);
+            await background;
+        }
         await Navigate("logs");
         var toolbar = pageContent
             .GetVisualDescendants()

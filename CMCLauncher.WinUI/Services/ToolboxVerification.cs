@@ -44,6 +44,35 @@ public sealed partial class MainWindow
                 && !navigationButtons.ContainsKey("page:minecraft-pfp"),
             "tools share one sidebar entry"
         );
+        var pending = Run(
+            ct => Task.Delay(Timeout.InfiniteTimeSpan, ct),
+            "Background verification",
+            backgroundKey: "verification"
+        );
+        var background = backgroundWork["verification"];
+        try
+        {
+            check(task == null && activeWork == null, "background tasks do not occupy the foreground slot");
+            await Run(_ =>
+            {
+                background.Cancellation.Cancel();
+                return Task.CompletedTask;
+            }, "Foreground verification");
+            try
+            {
+                await pending;
+                throw new IOException("The background task ignored cancellation.");
+            }
+            catch (OperationCanceledException) when (background.Work.State == "已取消") { }
+            check(task == null && backgroundWork.Count == 0, "individual cancellation clears only the intended task");
+        }
+        finally
+        {
+            if (backgroundWork.TryGetValue("verification", out var remaining))
+                remaining.Cancellation.Cancel();
+            try { await pending; }
+            catch (OperationCanceledException) { }
+        }
         await Capture(Path.Combine(directory, "toolbox.png"));
         var open = Descendants(PageBody)
             .OfType<Button>()

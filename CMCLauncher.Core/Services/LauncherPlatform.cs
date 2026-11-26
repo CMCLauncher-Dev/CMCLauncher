@@ -25,6 +25,8 @@ public class LauncherPlatform : CMCLauncher.Platform.PlatformEnvironment
 
     public virtual MemoryOptimizationResult OptimizeMemory(CancellationToken ct) => default;
 
+    public virtual MemoryOptimizationResult? OptimizeMemoryBeforeLaunch(CancellationToken ct) => OptimizeMemory(ct);
+
     // 把 GPU 偏好设置应用到指定可执行文件（默认空实现，由平台宿主覆盖）。
     public virtual Task ApplyGpuPreference(Store store, string executable) => Task.CompletedTask;
 

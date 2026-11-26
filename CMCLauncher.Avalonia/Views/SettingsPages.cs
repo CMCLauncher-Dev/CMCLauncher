@@ -1467,10 +1467,10 @@ public sealed partial class MainWindow
                         "Cancel task",
                         () =>
                         {
-                            if (session.Active == item)
+                            if (session.CanCancel(item))
                             {
                                 cancellationRequested = true;
-                                session.Cancel();
+                                session.Cancel(item);
                                 item.Stage = Ui("Cancelling…");
                             }
                             return Task.CompletedTask;
@@ -1480,7 +1480,7 @@ public sealed partial class MainWindow
                     cancel.VerticalAlignment = VerticalAlignment.Center;
                     buttonAvailability.Add(
                         cancel,
-                        () => item.IsRunning && session.Active == item && !cancellationRequested
+                        () => item.IsRunning && session.CanCancel(item) && !cancellationRequested
                     );
                     Grid.SetColumn(cancel, 1);
                     footer.Children.Add(cancel);
@@ -1497,9 +1497,9 @@ public sealed partial class MainWindow
                         panel.Spacing = item.IsRunning ? 10 : 4;
                         stage.IsVisible = item.IsRunning || item.Stage != item.State;
                         bar.IsVisible = item.IsRunning;
-                        cancel.IsVisible = item.IsRunning && session.Active == item;
+                        cancel.IsVisible = item.IsRunning && session.CanCancel(item);
                         cancel.IsEnabled =
-                            item.IsRunning && session.Active == item && !cancellationRequested;
+                            item.IsRunning && session.CanCancel(item) && !cancellationRequested;
                         heading.IsVisible =
                             !item.IsRunning
                             && ReferenceEquals(

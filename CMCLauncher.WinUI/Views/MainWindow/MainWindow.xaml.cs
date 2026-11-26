@@ -386,6 +386,8 @@ public sealed partial class MainWindow : Window
             resourceSearch?.Cancel();
             systemUi.ColorValuesChanged -= SystemThemeChanged;
             task?.Cancel();
+            foreach (var entry in backgroundWork.Values.ToArray())
+                entry.Cancellation.Cancel();
             StopWallpaperVideo();
             core.Dispose();
             curseforge.Dispose();

@@ -67,7 +67,7 @@ public sealed partial class MainWindow
         if (frpcStartButton != null)
             frpcStartButton.IsEnabled =
                 !frpc.Running
-                && task == null
+                && !backgroundWork.ContainsKey("frpc-process")
                 && frpc.Installed().Contains(store.Config.Settings.FrpcVersion)
                 && File.Exists(store.Config.Settings.FrpcConfigPath);
         if (frpcStopButton != null)
@@ -173,12 +173,14 @@ public sealed partial class MainWindow
                 await SaveFrpcEditor();
                 frpcAction = Run(
                     ct => frpc.Start(settings.FrpcVersion, settings.FrpcConfigPath, ct),
-                    Ui("Start frpc")
+                    Ui("Start frpc"),
+                    backgroundKey: "frpc-process"
                 );
                 await frpcAction;
                 UpdateFrpcStatus();
             },
-            true
+            true,
+            independent: true
         );
         // 停止按钮不受启动器下载任务的禁用列表影响。
         frpcStopButton = new Button

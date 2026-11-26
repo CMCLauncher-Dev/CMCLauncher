@@ -60,7 +60,8 @@ public sealed partial class MainWindow
     internal Button Action(
         string label,
         System.Action<object, RoutedEventArgs> click,
-        bool primary = false
+        bool primary = false,
+        bool independent = false
     ) =>
         Action(
             label,
@@ -69,14 +70,16 @@ public sealed partial class MainWindow
                 click(sender, args);
                 return Task.CompletedTask;
             },
-            primary
+            primary,
+            independent
         );
 
     // 页面操作共用异常处理和防重复点击逻辑，创建时也登记到任务按钮列表。
     internal Button Action(
         string label,
         Func<object, RoutedEventArgs, Task> click,
-        bool primary = false
+        bool primary = false,
+        bool independent = false
     )
     {
         var button = new Button
@@ -86,7 +89,7 @@ public sealed partial class MainWindow
             MinWidth = 84,
             MinHeight = 34,
             CornerRadius = new CornerRadius(5),
-            IsEnabled = task == null,
+            IsEnabled = independent || task == null,
         };
         button.Loaded += (_, _) => ApplyPersonalization();
         if (primary)
@@ -112,30 +115,33 @@ public sealed partial class MainWindow
             }
             catch (OperationCanceledException)
             {
-                Report("操作已取消");
+                if (!independent)
+                    Report("操作已取消");
                 RuntimeLog.Write("CANCEL", label);
             }
             catch (Exception ex)
             {
                 RuntimeLog.Write("ERROR", label + " · " + ex);
-                await Error(ex);
+                await Error(ex, reportStatus: !independent);
             }
             finally
             {
-                button.IsEnabled = task == null && HomeButtonAvailable(button);
+                button.IsEnabled = (independent || task == null) && HomeButtonAvailable(button);
             }
         };
-        taskButtons.Add(button);
+        if (!independent)
+            taskButtons.Add(button);
         return button;
     }
 
     // 同时发生的错误只开一个对话框，完整异常由日志保留。
-    internal async Task Error(Exception ex)
+    internal async Task Error(Exception ex, bool reportStatus = true)
     {
         var message = string.IsNullOrWhiteSpace(ex.Message)
             ? $"{Ui("Operation incomplete")} ({ex.GetType().Name}, 0x{ex.HResult:X8})"
             : ex.Message;
-        Report(message);
+        if (reportStatus)
+            Report(message);
         if (dialogOpen)
             return;
         dialogOpen = true;

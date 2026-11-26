@@ -9,6 +9,7 @@ public sealed partial class MainWindow
 {
     CancellationTokenSource? task;
     readonly List<Button> taskButtons = new();
+    readonly Dictionary<string, (WorkItem Work, CancellationTokenSource Cancellation)> backgroundWork = new();
 
     // 抽屉跨页面保留，卡片单独登记，避免页面重建后失去主题刷新。
     readonly List<Border> taskCards = new();
@@ -172,8 +173,22 @@ public sealed partial class MainWindow
             panel.Children.Add(footer);
             TaskDrawerBody.Children.Add(TaskCard(panel));
         }
-        else
+        else if (backgroundWork.Count == 0)
             TaskDrawerBody.Children.Add(Text(Ui("No tasks in progress"), 14));
+        foreach (var entry in backgroundWork.Values)
+        {
+            var panel = new StackPanel { Spacing = 8 };
+            panel.Children.Add(Text(entry.Work.Name, 17, true));
+            panel.Children.Add(new ProgressBar { IsIndeterminate = true, Height = 5, MinHeight = 5 });
+            var cancel = new Button { Content = Ui("Cancel task"), IsEnabled = !entry.Cancellation.IsCancellationRequested };
+            cancel.Click += (_, _) =>
+            {
+                cancel.IsEnabled = false;
+                entry.Cancellation.Cancel();
+            };
+            panel.Children.Add(cancel);
+            TaskDrawerBody.Children.Add(TaskCard(panel));
+        }
         if (recentWork.Any(w => !w.Launch))
         {
             TaskDrawerBody.Children.Add(Text(Ui("Recent tasks"), 15, true));
@@ -210,7 +225,7 @@ public sealed partial class MainWindow
     // 按采样间隔计算速度，不用每个下载块都重绘任务面板。
     internal void RefreshTaskMetrics()
     {
-        UpdateTaskCount(activeWork is { Launch: false } ? 1 : 0);
+        UpdateTaskCount((activeWork is { Launch: false } ? 1 : 0) + backgroundWork.Count);
         RefreshLaunchCard();
         if (activeWork is not { } work)
             return;
@@ -288,32 +303,40 @@ public sealed partial class MainWindow
     internal async Task Run(
         Func<CancellationToken, Task> operation,
         string? name = null,
-        bool showSuccessToast = true
+        bool showSuccessToast = true,
+        string? backgroundKey = null
     )
     {
-        if (task != null)
-            throw new Exception("已有任务进行中，请稍候或取消当前任务");
+        if (backgroundKey == null ? task != null : backgroundWork.ContainsKey(backgroundKey))
+            throw new InvalidOperationException(Ui("A task is already running."));
 
         using var cancellation = new CancellationTokenSource();
         var work = new WorkItem
         {
             Name = name ?? PageTitle.Text,
-            Stage = launching ? "准备启动" : "Processing…",
-            Launch = launching,
+            Stage = backgroundKey == null && launching ? "准备启动" : "Processing…",
+            Launch = backgroundKey == null && launching,
         };
-        task = cancellation;
-        activeWork = work;
+        if (backgroundKey == null)
+        {
+            task = cancellation;
+            activeWork = work;
+        }
+        else
+            backgroundWork.Add(backgroundKey, (work, cancellation));
 
         try
         {
-            SetTaskButtonsEnabled(false);
+            if (backgroundKey == null)
+                SetTaskButtonsEnabled(false);
             RuntimeLog.Debug(
                 $"Task started: name={work.Name}; page={page}; instance={selected?.Id ?? "none"}; game={selected?.GameVersion ?? "none"}; loader={selected?.Loader ?? "none"}; concurrency={LauncherCore.DownloadConcurrency(store.Config.Settings)}"
             );
             RefreshTaskMetrics();
             if (TaskDrawer.IsPaneOpen)
                 Tasks();
-            UpdateDownloadProgress(null);
+            if (backgroundKey == null)
+                UpdateDownloadProgress(null);
 
             await operation(cancellation.Token);
             work.State = "已完成";
@@ -361,9 +384,14 @@ public sealed partial class MainWindow
             if (recentWork.Count > 12)
                 recentWork.RemoveAt(recentWork.Count - 1);
 
-            activeWork = null;
-            task = null;
-            SetTaskButtonsEnabled(true);
+            if (backgroundKey == null)
+            {
+                activeWork = null;
+                task = null;
+                SetTaskButtonsEnabled(true);
+            }
+            else
+                backgroundWork.Remove(backgroundKey);
             UpdateFrpcStatus();
             RefreshTaskMetrics();
             if (TaskDrawer.IsPaneOpen)

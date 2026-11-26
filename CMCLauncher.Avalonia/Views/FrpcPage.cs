@@ -104,7 +104,8 @@ public sealed partial class MainWindow
                         await session.FrpcProfiles.Save(profile.Path, editor.Text ?? "", ct);
                         await session.Run(
                             "Verify frpc",
-                            token => session.Frpc.Verify(version, profile.Path, token)
+                            token => session.Frpc.Verify(version, profile.Path, token),
+                            backgroundKey: "frpc-process"
                         );
                     }
                 ),
@@ -121,7 +122,8 @@ public sealed partial class MainWindow
                         await session.FrpcProfiles.Save(profile.Path, editor.Text ?? "", ct);
                         await session.Run(
                             "Start frpc",
-                            token => session.Frpc.Start(version, profile.Path, token)
+                            token => session.Frpc.Start(version, profile.Path, token),
+                            backgroundKey: "frpc-process"
                         );
                         state.Text = Ui(session.Frpc.Running ? "Running" : "Stopped");
                     },
