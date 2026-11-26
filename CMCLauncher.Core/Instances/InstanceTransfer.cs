@@ -19,6 +19,7 @@ public static class InstanceTransfer
     static readonly byte[] DiscoveryRequest = "CMCLauncher.InstanceTransfer.1?"u8.ToArray();
     static readonly byte[] LegacyConnectionRequest = "CMC.PairRequest1"u8.ToArray();
     static readonly byte[] ConnectionRequest = "CMC.PairRequest2"u8.ToArray();
+    internal const string RuntimeFolder = ".cmc-transfer-runtime";
     const string Manifest = "instance.json";
     const string BatchManifest = "instances.json";
     const int MaxManifestBytes = 1024 * 1024;
@@ -42,7 +43,8 @@ public static class InstanceTransfer
         string Description,
         string GameVersion,
         string Loader,
-        string? LoaderVersion
+        string? LoaderVersion,
+        bool HasRuntime = false
     );
 
     public static async Task Send(
@@ -52,7 +54,8 @@ public static class InstanceTransfer
         Action<string, string> ready,
         CancellationToken ct,
         Func<string, string, CancellationToken, Task<bool>>? confirm = null,
-        Action<long, long>? progress = null
+        Action<long, long>? progress = null,
+        LauncherCore? fullRuntime = null
     )
     {
         if (selections.Count == 0)
@@ -60,7 +63,7 @@ public static class InstanceTransfer
         var profiles = selections
             .Select(selection =>
             {
-                var profile = CreateProfile(selection.Instance);
+                var profile = CreateProfile(selection.Instance) with { HasRuntime = fullRuntime != null };
                 if (SelectionError(selection.Instance) is { } error)
                     throw new InvalidDataException(profile.Name + ": " + error);
                 return profile;
@@ -86,16 +89,30 @@ public static class InstanceTransfer
             {
                 using (var entry = zip.CreateEntry(batch ? BatchManifest : Manifest).Open())
                     await entry.WriteAsync(manifestBytes, ct);
+                long remaining = MaxArchiveBytes;
                 for (var index = 0; index < selections.Count; index++)
                 {
                     var selection = selections[index];
                     var root = store.GameDirectory(selection.Instance);
                     var prefix = batch ? EntryPrefix(index) : "";
+                    if (fullRuntime != null)
+                    {
+                        var runtime = await fullRuntime.PrepareTransferRuntime(selection.Instance, ct);
+                        var runtimePrefix = prefix + RuntimeFolder + "/";
+                        var profileBytes = JsonSerializer.SerializeToUtf8Bytes(runtime.Profile);
+                        remaining -= profileBytes.Length;
+                        if (remaining < 0)
+                            throw new IOException("Transfer archive is too large.");
+                        using (var entry = zip.CreateEntry(runtimePrefix + "profile.json").Open())
+                            await entry.WriteAsync(profileBytes, ct);
+                        foreach (var path in runtime.Files)
+                            remaining = await Pack(zip, runtime.Root, runtimePrefix, path, remaining, ct, required: true);
+                    }
                     foreach (var path in selection.Paths.Distinct(StringComparer.Ordinal))
                     {
                         if (!allowed.Contains(path))
                             throw new InvalidDataException("Invalid transfer content.");
-                        await Pack(zip, root, prefix, path, ct);
+                        remaining = await Pack(zip, root, prefix, path, remaining, ct);
                     }
                 }
             }
@@ -614,7 +631,8 @@ public static class InstanceTransfer
             GameVersion = profile.GameVersion,
             Loader = profile.Loader,
             LoaderVersion = profile.LoaderVersion,
-            PendingTransferredLoaderSetup = profile.Loader is "forge" or "neoforge",
+            PendingTransferredLoaderSetup = !profile.HasRuntime && profile.Loader is "forge" or "neoforge",
+            HasTransferredRuntime = profile.HasRuntime,
             TransferredFromDevice = true,
             StorageRoot = store.MinecraftRoot,
         };
@@ -624,7 +642,9 @@ public static class InstanceTransfer
         try
         {
             installing();
-            await Unpack(entries, prefix, stage, ct);
+            await Unpack(entries, prefix, stage, profile.HasRuntime, ct);
+            if (profile.HasRuntime && !File.Exists(Store.SafePath(stage, RuntimeFolder + "/profile.json")))
+                throw new InvalidDataException("The transfer is missing its game profile.");
             for (var suffix = 2; ; suffix++)
             {
                 try
@@ -743,36 +763,46 @@ public static class InstanceTransfer
         }
     }
 
-    static async Task Pack(
+    static async Task<long> Pack(
         ZipArchive zip,
         string root,
         string prefix,
         string relative,
-        CancellationToken ct
+        long remaining,
+        CancellationToken ct,
+        bool required = false
     )
     {
         ct.ThrowIfCancellationRequested();
         var path = Path.Combine(root, relative);
-        if (!File.Exists(path) && !Directory.Exists(path))
-            return;
-        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            return;
+        if ((!File.Exists(path) && !Directory.Exists(path))
+            || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+        {
+            if (required)
+                throw new IOException("The required transfer file is missing or linked: " + relative);
+            return remaining;
+        }
         Store.SafePath(root, relative);
         if (Directory.Exists(path))
         {
             foreach (var child in Directory.EnumerateFileSystemEntries(path))
-                await Pack(zip, root, prefix, relative + "/" + Path.GetFileName(child), ct);
-            return;
+                remaining = await Pack(zip, root, prefix, relative + "/" + Path.GetFileName(child), remaining, ct);
+            return remaining;
         }
         using var source = File.OpenRead(path);
+        var length = source.Length;
+        if (length > remaining)
+            throw new IOException("Transfer archive is too large.");
         using var destination = zip.CreateEntry(prefix + relative, CompressionLevel.Fastest).Open();
-        await source.CopyToAsync(destination, ct);
+        await CopyExactly(source, destination, length, ct);
+        return remaining - length;
     }
 
     static async Task Unpack(
         IReadOnlyList<ZipArchiveEntry> entries,
         string prefix,
         string stage,
+        bool hasRuntime,
         CancellationToken ct
     )
     {
@@ -781,7 +811,11 @@ public static class InstanceTransfer
         {
             ct.ThrowIfCancellationRequested();
             var relative = entry.FullName[prefix.Length..];
-            if (relative.Contains('\\') || !allowed.Contains(relative.Split('/')[0]))
+            var parts = relative.Split('/');
+            var runtime = hasRuntime && parts[0] == RuntimeFolder
+                && (parts is [_, "profile.json"] || (parts.Length > 2
+                    && parts[1] is "versions" or "assets" or "libraries"));
+            if (relative.Contains('\\') || (!runtime && !allowed.Contains(parts[0])))
                 throw new InvalidDataException("Invalid transfer content.");
             var target = Store.SafePath(stage, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);

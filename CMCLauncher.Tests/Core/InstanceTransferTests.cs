@@ -223,6 +223,94 @@ static class InstanceTransferTests
             throw new Exception("A complete Forge build must not be prefixed twice.");
         Console.WriteLine("PASS transferred Forge build normalization");
         await VerifyFailedImportReceipt(sender, receiver, instance);
+        await VerifyCompleteTransfer(temporary);
+    }
+
+    static async Task VerifyCompleteTransfer(string temporary)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var sender = new Store(Path.Combine(temporary, "complete-sender"));
+        var receiver = new Store(Path.Combine(temporary, "complete-receiver"));
+        using var sourceCore = new LauncherCore(sender, new NoNetwork());
+        var instance = new Instance
+        {
+            Name = "Offline transfer",
+            GameVersion = "1.21.1",
+            Loader = "neoforge",
+            LoaderVersion = "21.1.249",
+            VersionId = "1.21.1",
+            ImportRoot = sender.Library,
+        };
+        var versionDir = Path.Combine(sender.Library, "versions", instance.GameVersion);
+        Directory.CreateDirectory(versionDir);
+        await File.WriteAllTextAsync(Path.Combine(versionDir, "1.21.1.jar"), "client", timeout.Token);
+        await File.WriteAllTextAsync(Path.Combine(versionDir, "1.21.1.json"), """
+            {
+              "mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
+              "assetIndex": { "id": "fixture", "size": 88 },
+              "logging": { "client": { "file": { "id": "fixture.xml", "size": 3 } } },
+              "libraries": [{
+                "name": "fixture:library:1",
+                "natives": { "windows": "windows-test", "linux": "linux-test" },
+                "downloads": { "classifiers": {
+                  "windows-test": { "path": "windows-test.jar", "size": 22 },
+                  "linux-test": { "path": "linux-test.jar", "size": 22 }
+                } }
+              }]
+            }
+            """, timeout.Token);
+        var libraries = Directory.CreateDirectory(Path.Combine(sender.Library, "libraries"));
+        foreach (var platform in new[] { "windows", "linux" })
+        {
+            using var zip = System.IO.Compression.ZipFile.Open(
+                Path.Combine(libraries.FullName, platform + "-test.jar"),
+                System.IO.Compression.ZipArchiveMode.Create
+            );
+        }
+        await File.WriteAllTextAsync(Path.Combine(libraries.FullName, "unrelated.jar"), "exclude", timeout.Token);
+        const string hash = "a9993e364706816aba3e25717850c26c9cd0d89d";
+        Directory.CreateDirectory(Path.Combine(sender.Library, "assets", "indexes"));
+        Directory.CreateDirectory(Path.Combine(sender.Library, "assets", "objects", "a9"));
+        Directory.CreateDirectory(Path.Combine(sender.Library, "assets", "log_configs"));
+        await File.WriteAllTextAsync(Path.Combine(sender.Library, "assets", "indexes", "fixture.json"),
+            """{"objects":{"fixture.txt":{"hash":"a9993e364706816aba3e25717850c26c9cd0d89d","size":3}}}""", timeout.Token);
+        await File.WriteAllTextAsync(Path.Combine(sender.Library, "assets", "objects", "a9", hash), "abc", timeout.Token);
+        await File.WriteAllTextAsync(Path.Combine(sender.Library, "assets", "log_configs", "fixture.xml"), "log", timeout.Token);
+        var ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sending = InstanceTransfer.Send(
+            sender, [new(instance, [])], false, (addresses, _) => ready.TrySetResult(addresses),
+            timeout.Token, (_, _, _) => Task.FromResult(true), fullRuntime: sourceCore
+        );
+        try
+        {
+            var addresses = await ready.Task.WaitAsync(timeout.Token);
+            var port = addresses.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0].Split(':')[1];
+            await InstanceTransfer.RequestReceive(receiver, "127.0.0.1:" + port,
+                _ => { }, () => { }, timeout.Token);
+            var reopened = new Store(receiver.Root);
+            var imported = reopened.Config.Instances.Single();
+            var runtime = Path.Combine(reopened.GameDirectory(imported), InstanceTransfer.RuntimeFolder);
+            if (!imported.HasTransferredRuntime || imported.PendingTransferredLoaderSetup
+                || !File.Exists(Path.Combine(runtime, "libraries", "windows-test.jar"))
+                || !File.Exists(Path.Combine(runtime, "libraries", "linux-test.jar"))
+                || File.Exists(Path.Combine(runtime, "libraries", "unrelated.jar")))
+                throw new Exception("Complete migration did not preserve its private cross-platform runtime.");
+            using var reopenedCore = new LauncherCore(reopened, new NoNetwork());
+            await reopenedCore.DownloadGame(imported, timeout.Token);
+            await sending;
+            Console.WriteLine("PASS complete migration prepares the imported game with all network requests denied");
+        }
+        finally
+        {
+            timeout.Cancel();
+            await sending;
+        }
+    }
+
+    sealed class NoNetwork : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            throw new IOException("Unexpected transfer test download: " + request.RequestUri);
     }
 
     static async Task VerifyFailedImportReceipt(Store sender, Store receiver, Instance instance)

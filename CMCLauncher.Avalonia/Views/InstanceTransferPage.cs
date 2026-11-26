@@ -199,6 +199,11 @@ public sealed partial class MainWindow
                 "Select one or more instances. Expand each card to choose its content.",
                 () => Connection(true)
             );
+            var fullMigration = new CheckBox
+            {
+                Content = Ui("Include Minecraft and dependencies for offline play"),
+            };
+            content.Children.Add(fullMigration);
             var selections =
                 new List<(
                     Instance Instance,
@@ -274,12 +279,15 @@ public sealed partial class MainWindow
                             status.Text = Ui("No instance selected.");
                             return;
                         }
+                        var runtime = fullMigration.IsChecked == true ? session.Core : null;
                         Stage(
                             "Pair the devices",
                             "Select this device on the receiving device to send a connection request.",
                             () => SendSelection(local)
                         );
-                        var pending = T("Preparing instance transfer…");
+                        var pending = T(runtime == null
+                            ? "Preparing instance transfer…"
+                            : "Preparing Minecraft and dependencies on this device…");
                         content.Children.Add(pending);
                         await Run(async ct =>
                         {
@@ -327,7 +335,8 @@ public sealed partial class MainWindow
                                                         transferred,
                                                         total
                                                     );
-                                            })
+                                            }),
+                                        fullRuntime: runtime
                                     ),
                                 ct
                             );
@@ -529,7 +538,7 @@ public sealed partial class MainWindow
                     );
                     content.Children.Add(
                         T(
-                            "Minecraft and loaders download when the imported instance is first launched."
+                            "With complete migration, only Java may need to download before you can play offline."
                         )
                     );
                     await Run(

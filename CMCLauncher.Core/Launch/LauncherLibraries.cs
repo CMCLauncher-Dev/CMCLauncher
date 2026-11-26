@@ -33,12 +33,15 @@ public sealed partial class LauncherCore
     async Task<List<string>> PrepareLibraries(
         JsonNode version,
         string storage,
-        string natives,
+        string? natives,
         CancellationToken ct,
-        Action<int, int>? report = null
+        Action<int, int>? report = null,
+        Action<string>? transferFile = null
     )
     {
-        var libraries = EffectiveLibraries(version);
+        IReadOnlyList<JsonNode> libraries = transferFile == null
+            ? EffectiveLibraries(version)
+            : version["libraries"].Items().ToArray();
         // classpath[index] 记录第 index 个库的 classpath 文件路径；
         // nativeFiles[index] 记录第 index 个库的 natives 文件与解压排除项。
         var classpath = new string?[libraries.Count];
@@ -49,7 +52,7 @@ public sealed partial class LauncherCore
             var key = LibraryCoordinateKey(lib);
             var classifier = NativeClassifier(lib);
             var artifact = lib["downloads"]?["artifact"];
-            var includeArtifact = (artifact != null || lib["downloads"] == null) && artifactKeys.Add(key);
+            var includeArtifact = (artifact != null || lib["downloads"] == null) && (transferFile != null || artifactKeys.Add(key));
             var native = classifier.Length > 0 ? lib["downloads"]?["classifiers"]?[classifier] : null;
             return (lib, index, includeArtifact, artifact, native);
         }).ToArray();
@@ -76,10 +79,31 @@ public sealed partial class LauncherCore
                         ct: token
                     );
                     classpath[index] = file;
+                    transferFile?.Invoke(file);
                 }
                 // 下载当前平台的 natives 库（按操作系统名选择 classifier，
                 // 并将 ${arch} 替换为 64/32）。
-                if (native != null)
+                if (transferFile != null)
+                {
+                    var classifiers = lib["downloads"]?["classifiers"] as JsonObject;
+                    if (classifiers != null && lib["natives"] is JsonObject platformNatives)
+                    {
+                        var names = platformNatives.SelectMany(entry =>
+                        {
+                            var name = entry.Value?.ToString() ?? "";
+                            return new[] { name.Replace("${arch}", "64"), name.Replace("${arch}", "32") };
+                        }).Distinct();
+                        foreach (var name in names)
+                        {
+                            if (classifiers[name] is not JsonObject archive)
+                                continue;
+                            var file = Store.SafePath(storage, "libraries/" + archive.S("path"));
+                            await Download(archive.S("url"), file, archive.S("sha1"), size: archive.Int("size"), ct: token);
+                            transferFile(file);
+                        }
+                    }
+                }
+                else if (native != null)
                 {
                     var file = Store.SafePath(storage, "libraries/" + native.S("path"));
                     await Download(
@@ -111,7 +135,7 @@ public sealed partial class LauncherCore
             if (entry is not { } native)
                 continue;
             using var zip = ZipFile.OpenRead(native.File);
-            await Extract(zip, natives, exclusions: native.Exclusions, ct: ct);
+            await Extract(zip, natives!, exclusions: native.Exclusions, ct: ct);
         }
         // 返回去重后的 classpath 文件列表。
         return classpath

@@ -765,6 +765,12 @@ public sealed partial class LauncherCore : IDisposable
 
     public async Task<JsonNode> VersionFor(Instance instance, CancellationToken ct)
     {
+        if (instance.HasTransferredRuntime)
+        {
+            var runtimeProfile = Store.SafePath(TransferRuntimeDirectory(instance), "profile.json");
+            return await ReadMetadata(runtimeProfile, ct)
+                ?? throw new InvalidDataException("The transferred game profile is missing or invalid.");
+        }
         var storage = store.StorageDirectory(instance);
         if (instance.ImportRoot != null)
         {
@@ -1122,6 +1128,7 @@ public sealed partial class LauncherCore : IDisposable
         );
         if (profileId != null)
         {
+            instance.HasTransferredRuntime = false;
             instance.VersionId = profileId;
             instance.LoaderVersion = instance.Loader == "forge" ? build[prefix.Length..] : build;
             return instance;
@@ -1291,12 +1298,40 @@ public sealed partial class LauncherCore : IDisposable
     public async Task DownloadGame(Instance instance, CancellationToken ct)
     {
         var version = await VersionFor(instance, ct);
-        var storage = store.StorageDirectory(instance);
         var game = store.GameDirectory(instance);
         Directory.CreateDirectory(game);
         var natives = Path.Combine(game, ".craft-natives");
         Directory.CreateDirectory(natives);
-        var jarId = version.S("jar", instance.GameVersion);
+        await PrepareGameFiles(instance, version, GameRuntimeDirectory(instance), natives, ct);
+        await ContentManager.Language(game, store.Config.Settings.GameLanguage);
+        await WriteIsolatedProfile(instance, version);
+    }
+
+    string TransferRuntimeDirectory(Instance instance) =>
+        Store.SafePath(store.GameDirectory(instance), InstanceTransfer.RuntimeFolder);
+
+    string GameRuntimeDirectory(Instance instance) =>
+        instance.HasTransferredRuntime ? TransferRuntimeDirectory(instance) : store.StorageDirectory(instance);
+
+    internal async Task<(JsonNode Profile, string Root, string[] Files)> PrepareTransferRuntime(
+        Instance instance, CancellationToken ct)
+    {
+        var version = (await VersionFor(instance, ct)).DeepClone();
+        version.AsObject().Remove("inheritsFrom");
+        version["jar"] = version.S("jar", instance.ImportRoot != null ? instance.VersionId! : instance.GameVersion);
+        var storage = GameRuntimeDirectory(instance);
+        var files = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
+        await PrepareGameFiles(instance, version, storage, null, ct, path =>
+            files.TryAdd(Path.GetRelativePath(storage, path).Replace('\\', '/'), 0));
+        return (version, storage, files.Keys.Order(StringComparer.Ordinal).ToArray());
+    }
+
+    async Task PrepareGameFiles(
+        Instance instance, JsonNode version, string storage, string? natives, CancellationToken ct,
+        Action<string>? transferFile = null
+    )
+    {
+        var jarId = version.S("jar", instance.ImportRoot != null ? instance.VersionId! : instance.GameVersion);
         var jar = Store.SafePath(storage, $"versions/{jarId}/{jarId}.jar");
         if (version["downloads"]?["client"] is JsonNode client)
             await Download(
@@ -1306,12 +1341,19 @@ public sealed partial class LauncherCore : IDisposable
                 size: client.Int("size"),
                 ct: ct
             );
+        if (transferFile != null)
+        {
+            if (!File.Exists(jar))
+                throw new FileNotFoundException("The instance is missing its client JAR.", jar);
+            transferFile(jar);
+        }
         await PrepareLibraries(
             version,
             storage,
             natives,
             ct,
-            (done, total) => Status?.Invoke($"下载游戏依赖 {done}/{total}")
+            (done, total) => Status?.Invoke($"下载游戏依赖 {done}/{total}"),
+            transferFile
         );
         if (version["assetIndex"] is JsonNode asset)
         {
@@ -1324,6 +1366,7 @@ public sealed partial class LauncherCore : IDisposable
                 asset.Int("size"),
                 IsAssetIndex
             );
+            transferFile?.Invoke(indexPath);
             var objects = index["objects"]!.AsObject().ToArray();
             int finished = 0;
             await DownloadMany(
@@ -1343,6 +1386,7 @@ public sealed partial class LauncherCore : IDisposable
                         size: value.Int("size"),
                         ct: token
                     );
+                    transferFile?.Invoke(target);
                     var progress = Interlocked.Increment(ref finished);
                     if (progress % 100 == 0 || progress == objects.Length)
                         Status?.Invoke($"下载游戏资源 {progress}/{objects.Length}");
@@ -1351,15 +1395,11 @@ public sealed partial class LauncherCore : IDisposable
             );
         }
         if (version["logging"]?["client"]?["file"] is JsonNode log)
-            await Download(
-                log.S("url"),
-                Store.SafePath(storage, "assets/log_configs/" + log.S("id")),
-                log.S("sha1"),
-                size: log.Int("size"),
-                ct: ct
-            );
-        await ContentManager.Language(game, store.Config.Settings.GameLanguage);
-        await WriteIsolatedProfile(instance, version);
+        {
+            var logPath = Store.SafePath(storage, "assets/log_configs/" + log.S("id"));
+            await Download(log.S("url"), logPath, log.S("sha1"), size: log.Int("size"), ct: ct);
+            transferFile?.Invoke(logPath);
+        }
     }
 
     // 将合并后的完整版本档案写入实例目录，供后续启动时直接读取（无需再次解析继承链）。
@@ -1502,7 +1542,7 @@ public sealed partial class LauncherCore : IDisposable
             Log?.Invoke("未能识别 Java 环境：" + ex.Message);
         }
         var game = store.GameDirectory(instance);
-        var storage = store.StorageDirectory(instance);
+        var storage = GameRuntimeDirectory(instance);
         Directory.CreateDirectory(game);
         using var nativeDirectory = new NativeDirectoryLease(game, message => Log?.Invoke(message));
         var natives = nativeDirectory.Path;
