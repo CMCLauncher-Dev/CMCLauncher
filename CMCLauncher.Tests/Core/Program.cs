@@ -595,6 +595,7 @@ try
     await TerracottaTests.Run(root);
     await DesktopUpdateTests.Run(root);
     await ModpackExportTests.Run(root);
+    await DeviceCodePollingTests.Run(Path.Combine(root, "device-code-polling"));
     await JsonRecoveryTests.Run(Path.Combine(root, "json-recovery"));
     await InstanceTransferTests.Run(Path.Combine(root, "instance-transfer"));
     Console.WriteLine(

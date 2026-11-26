@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace CMCLauncher;
@@ -28,7 +29,13 @@ public sealed class MicrosoftAuth(LauncherCore core)
     }
 
     // OAuth POST 请求 — 自动识别 form/json 两种 Content-Type，处理 AuthException
-    async Task<JsonNode> Post(string url, JsonNode payload, bool form, CancellationToken ct)
+    async Task<JsonNode> Post(
+        string url,
+        JsonNode payload,
+        bool form,
+        CancellationToken ct,
+        bool polling = false
+    )
     {
         using HttpContent content = form
             ? new FormUrlEncodedContent(
@@ -38,7 +45,11 @@ public sealed class MicrosoftAuth(LauncherCore core)
             )
             : new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
         using var response = await core.Http.PostAsync(url, content, ct);
-        var result = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct))!;
+        if (polling && IsRetryableStatus((int)response.StatusCode))
+            response.EnsureSuccessStatusCode();
+        var result =
+            JsonNode.Parse(await response.Content.ReadAsStringAsync(ct)) as JsonObject
+            ?? throw new JsonException("Expected an object from the authentication service.");
         if (!response.IsSuccessStatusCode)
         {
             var error = result.S(
@@ -87,37 +98,104 @@ public sealed class MicrosoftAuth(LauncherCore core)
             true,
             ct
         );
+        var lifetime = TimeSpan.FromSeconds(
+            Math.Clamp(code.Int("expires_in", 900), 0, int.MaxValue / 1000)
+        );
+        var issued = System.Diagnostics.Stopwatch.StartNew();
         showCode(code.S("user_code"), VerificationUrl(code));
         status?.Invoke("等待浏览器授权；完成后将继续验证 Xbox 和 Minecraft 账号…");
-        var expiry = DateTime.UtcNow.AddSeconds(code.Int("expires_in", 900));
-        var interval = Math.Max(code.Int("interval", 5), 5);
-        // 授权尚未完成时继续轮询；slow_down 要延长间隔，不能立即重试。
-        while (DateTime.UtcNow < expiry)
+        var token = await PollDeviceToken(
+            clientId,
+            code.S("device_code"),
+            TimeSpan.FromSeconds(Math.Clamp(code.Int("interval", 5), 5, int.MaxValue / 1000)),
+            lifetime - issued.Elapsed,
+            ct
+        );
+        return await Exchange(token, ct, status);
+    }
+
+    internal async Task<JsonNode> PollDeviceToken(
+        string clientId,
+        string deviceCode,
+        TimeSpan interval,
+        TimeSpan lifetime,
+        CancellationToken ct
+    )
+    {
+        ct.ThrowIfCancellationRequested();
+        if (lifetime <= TimeSpan.Zero)
+            throw new TimeoutException("登录代码已过期");
+
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        deadline.CancelAfter(lifetime);
+        var payload = new JsonObject
         {
-            await Task.Delay(TimeSpan.FromSeconds(interval), ct);
-            try
+            ["client_id"] = clientId,
+            ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code",
+            ["device_code"] = deviceCode,
+        };
+        try
+        {
+            while (true)
             {
-                var token = await Post(
-                    LoginBase + "token",
-                    new JsonObject
-                    {
-                        ["client_id"] = clientId,
-                        ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code",
-                        ["device_code"] = code.S("device_code"),
-                    },
-                    true,
-                    ct
-                );
-                return await Exchange(token, ct, status);
-            }
-            catch (AuthException e) when (e.Code == "authorization_pending") { }
-            catch (AuthException e) when (e.Code == "slow_down")
-            {
-                interval += 5;
+                var remaining = lifetime - elapsed.Elapsed;
+                if (remaining <= TimeSpan.Zero)
+                    break;
+                if (interval >= remaining)
+                {
+                    await Task.Delay(remaining, deadline.Token);
+                    break;
+                }
+                await Task.Delay(interval, deadline.Token);
+                if (elapsed.Elapsed >= lifetime)
+                    break;
+                try
+                {
+                    deadline.Token.ThrowIfCancellationRequested();
+                    var token = await Post(
+                        LoginBase + "token",
+                        payload,
+                        true,
+                        deadline.Token,
+                        polling: true
+                    );
+                    deadline.Token.ThrowIfCancellationRequested();
+                    if (
+                        token["access_token"] is JsonValue accessToken
+                        && accessToken.TryGetValue<string>(out var value)
+                        && !string.IsNullOrWhiteSpace(value)
+                    )
+                        return token;
+                }
+                catch (AuthException e) when (e.Code == "authorization_pending") { }
+                catch (AuthException e) when (e.Code == "slow_down")
+                {
+                    interval += TimeSpan.FromSeconds(5);
+                }
+                catch (Exception ex)
+                    when (!deadline.IsCancellationRequested && IsPollingFailure(ex)) { }
             }
         }
-        throw new Exception("登录代码已过期");
+        catch (OperationCanceledException)
+            when (deadline.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            throw new TimeoutException("登录代码已过期");
+        }
+        ct.ThrowIfCancellationRequested();
+        throw new TimeoutException("登录代码已过期");
     }
+
+    static bool IsRetryableStatus(int status) => status is 408 or 429 or >= 500 and <= 599;
+
+    static bool IsPollingFailure(Exception ex) =>
+        ex switch
+        {
+            HttpRequestException request => request.StatusCode == null
+                || IsRetryableStatus((int)request.StatusCode.Value),
+            IOException or JsonException or OperationCanceledException => true,
+            _ => false,
+        };
 
     // 只向用户展示允许的 Microsoft 登录域名，设备码单独显示和复制。
     public static string VerificationUrl(JsonNode response)
