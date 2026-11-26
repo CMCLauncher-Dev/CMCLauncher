@@ -278,9 +278,40 @@ public sealed partial class MainWindow
                                                 content.Children.Add(
                                                     Text("Pairing code", 16, true)
                                                 );
-                                                content.Children.Add(
+                                                var codeRow = new Grid { ColumnSpacing = 8 };
+                                                codeRow.ColumnDefinitions.Add(
+                                                    new ColumnDefinition
+                                                    {
+                                                        Width = new GridLength(
+                                                            1,
+                                                            GridUnitType.Star
+                                                        ),
+                                                    }
+                                                );
+                                                codeRow.ColumnDefinitions.Add(
+                                                    new ColumnDefinition { Width = GridLength.Auto }
+                                                );
+                                                codeRow.Children.Add(
                                                     new TextBox { Text = code, IsReadOnly = true }
                                                 );
+                                                var copy = Button(
+                                                    "Copy",
+                                                    () =>
+                                                    {
+                                                        if (
+                                                            !DesktopClipboard.TrySetText(
+                                                                code,
+                                                                out var failure
+                                                            )
+                                                        )
+                                                            throw new IOException(failure);
+                                                        ShowToast(Ui("Copied"));
+                                                        return Task.CompletedTask;
+                                                    }
+                                                );
+                                                Grid.SetColumn(copy, 1);
+                                                codeRow.Children.Add(copy);
+                                                content.Children.Add(codeRow);
                                                 status.Text = Ui(
                                                     "Waiting for the receiving device…"
                                                 );
@@ -400,7 +431,7 @@ public sealed partial class MainWindow
             }
         }
 
-        void ReceivePairing(bool local, string? selectedAddress = null)
+        void ReceivePairing(bool local, string? selectedAddress = null, string? enteredCode = null)
         {
             Stage(
                 "Pair the devices",
@@ -412,6 +443,7 @@ public sealed partial class MainWindow
             var address = new TextBox { PlaceholderText = Ui("Sender address (IPv4:port)") };
             var code = new TextBox { PlaceholderText = Ui("Pairing code") };
             address.Text = selectedAddress ?? "";
+            code.Text = enteredCode ?? "";
             var receive = Button(
                 "Receive instance",
                 async () =>
@@ -426,10 +458,20 @@ public sealed partial class MainWindow
                         status.Text = Ui("Enter the sender address and pairing code.");
                         return;
                     }
+                    if (
+                        !InstanceTransfer.TryNormalizePairingCode(code.Text, out var normalizedCode)
+                    )
+                    {
+                        status.Text = Ui(
+                            "Copy the full pairing code from the sending device and try again."
+                        );
+                        code.Focus(FocusState.Programmatic);
+                        return;
+                    }
                     Stage(
                         "Transferring instance",
                         "Keep both devices connected until the transfer finishes.",
-                        () => ReceivePairing(local, address.Text)
+                        () => ReceivePairing(local, address.Text, code.Text)
                     );
                     content.Children.Add(
                         Text(
@@ -443,7 +485,7 @@ public sealed partial class MainWindow
                             store,
                             core,
                             address.Text,
-                            code.Text,
+                            normalizedCode,
                             () => status.Text = Ui("Installing Minecraft and importing content…"),
                             ct
                         );

@@ -70,7 +70,7 @@ static class InstanceTransferTests
                 receiver,
                 core,
                 "127.0.0.1:" + port,
-                code,
+                "  " + code.Replace("-", " – " + Environment.NewLine).ToLowerInvariant() + "  ",
                 () => { },
                 timeout.Token
             );

@@ -278,6 +278,27 @@ public static class InstanceTransfer
         return devices.OrderBy(x => x).ToArray();
     }
 
+    public static bool TryNormalizePairingCode(string? code, out string normalized)
+    {
+        normalized = string.Concat(
+            (code ?? "").Where(c => !char.IsWhiteSpace(c) && c != '\u200B' && c != '\uFEFF')
+        );
+        if (
+            normalized.Length == 65
+            && normalized[32]
+                is '-'
+                    or '\u2010'
+                    or '\u2011'
+                    or '\u2012'
+                    or '\u2013'
+                    or '\u2014'
+                    or '\u2212'
+                    or '\uFF0D'
+        )
+            normalized = normalized.Remove(32, 1);
+        return normalized.Length == 64 && normalized.All(Uri.IsHexDigit);
+    }
+
     public static async Task<IReadOnlyList<Instance>> Receive(
         Store store,
         LauncherCore core,
@@ -294,11 +315,12 @@ public static class InstanceTransfer
             || !address.Contains(':')
         )
             throw new FormatException("Enter an IPv4 address and port.");
-        var parts = code.Trim().Split('-');
-        if (parts.Length != 2 || parts.Any(x => x.Length != 32))
-            throw new FormatException("Invalid pairing code.");
-        var fingerprint = Convert.FromHexString(parts[0]);
-        var secret = Convert.FromHexString(parts[1]);
+        if (!TryNormalizePairingCode(code, out var normalized))
+            throw new FormatException(
+                "Copy the full pairing code from the sending device and try again."
+            );
+        var fingerprint = Convert.FromHexString(normalized[..32]);
+        var secret = Convert.FromHexString(normalized[32..]);
         using var client = new TcpClient();
         using var stream = await Connect(client, endpoint, fingerprint, ct);
         await stream.WriteAsync(secret, ct);
