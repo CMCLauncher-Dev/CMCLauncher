@@ -595,6 +595,22 @@ try
     await TerracottaTests.Run(root);
     await DesktopUpdateTests.Run(root);
     await ModpackExportTests.Run(root);
+    if (!ModDependencyChecker.Satisfies("1.9.0", "^1.2.0")
+        || ModDependencyChecker.Satisfies("2.0.0", "^1.2.0")
+        || ModDependencyChecker.Satisfies("0.3.0", "^0.2.1")
+        || ModDependencyChecker.Satisfies("1.3.0", "~1.2")
+        || ModDependencyChecker.Satisfies("1.2.0-rc.2", ">=1.2.0")
+        || !ModDependencyChecker.Satisfies("1.2.0+build.100", "=1.2.0")
+        || !ModDependencyChecker.Satisfies("1.5", "[1.0,2.0)")
+        || ModDependencyChecker.Satisfies("2.0", "[1.0,2.0)"))
+        throw new IOException("Mod dependency version bounds or SemVer precedence are incorrect.");
+    try
+    {
+        ModrinthService.RequireDownloadFile(System.Text.Json.Nodes.JsonNode.Parse("""{"files":[]}""")!);
+        throw new InvalidOperationException("An empty Modrinth version was treated as downloadable.");
+    }
+    catch (IOException) { }
+    Console.WriteLine("PASS Modrinth empty file handling and mod version ranges");
     await DeviceCodePollingTests.Run(Path.Combine(root, "device-code-polling"));
     await JsonRecoveryTests.Run(Path.Combine(root, "json-recovery"));
     await RunningGameTests.Run(root);

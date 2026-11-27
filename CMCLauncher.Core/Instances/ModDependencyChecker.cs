@@ -192,14 +192,14 @@ public static class ModDependencyChecker
 
     // ---------- 轻量语义版本与 Maven 范围判定 ----------
 
-    static bool Satisfies(string version, string range)
+    internal static bool Satisfies(string version, string range)
     {
         if (range.Contains(" || ", StringComparison.Ordinal))
             return range.Split(" || ", StringSplitOptions.RemoveEmptyEntries)
                 .Any(alternative => Satisfies(version, alternative));
-        foreach (var part in range.Split(','))
+        foreach (Match part in Regex.Matches(range, @"[\[(][^\])]*[\])]|[^,]+"))
         {
-            var req = part.Trim();
+            var req = part.Value.Trim();
             if (req.Length == 0)
                 continue;
             if (req.Contains(" - ", StringComparison.Ordinal))
@@ -233,9 +233,7 @@ public static class ModDependencyChecker
                 if (op == '<')
                     if (req.StartsWith("<=") ? c <= 0 : c < 0)
                         return true;
-                if (op == '~' && c >= 0)
-                    return true;
-                if (op == '^' && c >= 0)
+                if ((op is '~' or '^') && c >= 0 && SameCompatiblePrefix(version, target, op))
                     return true;
                 continue;
             }
@@ -249,10 +247,14 @@ public static class ModDependencyChecker
     // 分别校验下界与上界（空界表示无限制）。
     static bool MavenSatisfies(string version, string range)
     {
+        if (range.Length < 2 || range[^1] is not (']' or ')'))
+            return false;
         var lowerIncl = range[0] == '[';
         var comma = range.IndexOf(',');
         var upperIncl = range[^1] == ']';
         var lowerText = trimBound(comma < 0 ? range[1..^1] : range[1..comma]);
+        if (comma < 0)
+            return lowerIncl && upperIncl && CompareVersion(version, lowerText) == 0;
         var upperText = comma < 0 ? "" : range[(comma + 1)..^1];
         var okLower = lowerText.Length == 0 || BoundOk(version, TrimOps(lowerText), lowerIncl, true);
         var okUpper = upperText.Length == 0 || BoundOk(version, TrimOps(upperText), upperIncl, false);
@@ -265,23 +267,38 @@ public static class ModDependencyChecker
         }
     }
 
-    // 去除版本字符串前导的比较运算符（= > < ~ ^）与末尾的 + 号。
+    // 去除前导比较运算符，保留版本本身的后缀。
     static string TrimOps(string s)
     {
         var t = s.Trim();
         while (t.Length > 0 && (t[0] is '=' or '>' or '<' or '~' or '^'))
             t = t[1..].TrimStart();
-        return t.Replace("+", "");
+        return t;
     }
 
     // 去除 Maven 界值两端的空白。
     static string trimBound(string s) => s.Trim();
 
-    // 只比较主/次/修订三段的数字大小，忽略预发布与构建后缀，足够覆盖常见依赖区间。
+    static bool SameCompatiblePrefix(string version, string target, char op)
+    {
+        var requested = Numbers(CoreVersion(target));
+        var installed = Numbers(CoreVersion(version));
+        if (requested.Count == 0 || installed.Count == 0)
+            return false;
+        var count = op == '~' ? Math.Min(2, requested.Count) : requested.FindIndex(n => n != 0) + 1;
+        if (count == 0)
+            count = Math.Min(3, requested.Count);
+        return Enumerable.Range(0, count).All(index => installed.ElementAtOrDefault(index) == requested[index]);
+    }
+
+    static string CoreVersion(string version) => version.Split('-', '+')[0];
+
     static int CompareVersion(string a, string b)
     {
-        var ax = Numbers(a);
-        var bx = Numbers(b);
+        var ax = Numbers(CoreVersion(a));
+        var bx = Numbers(CoreVersion(b));
+        if (ax.Count == 0 || bx.Count == 0)
+            return StringComparer.OrdinalIgnoreCase.Compare(a, b);
         for (var i = 0; i < Math.Max(ax.Count, bx.Count); i++)
         {
             var av = i < ax.Count ? ax[i] : 0;
@@ -289,10 +306,27 @@ public static class ModDependencyChecker
             if (av != bv)
                 return av.CompareTo(bv);
         }
-        return 0;
+        var aParts = a.Split('+')[0].Split('-', 2);
+        var bParts = b.Split('+')[0].Split('-', 2);
+        if (aParts.Length != bParts.Length)
+            return bParts.Length.CompareTo(aParts.Length);
+        if (aParts.Length == 1)
+            return 0;
+        var left = aParts[1].Split('.');
+        var right = bParts[1].Split('.');
+        for (var i = 0; i < Math.Min(left.Length, right.Length); i++)
+        {
+            var leftNumber = System.Numerics.BigInteger.TryParse(left[i], out var x);
+            var rightNumber = System.Numerics.BigInteger.TryParse(right[i], out var y);
+            var comparison = leftNumber != rightNumber ? (leftNumber ? -1 : 1)
+                : leftNumber ? x.CompareTo(y)
+                : StringComparer.Ordinal.Compare(left[i], right[i]);
+            if (comparison != 0)
+                return comparison;
+        }
+        return left.Length.CompareTo(right.Length);
     }
 
-    // 提取版本字符串中全部数字段（如 "1.20.1-beta+3" → [1, 20, 1, 3]）。
     static List<int> Numbers(string v)
     {
         var result = new List<int>();

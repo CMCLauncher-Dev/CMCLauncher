@@ -647,6 +647,15 @@ public sealed class ModrinthService(LauncherCore core, Store store)
     }
 
     // 下载单个文件并校验哈希（优先 SHA512，回退 SHA1）。
+    internal static JsonNode RequireDownloadFile(JsonNode version)
+    {
+        var files = version["files"].Items().Where(file =>
+            file is JsonObject && file.S("url").Length > 0 && file.S("filename").Length > 0).ToArray();
+        return files.FirstOrDefault(file => file.S("primary") == "true")
+            ?? files.FirstOrDefault()
+            ?? throw new IOException($"Modrinth 版本「{version.S("name", version.S("id", "未知版本"))}」未提供可下载的文件。");
+    }
+
     async Task DownloadFile(JsonNode file, string target, CancellationToken ct)
     {
         var hashes = file["hashes"];
@@ -692,12 +701,7 @@ public sealed class ModrinthService(LauncherCore core, Store store)
                 : await ExactVersion(project, versionId, ct);
         if (!version["game_versions"].Items().Any(n => n.ToString() == instance.GameVersion))
             throw new Exception("此文件不支持当前实例的 Minecraft 版本");
-        var file =
-            version["files"].Items().FirstOrDefault(f => f.S("primary") == "true") ?? version[
-                "files"
-            ]
-                .Items()
-                .First();
+        var file = RequireDownloadFile(version);
         if (!file.S("filename").EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             throw new Exception("此项目未提供可导入的 ZIP 文件");
         var stage = Store.SafePath(store.Library, "content-stage/" + Guid.NewGuid());
@@ -774,6 +778,10 @@ public sealed class ModrinthService(LauncherCore core, Store store)
                 || !version["loaders"].Items().Any(n => n.ToString() == instance.Loader)
             )
                 throw new Exception("依赖与此实例不兼容：" + version.S("name"));
+            var file = RequireDownloadFile(version);
+            var filename = file.S("filename");
+            if (!filename.EndsWith(".jar", StringComparison.OrdinalIgnoreCase))
+                throw new Exception("Mod 文件不是 JAR");
             foreach (
                 var dep in version["dependencies"]
                     .Items()
@@ -787,15 +795,6 @@ public sealed class ModrinthService(LauncherCore core, Store store)
                     dep.S("version_id") is { Length: > 0 } exact ? exact : null
                 );
             }
-            var file =
-                version["files"].Items().FirstOrDefault(f => f.S("primary") == "true") ?? version[
-                    "files"
-                ]
-                    .Items()
-                    .First();
-            var filename = file.S("filename");
-            if (!filename.EndsWith(".jar", StringComparison.OrdinalIgnoreCase))
-                throw new Exception("Mod 文件不是 JAR");
             if (
                 File.Exists(Store.SafePath(modRoot, filename))
                 || File.Exists(Store.SafePath(modRoot + ".craft-disabled", filename))

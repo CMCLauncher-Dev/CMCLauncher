@@ -47,16 +47,24 @@ public sealed class MicrosoftAuth(LauncherCore core)
         using var response = await core.Http.PostAsync(url, content, ct);
         if (polling && IsRetryableStatus((int)response.StatusCode))
             response.EnsureSuccessStatusCode();
-        var result =
-            JsonNode.Parse(await response.Content.ReadAsStringAsync(ct)) as JsonObject
-            ?? throw new JsonException("Expected an object from the authentication service.");
+        JsonObject? result = null;
+        try
+        {
+            result = JsonNode.Parse(await response.Content.ReadAsStringAsync(ct)) as JsonObject;
+        }
+        catch (JsonException)
+        {
+            // Gateway and proxy errors can return HTML, plain text, or an empty body.
+        }
         if (!response.IsSuccessStatusCode)
         {
+            var status = $"登录服务返回 HTTP {(int)response.StatusCode}";
+            var xerr = result.S("XErr");
             var error = result.S(
                 "error_description",
                 result.S(
                     "errorMessage",
-                    $"登录服务返回 {(int)response.StatusCode} / {result.S("XErr")}"
+                    xerr.Length > 0 ? $"{status}（XErr {xerr}）" : status
                 )
             );
             var stage = new Uri(url).Host switch
@@ -74,7 +82,8 @@ public sealed class MicrosoftAuth(LauncherCore core)
                 : "";
             throw new AuthException(result.S("error"), $"{stage}失败：{error}{explanation}");
         }
-        return result;
+        return result ?? throw new AuthException(
+            "invalid_response", $"登录服务返回无效响应（HTTP {(int)response.StatusCode}）");
     }
 
     // 设备代码登录流程：
@@ -194,6 +203,7 @@ public sealed class MicrosoftAuth(LauncherCore core)
             HttpRequestException request => request.StatusCode == null
                 || IsRetryableStatus((int)request.StatusCode.Value),
             IOException or JsonException or OperationCanceledException => true,
+            AuthException { Code: "invalid_response" } => true,
             _ => false,
         };
 

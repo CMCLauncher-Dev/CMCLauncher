@@ -488,16 +488,40 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
             await core.Download(release.Url, zip, release.Sha256, "sha256", release.Size, ct);
             await ExtractClient(zip, Path.Combine(stage, "client"), ct);
             ct.ThrowIfCancellationRequested();
-            if (Directory.Exists(target))
-                throw new IOException("Incomplete Frp Client installation already exists.");
-            Directory.Move(Path.Combine(stage, "client"), target);
+            PublishClient(Path.Combine(stage, "client"), target);
             Emit("Installed Frp Client " + release.Version);
         }
         finally
         {
-            if (stage != null && Directory.Exists(stage))
-                Directory.Delete(stage, true);
-            gate.Release();
+            try
+            {
+                if (stage != null && Directory.Exists(stage))
+                    Directory.Delete(stage, true);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+    }
+
+    void PublishClient(string client, string target)
+    {
+        string? incomplete = null;
+        if (Directory.Exists(target))
+        {
+            incomplete = Store.SafePath(Root, ".incomplete-" + Guid.NewGuid().ToString("N"));
+            Directory.Move(target, incomplete);
+        }
+        try
+        {
+            Directory.Move(client, target);
+        }
+        catch
+        {
+            if (incomplete != null && !Directory.Exists(target))
+                Directory.Move(incomplete, target);
+            throw;
         }
     }
 
@@ -647,10 +671,10 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
             ?? throw new IOException("Could not start Frp Client verification.");
         try
         {
-            var stdout = Pump(child.StandardOutput);
-            var stderr = Pump(child.StandardError);
+            var stdout = Pump(child.StandardOutput, timeout.Token);
+            var stderr = Pump(child.StandardError, timeout.Token);
             await child.WaitForExitAsync(timeout.Token);
-            await Task.WhenAll(stdout, stderr);
+            await Task.WhenAll(stdout, stderr).WaitAsync(timeout.Token);
             if (child.ExitCode != 0)
                 throw new IOException(
                     "Frp Client configuration verification failed. See Frp Client logs."
@@ -662,7 +686,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
             if (!child.HasExited)
             {
                 child.Kill(true);
-                await child.WaitForExitAsync();
+                await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
             }
         }
     }
@@ -677,7 +701,7 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
                 throw new ObjectDisposedException(GetType().FullName);
             if (Running)
                 throw new IOException("Frp Client is already running.");
-            await completion;
+            await completion.WaitAsync(TimeSpan.FromSeconds(5), ct);
             await VerifyCore(version, config, ct);
             ct.ThrowIfCancellationRequested();
             if (disposed)
@@ -701,19 +725,31 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
     // 观察子进程：读取 stdout/stderr 并等待退出，更新退出码。
     async Task Observe(Process child)
     {
-        var stdout = Pump(child.StandardOutput);
-        var stderr = Pump(child.StandardError);
-        await child.WaitForExitAsync();
-        await Task.WhenAll(stdout, stderr);
-        ExitCode = child.ExitCode;
-        Emit("Frp Client exited: " + ExitCode);
-        Changed?.Invoke();
+        using var output = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        var stdout = Pump(child.StandardOutput, output.Token);
+        var stderr = Pump(child.StandardError, output.Token);
+        try
+        {
+            await child.WaitForExitAsync(lifetime.Token);
+            ExitCode = child.ExitCode;
+            output.CancelAfter(TimeSpan.FromSeconds(2));
+            await Task.WhenAll(stdout, stderr).WaitAsync(output.Token);
+        }
+        catch (OperationCanceledException) when (output.IsCancellationRequested) { }
+        catch (IOException ex) { Emit("Frp Client output could not be read: " + ex.Message); }
+        finally
+        {
+            output.Cancel();
+            if (ExitCode is { } code)
+                Emit("Frp Client exited: " + code);
+            Changed?.Invoke();
+        }
     }
 
     // 逐行读取流并触发 Output 事件（单行截断 4096 字符）。
-    async Task Pump(StreamReader reader)
+    async Task Pump(StreamReader reader, CancellationToken ct)
     {
-        while (await reader.ReadLineAsync() is { } line)
+        while (await reader.ReadLineAsync().WaitAsync(ct) is { } line)
             Emit(line.Length > 4096 ? line[..4096] + "…" : line);
     }
 
@@ -734,9 +770,13 @@ public sealed class FrpcManager(Store store, LauncherCore core) : IDisposable
         await gate.WaitAsync();
         try
         {
-            if (Running)
-                process!.Kill(true);
-            await completion;
+            try
+            {
+                if (Running)
+                    process!.Kill(true);
+            }
+            catch (InvalidOperationException) when (!Running) { }
+            await completion.WaitAsync(TimeSpan.FromSeconds(5));
         }
         finally
         {

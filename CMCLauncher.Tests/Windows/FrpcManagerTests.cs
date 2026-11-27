@@ -140,11 +140,13 @@ static class FrpcManagerTests
             (await manager.FindRelease("0.71.1", default)).Sha256 == hash,
             "Older release checksum asset fallback"
         );
+        var incomplete = Directory.CreateDirectory(Path.Combine(manager.Root, "0.71.1"));
+        await File.WriteAllTextAsync(Path.Combine(incomplete.FullName, "partial.txt"), "partial");
         await manager.Install(found, default);
         Check(
             manager.Installed().SequenceEqual(["0.71.1"])
                 && File.Exists(Path.Combine(manager.Root, "0.71.1", "LICENSE")),
-            "Verified client and license installed"
+            "Verified client and license replace an incomplete installation"
         );
         Check(
             !File.Exists(Path.Combine(root, "outside.txt"))

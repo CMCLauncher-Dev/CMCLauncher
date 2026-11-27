@@ -59,6 +59,17 @@ static class DeviceCodePollingTests
                 && declined.Attempts == 1
             ) { }
 
+        var nonJson = new PollingHandler(_ =>
+            new(HttpStatusCode.Forbidden) { Content = new StringContent("<html>Blocked</html>") });
+        using var nonJsonCore = new LauncherCore(store, nonJson);
+        try
+        {
+            await new MicrosoftAuth(nonJsonCore).PollDeviceToken("client", "device", interval, lifetime, default);
+            throw new InvalidOperationException("Expected a readable HTTP authentication error.");
+        }
+        catch (Exception ex) when (ex.Message.Contains("403", StringComparison.Ordinal)
+            && nonJson.Attempts == 1) { }
+
         try
         {
             await auth.PollDeviceToken(
