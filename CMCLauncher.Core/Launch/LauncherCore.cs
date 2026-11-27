@@ -1323,7 +1323,7 @@ public sealed partial class LauncherCore : IDisposable
         var files = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
         await PrepareGameFiles(instance, version, storage, null, ct, path =>
             files.TryAdd(Path.GetRelativePath(storage, path).Replace('\\', '/'), 0));
-        return (version, storage, files.Keys.Order(StringComparer.Ordinal).ToArray());
+        return (version, storage, files.Keys.OrderBy(path => path, StringComparer.Ordinal).ToArray());
     }
 
     async Task PrepareGameFiles(
