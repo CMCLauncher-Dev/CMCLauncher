@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.UI.Composition;
@@ -144,9 +145,80 @@ public sealed partial class MainWindow
         // CI 验证无交互会话，跳过透明样式处理。
         if (Verifying)
             return;
+        // 该窗口是 WS_EX_LAYERED 分层透明窗口，系统背景材质（Mica/Acrylic）
+        // 在分层合成路径下会退化成不透明白底，因此始终保持 TransparentBackdrop，
+        // 真正的背景模糊交由 DWM 的 AccentPolicy 在分层窗口上合成。
         if (SystemBackdrop is not TransparentBackdrop)
             SystemBackdrop = new TransparentBackdrop();
+        ApplyWindowBlur(glass && store.Config.Settings.GlassBackgroundBlur);
     }
+
+    // 背景模糊与卡片不透明度相互独立：模糊由 DWM 对窗口背后内容做 BlurBehind，
+    // 卡片表面的半透明（GlassOpacityPercent）始终叠加在模糊之上由 UI 单独控制。
+    void ApplyWindowBlur(bool blur)
+    {
+        var hWnd = WindowNative.GetWindowHandle(this);
+        var policy = new AccentPolicy
+        {
+            AccentState = blur ? AccentState.ACCENT_ENABLE_BLURBEHIND : AccentState.ACCENT_DISABLED,
+            AccentFlags = 0,
+            GradientColor = 0,
+            AnimationId = 0,
+        };
+        var size = Marshal.SizeOf<AccentPolicy>();
+        var pointer = Marshal.AllocHGlobal(size);
+        try
+        {
+            Marshal.StructureToPtr(policy, pointer, false);
+            var data = new WindowCompositionAttributeData
+            {
+                Attribute = WCA_ACCENT_POLICY,
+                Data = pointer,
+                SizeOfData = size,
+            };
+            SetWindowCompositionAttribute(hWnd, ref data);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(pointer);
+        }
+    }
+
+    enum AccentState
+    {
+        ACCENT_DISABLED = 0,
+        ACCENT_ENABLE_GRADIENT = 1,
+        ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
+        ACCENT_ENABLE_BLURBEHIND = 3,
+        ACCENT_ENABLE_ACRYLICBLURBEHIND = 4,
+        ACCENT_ENABLE_HOSTBACKDROP = 5,
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct AccentPolicy
+    {
+        public AccentState AccentState;
+        public uint AccentFlags;
+        public uint GradientColor;
+        public uint AnimationId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct WindowCompositionAttributeData
+    {
+        public int Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    static extern bool SetWindowCompositionAttribute(
+        IntPtr hWnd,
+        ref WindowCompositionAttributeData data
+    );
+
+    const int WCA_ACCENT_POLICY = 19;
 
     // 继承 SystemBackdrop，但不附加任何系统背景材质（不创建 Mica/Acrylic 控制器）。
     // 这一版本的 Windows App SDK 不再分派 CompositionBackdropController，
@@ -427,6 +499,30 @@ public sealed partial class MainWindow
             opacitySaveTimer.Stop();
             opacitySaveTimer.Start();
         };
+        // 背景模糊独立于卡片不透明度：单独控制窗口背后的系统模糊材质。
+        var blurBackground = new ToggleSwitch
+        {
+            Header = Ui("Blur background"),
+            IsOn = settings.GlassBackgroundBlur,
+            Tag = "glass-background-blur",
+        };
+        blurBackground.Toggled += async (_, _) =>
+        {
+            if (syncingAppearanceControls)
+                return;
+            settings.GlassBackgroundBlur = blurBackground.IsOn;
+            try
+            {
+                ApplyBackdrop(micaEffect.IsOn);
+            }
+            catch (Exception ex)
+            {
+                // 系统材质切换不应中断设置保存或背景刷新，记录后回退。
+                RuntimeLog.Write("ERROR", $"Glass blur backdrop: {ex}");
+            }
+            ApplyTheme();
+            await SaveAppearance();
+        };
         var glassOptions = new Expander
         {
             Header = Ui("Glass settings"),
@@ -435,7 +531,12 @@ public sealed partial class MainWindow
             Content = new StackPanel
             {
                 Spacing = 12,
-                Children = { AppearanceRow(glassStyle, showGlassCardBorders), glassOpacity },
+                Children =
+                {
+                    AppearanceRow(glassStyle, showGlassCardBorders),
+                    glassOpacity,
+                    blurBackground,
+                },
             },
         };
         void RefreshGlassOptions() =>
@@ -820,6 +921,7 @@ public sealed partial class MainWindow
                 micaEffect.IsOn = settings.MicaEffect;
                 glassStyle.SelectedIndex = settings.GlassStyle == "aero" ? 1 : 0;
                 showGlassCardBorders.IsOn = settings.ShowGlassCardBorders;
+                blurBackground.IsOn = settings.GlassBackgroundBlur;
                 RefreshGlassOptions();
                 foreach (var control in AppearanceElements(PageBody))
                 {

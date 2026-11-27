@@ -16,11 +16,13 @@ public sealed partial class MainWindow
         var savedGlassBorders = settings.ShowGlassCardBorders;
         var savedGlassStyle = settings.GlassStyle;
         var savedGlassOpacity = settings.GlassOpacityPercent;
+        var savedGlassBlur = settings.GlassBackgroundBlur;
         try
         {
             settings.MicaEffect = false;
             settings.ShowGlassCardBorders = true;
             settings.GlassStyle = "aero";
+            settings.GlassBackgroundBlur = false;
             page = "personalization";
             await RenderAsync();
             var toggle = AppearanceElements(PageBody)
@@ -60,10 +62,25 @@ public sealed partial class MainWindow
             glassOptions.IsExpanded = true;
             var opacity = ((StackPanel)glassOptions.Content).Children.OfType<Slider>().Single();
             opacity.Value = 60;
+            var blurToggle = AppearanceElements((StackPanel)glassOptions.Content)
+                .OfType<ToggleSwitch>()
+                .Single(t => t.Tag?.ToString() == "glass-background-blur");
+            check(
+                !blurToggle.IsOn && !settings.GlassBackgroundBlur,
+                "background blur defaults off, keeping the clear-transparent behavior"
+            );
+            blurToggle.IsOn = true;
+            for (
+                var attempt = 0;
+                attempt < 50 && !new Store(store.Root).Config.Settings.GlassBackgroundBlur;
+                attempt++
+            )
+                await Task.Delay(20);
             var preview = PageBody.Children.OfType<Border>().First();
             check(
-                preview.Background is SolidColorBrush { Color.A: 153 },
-                "glass opacity changes the card surface without fading its content"
+                preview.Background is SolidColorBrush { Color.A: 153 }
+                    && new Store(store.Root).Config.Settings.GlassBackgroundBlur,
+                "background blur switches independently and does not share the opacity slider value"
             );
             borderToggle.IsOn = false;
             for (
@@ -126,6 +143,7 @@ public sealed partial class MainWindow
             settings.ShowGlassCardBorders = savedGlassBorders;
             settings.GlassStyle = savedGlassStyle;
             settings.GlassOpacityPercent = savedGlassOpacity;
+            settings.GlassBackgroundBlur = savedGlassBlur;
             await store.Save();
             ApplyTheme();
             ApplyPersonalization();

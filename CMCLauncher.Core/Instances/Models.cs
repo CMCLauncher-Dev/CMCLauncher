@@ -83,6 +83,11 @@ public sealed class Settings
     // 仅当 MicaEffect 为 true 时生效。
     public string GlassStyle { get; set; } = "transparent";
 
+    // 背景模糊是独立于卡片不透明度的开关：开启时对窗口背后的桌面内容
+    // 应用系统模糊材质（Acrylic/Mica），关闭时保持现有纯透明透出行为。
+    // MicaEffect 为 false 时该开关被忽略；系统不支持模糊材质时静默回退。
+    public bool GlassBackgroundBlur { get; set; } = false;
+
     // 自定义背景图：绝对路径，非空时在内容区底层铺图；为空表示不启用。
     // 图片由启动器读取，不影响已安装模组或游戏文件。
     public string CustomBackground { get; set; } = "";

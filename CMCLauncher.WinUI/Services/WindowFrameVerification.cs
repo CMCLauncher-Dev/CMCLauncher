@@ -86,12 +86,16 @@ public sealed partial class MainWindow
             );
         var settings = store.Config.Settings;
         var savedGlass = settings.MicaEffect;
+        var savedBlur = settings.GlassBackgroundBlur;
         try
         {
             object? stableBackdrop = null;
             foreach (var glass in new[] { false, true, false, true, false })
             {
                 settings.MicaEffect = glass;
+                // 背景模糊由系统材质接管后会改变合成器路径，验证窗口骨架时
+                // 保持纯透明路径，确保该断言覆盖 compositor 本身的稳定性。
+                settings.GlassBackgroundBlur = false;
                 var verifying = Verifying;
                 try
                 {
@@ -201,6 +205,7 @@ public sealed partial class MainWindow
         }
         finally
         {
+            settings.GlassBackgroundBlur = savedBlur;
             settings.MicaEffect = savedGlass;
             var verifying = Verifying;
             try
