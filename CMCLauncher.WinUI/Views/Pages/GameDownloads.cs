@@ -440,8 +440,7 @@ public sealed partial class MainWindow
                 {
                     await core.InstallNewGame(instance, build, ct);
                     store.Config.Instances.Add(instance);
-                    selected = instance;
-                    store.Config.SelectedInstanceId = instance.Id;
+                    SetSelectedInstance(instance);
                     await store.Save();
                 });
                 page = "instances";

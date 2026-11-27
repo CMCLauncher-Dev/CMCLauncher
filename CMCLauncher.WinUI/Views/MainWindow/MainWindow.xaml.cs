@@ -344,7 +344,7 @@ public sealed partial class MainWindow : Window
                 if (
                     activeTask != null
                     && task == activeTask
-                    && !launching
+                    && !AnyGameLaunching
                     && work == activeWork
                     && work != null
                     && phase == Volatile.Read(ref work.Phase)

@@ -30,8 +30,11 @@ public sealed partial class MainWindow
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     static extern bool SetWindowText(IntPtr hWnd, string text);
 
-    Process? game;
-    string? runningInstanceId;
+    readonly RunningGames runningGames = new();
+    Instance? startingInstance;
+    static string LaunchKey(Instance instance) => "game-launch:" + instance.Id;
+    bool AnyGameLaunching => launching || startingInstance != null;
+    Button? launchCardStop;
     bool launching;
     string? launcherExitBehavior;
     GameDebugWindow? debugWindow;
@@ -42,17 +45,24 @@ public sealed partial class MainWindow
     // 先验证账号并补全依赖，出现游戏窗口后才把启动任务标记完成。
     async Task Launch(Instance instance)
     {
-        if (task != null)
-            throw new Exception("已有任务进行中，请稍候或取消当前任务");
-        launching = true;
-        launchProgressValue = 0;
-        RefreshLaunchCard("正在准备启动…");
+        if (AnyGameLaunching)
+            throw new IOException(Ui("Wait for the current game to finish starting."));
+        var key = LaunchKey(instance);
+        startingInstance = instance;
+        SetTaskButtonsEnabled(task == null);
         StartInstanceDebugLog(instance);
-        var progress = new Progress<(double Value, string Stage)>(update =>
+        var launchDebugWindow = debugWindow;
+        void ReportLaunch(double value, string stage)
         {
-            UpdateLaunchProgress(update.Value, update.Stage);
-            debugWindow?.SetProgress(update.Value, Ui(update.Stage));
-        });
+            if (!backgroundWork.TryGetValue(key, out var work))
+                return;
+            work.Work.Progress = Math.Max(work.Work.Progress ?? 0, value);
+            work.Work.Stage = stage;
+            launchDebugWindow?.SetProgress(value, Ui(stage));
+            RefreshTaskMetrics();
+        }
+        var progress = new Progress<(double Value, string Stage)>(update =>
+            ReportLaunch(update.Value, update.Stage));
         try
         {
             await Run(
@@ -65,7 +75,7 @@ public sealed partial class MainWindow
                         )
                         ?? throw new Exception("请先添加账号");
                     MicrosoftAuth.EnsureAccountAllowed(store.Config.Accounts, account);
-                    UpdateLaunchProgress(0, "正在验证账号…");
+                    ReportLaunch(0, "正在验证账号…");
                     if (account.Type == "yggdrasil")
                     {
                         // Refresh the ownership account before sending any third-party token.
@@ -110,8 +120,8 @@ public sealed partial class MainWindow
                             LauncherUpdateInstaller.Executable,
                             Path.Combine(store.Root, "logs", "game-exit-restart.log")
                         );
-                    game = launchedGame;
-                    runningInstanceId = instance.Id;
+                    var running = runningGames.Add(instance, store.GameDirectory(instance), launchedGame);
+                    RefreshLaunchCard();
                     // 界面正常处理退出时通知监视进程；只有界面失去响应才由它恢复启动器。
                     var monitoringDone = new TaskCompletionSource(
                         TaskCreationOptions.RunContinuationsAsynchronously
@@ -133,11 +143,6 @@ public sealed partial class MainWindow
                         finally
                         {
                             await monitoringDone.Task;
-                            if (ReferenceEquals(game, launchedGame))
-                            {
-                                game = null;
-                                runningInstanceId = null;
-                            }
                             try
                             {
                                 acknowledgeExit();
@@ -146,17 +151,26 @@ public sealed partial class MainWindow
                             {
                                 AddLog("Game-exit acknowledgment failed: " + ex.Message);
                             }
-                            debugWindow?.SetProgress(100, Ui("Game exited"));
-                            RefreshLaunchCard();
+                            launchDebugWindow?.SetProgress(100, Ui("Game exited"));
                             try
                             {
-                                if (!ct.IsCancellationRequested)
+                                if (!ct.IsCancellationRequested && !running.StopRequested)
                                     await HandleGameExit(instance, launchedGame, launchStarted);
+                                else
+                                    await core.CompleteOptionsLaunch(launchedGame);
+                            }
+                            catch (Exception ex)
+                            {
+                                AddLog("Game exit finalization failed: " + ex.Message);
                             }
                             finally
                             {
+                                runningGames.Remove(running);
                                 launchedGame.Dispose();
-                                ApplyLauncherVisibilityOnExit();
+                                SetTaskButtonsEnabled(task == null);
+                                RefreshLaunchCard();
+                                if (!runningGames.Any && !AnyGameLaunching)
+                                    ApplyLauncherVisibilityOnExit();
                             }
                         }
                     }
@@ -165,10 +179,12 @@ public sealed partial class MainWindow
                     {
                         instance.LastPlayed = DateTime.Now;
                         await store.Save();
-                        UpdateLaunchProgress(99, "等待游戏窗口出现…");
+                        ReportLaunch(99, "等待游戏窗口出现…");
                         while (true)
                         {
                             ct.ThrowIfCancellationRequested();
+                            if (running.StopRequested)
+                                throw new OperationCanceledException();
                             launchedGame.Refresh();
                             if (launchedGame.HasExited)
                                 throw new Exception(
@@ -178,14 +194,16 @@ public sealed partial class MainWindow
                                 break;
                             await Task.Delay(250, ct);
                         }
-                        UpdateLaunchProgress(100, "游戏窗口已出现");
-                        debugWindow?.SetProgress(100, Ui("Game is running"));
+                        ReportLaunch(100, "游戏窗口已出现");
+                        launchDebugWindow?.SetProgress(100, Ui("Game is running"));
                         if (!string.IsNullOrWhiteSpace(store.Config.Settings.GameWindowTitle))
                             SetWindowText(
                                 launchedGame.MainWindowHandle,
                                 store.Config.Settings.GameWindowTitle
                             );
                         await Task.Delay(350, ct);
+                        if (running.StopRequested)
+                            throw new OperationCanceledException();
                         if (launchedGame.HasExited)
                             throw new Exception(
                                 $"游戏在启动期间退出，退出码 {launchedGame.ExitCode}。请查看运行日志。"
@@ -193,8 +211,7 @@ public sealed partial class MainWindow
                     }
                     catch (OperationCanceledException)
                     {
-                        if (!launchedGame.HasExited)
-                            launchedGame.Kill(true);
+                        runningGames.Stop(running);
                         await launchedGame.WaitForExitAsync();
                         throw;
                     }
@@ -203,25 +220,28 @@ public sealed partial class MainWindow
                         monitoringDone.TrySetResult();
                     }
                 },
-                "启动游戏 · " + instance.Name
+                "启动游戏 · " + instance.Name, backgroundKey: key, isLaunch: true
             );
             Report("游戏正在运行");
             ApplyLaunchVisibility();
         }
         catch (OperationCanceledException)
         {
-            debugWindow?.SetProgress(0, Ui("Cancelled"));
+            launchDebugWindow?.SetProgress(0, Ui("Cancelled"));
             throw;
         }
         catch (Exception ex)
         {
-            debugWindow?.SetProgress(0, ex.Message);
+            launchDebugWindow?.SetProgress(0, ex.Message);
             throw;
         }
         finally
         {
-            launching = false;
+            startingInstance = null;
+            SetTaskButtonsEnabled(task == null);
             RefreshLaunchCard();
+            if (!runningGames.Any && !AnyGameLaunching)
+                ApplyLauncherVisibilityOnExit();
         }
     }
 

@@ -591,9 +591,11 @@ public sealed partial class MainWindow
                     13
                 )
             );
+            var switchVersion = Btn("Switch version", () => session.Launching ? Task.CompletedTask : Navigate("instances"));
+            buttonAvailability.Add(switchVersion, () => !session.Launching);
             body.Children.Add(
                 Row(
-                    Btn("Switch version", () => Navigate("instances")),
+                    switchVersion,
                     current == null
                         ? Btn("Add local game", ImportLocal)
                         : Btn("Version settings", InstanceSettings)
@@ -612,10 +614,11 @@ public sealed partial class MainWindow
                 current == null ? "Download game" : "Launch game",
                 current == null
                     ? () => Navigate("downloads")
-                    : () => session.Run("Launch game", session.LaunchSelected),
+                    : () => session.LaunchInstance(current),
                 true
             );
-            buttonAvailability.Add(launch, () => !session.Busy && !session.GameRunning);
+            bool CanLaunch() => !session.Busy && !session.Launching;
+            buttonAvailability.Add(launch, CanLaunch);
             launch.MinWidth = 130;
             launch.HorizontalAlignment = HorizontalAlignment.Right;
             var footer = new Grid
@@ -628,7 +631,8 @@ public sealed partial class MainWindow
                 "Cancel launch",
                 () =>
                 {
-                    session.Cancel();
+                    if (session.LaunchOperation(current) is { } operation)
+                        session.Cancel(operation);
                     return Task.CompletedTask;
                 }
             );
@@ -650,23 +654,49 @@ public sealed partial class MainWindow
             launchRow.Children.Add(cancel);
             var readiness = Stack(state, launchRow);
             footer.Children.Add(readiness);
-            Grid.SetColumn(launch, 1);
-            footer.Children.Add(launch);
+            Button stop = null!;
+            stop = HomeTool("■", "Stop running games", () =>
+            {
+                var menu = new MenuFlyout();
+                foreach (var running in session.RunningGames.Active)
+                {
+                    var item = new MenuItem { Header = running.Label };
+                    item.Click += async (_, _) =>
+                    {
+                        try { session.RunningGames.Stop(running); }
+                        catch (Exception ex) { await Error(ex); }
+                    };
+                    menu.Items.Add(item);
+                }
+                if (menu.Items.Count > 0)
+                    menu.ShowAt(stop);
+                return Task.CompletedTask;
+            });
+            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            actions.Children.Add(launch);
+            stop.Width = stop.MinWidth = 36;
+            stop.VerticalAlignment = VerticalAlignment.Center;
+            actions.Children.Add(stop);
+            Grid.SetColumn(actions, 1);
+            footer.Children.Add(actions);
             body.Children.Add(footer);
             void RefreshLaunch()
             {
-                state.Text = session.Launching
-                    ? session.Status
+                var operation = session.LaunchOperation(current);
+                state.Text = operation != null
+                    ? operation.Stage
                     : Ui(
                         current == null ? "Choose a game version to get started"
                         : session.Account == null ? "Add an account to launch the game"
                         : "Ready to play"
                     );
-                launchRow.IsVisible = session.Launching;
+                launchRow.IsVisible = operation != null;
                 launchProgress.IsIndeterminate = false;
-                launchPercent.Text = (session.Progress ?? 0).ToString("0") + "%";
-                launchProgress.Value = session.Progress ?? 0;
-                launch.IsEnabled = !session.Busy && !session.GameRunning;
+                launchPercent.Text = (operation?.Progress ?? 0).ToString("0") + "%";
+                launchProgress.Value = operation?.Progress ?? 0;
+                launch.IsEnabled = CanLaunch();
+                switchVersion.IsEnabled = !session.Launching;
+                stop.IsVisible = session.RunningGames.Active.Any();
             }
             void Changed(object? _, System.ComponentModel.PropertyChangedEventArgs e) =>
                 RefreshLaunch();

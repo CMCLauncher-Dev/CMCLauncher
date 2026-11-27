@@ -236,7 +236,7 @@ public sealed partial class MainWindow
                     CloseButtonText = Ui("Later"),
                     DefaultButton = ContentDialogButton.Close,
                     IsPrimaryButtonEnabled =
-                        !canInstall || (task == null && game is not { HasExited: false }),
+                        !canInstall || (task == null && !AnyGameLaunching && !runningGames.Any),
                 };
                 result = await dialog.ShowAsync();
             }
@@ -273,7 +273,7 @@ public sealed partial class MainWindow
             return;
         if (release.IsBeta && !store.Config.Settings.ReceiveBetaUpdates)
             return;
-        if (task != null || game is { HasExited: false })
+        if (task != null || AnyGameLaunching || runningGames.Any)
             throw new InvalidOperationException(
                 Ui("Finish active tasks and close the game before installing an update.")
             );
@@ -355,7 +355,7 @@ public sealed partial class MainWindow
             );
             if (release.IsBeta && !store.Config.Settings.ReceiveBetaUpdates)
                 return;
-            if (task != null || game is { HasExited: false })
+            if (task != null || AnyGameLaunching || runningGames.Any)
                 throw new InvalidOperationException(
                     Ui("Finish active tasks and close the game before installing an update.")
                 );

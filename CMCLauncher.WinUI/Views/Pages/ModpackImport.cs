@@ -273,8 +273,7 @@ public sealed partial class MainWindow
                         ct
                     );
                     store.Config.Instances.Add(instance);
-                    selected = instance;
-                    store.Config.SelectedInstanceId = instance.Id;
+                    SetSelectedInstance(instance);
                     await store.Save();
                 }
             },

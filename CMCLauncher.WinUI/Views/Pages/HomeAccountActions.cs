@@ -10,6 +10,8 @@ public sealed partial class MainWindow
     {
         if (button.Tag is not string tag)
             return true;
+        if (tag is "home-launch" or "home-switch-instance")
+            return !AnyGameLaunching;
         if (tag.StartsWith("home-add:", StringComparison.Ordinal))
             return !store.Config.Settings.HomeCards.Any(c => c.Id == tag[9..]);
         if (

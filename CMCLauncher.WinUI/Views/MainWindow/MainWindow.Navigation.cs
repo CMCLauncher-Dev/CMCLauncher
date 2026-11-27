@@ -379,6 +379,7 @@ public sealed partial class MainWindow
         launchCardProgress = null;
         launchCardCancel = null;
         launchCardProgressRow = null;
+        launchCardStop = null;
         SyncNavigation();
         PageBody.Children.Clear();
         taskButtons.Clear();

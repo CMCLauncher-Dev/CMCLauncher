@@ -483,8 +483,7 @@ public sealed partial class MainWindow
                                                         ResolveModpackName
                                                     );
                                             store.Config.Instances.Add(instance);
-                                            selected = instance;
-                                            store.Config.SelectedInstanceId = instance.Id;
+                                            SetSelectedInstance(instance);
                                             await store.Save();
                                         }
                                         else if (destination is { } location)

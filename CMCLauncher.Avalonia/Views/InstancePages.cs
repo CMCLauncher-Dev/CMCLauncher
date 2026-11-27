@@ -115,6 +115,8 @@ public sealed partial class MainWindow
                             async () =>
                             {
                                 flyout.Hide();
+                                if (session.Launching)
+                                    return;
                                 session.Selected = item;
                                 await session.Save();
                                 await InstanceSettings();
@@ -192,6 +194,8 @@ public sealed partial class MainWindow
                     ToolTip.SetTip(border, session.Store.GameDirectory(item));
                     async Task Choose()
                     {
+                        if (session.Launching)
+                            return;
                         session.Selected = item;
                         await session.Save();
                         await Navigate("home");

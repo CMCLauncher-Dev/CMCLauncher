@@ -194,10 +194,19 @@ public sealed partial class MainWindow
 
     internal async Task SelectInstance(Instance instance)
     {
+        if (AnyGameLaunching)
+            return;
+        SetSelectedInstance(instance);
+        await store.Save();
+    }
+
+    void SetSelectedInstance(Instance instance)
+    {
+        if (AnyGameLaunching)
+            return;
         selected = instance;
         store.Config.SelectedInstanceId = instance.Id;
         world = null;
-        await store.Save();
     }
 
     internal ComboBox InstanceSelector()
@@ -207,6 +216,7 @@ public sealed partial class MainWindow
             ItemsSource = store.Config.Instances,
             DisplayMemberPath = nameof(Instance.Name),
             SelectedItem = selected,
+            IsEnabled = !AnyGameLaunching,
             PlaceholderText = Ui("Select an instance"),
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };

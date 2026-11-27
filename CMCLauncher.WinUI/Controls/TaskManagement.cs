@@ -56,6 +56,8 @@ public sealed partial class MainWindow
     {
         if (stage != null)
             launchStage = stage;
+        if (launchCardStop != null)
+            launchCardStop.Visibility = runningGames.Active.Any() ? Visibility.Visible : Visibility.Collapsed;
         if (
             launchStatusText == null
             || launchCardProgressRow == null
@@ -64,20 +66,24 @@ public sealed partial class MainWindow
             || launchCardPercent == null
         )
             return;
-        launchCardProgressRow.Visibility = launching ? Visibility.Visible : Visibility.Collapsed;
-        launchCardProgress.Value = launchProgressValue;
-        launchCardPercent.Text = $"{launchProgressValue:0}%";
-        launchCardCancel.IsEnabled = launching && task != null && !task.IsCancellationRequested;
+        var selectedLaunch = selected == null ? default : backgroundWork.GetValueOrDefault(LaunchKey(selected));
+        var hasProgress = selectedLaunch.Work != null || launching;
+        var value = selectedLaunch.Work?.Progress ?? launchProgressValue;
+        launchCardProgressRow.Visibility = hasProgress ? Visibility.Visible : Visibility.Collapsed;
+        launchCardProgress.Value = value;
+        launchCardPercent.Text = $"{value:0}%";
+        launchCardCancel.IsEnabled = (selectedLaunch.Cancellation ?? (launching ? task : null))
+            is { IsCancellationRequested: false };
         var account = store.Config.Accounts.FirstOrDefault(a =>
             a.Key == store.Config.SelectedAccount
         );
         launchStatusText.Text = Ui(
-            launching ? activeWork?.Stage ?? launchStage
+            selectedLaunch.Work?.Stage ?? (launching ? activeWork?.Stage ?? launchStage
             : selected == null ? "从选择版本开始"
             : account == null ? "添加账号后即可启动"
             : !MicrosoftAuth.CanUseAccount(store.Config.Accounts, account)
                 ? "请先验证 Microsoft 正版账号"
-            : "已准备就绪"
+            : "已准备就绪")
         );
     }
 
@@ -304,7 +310,8 @@ public sealed partial class MainWindow
         Func<CancellationToken, Task> operation,
         string? name = null,
         bool showSuccessToast = true,
-        string? backgroundKey = null
+        string? backgroundKey = null,
+        bool isLaunch = false
     )
     {
         if (backgroundKey == null ? task != null : backgroundWork.ContainsKey(backgroundKey))
@@ -314,8 +321,8 @@ public sealed partial class MainWindow
         var work = new WorkItem
         {
             Name = name ?? PageTitle.Text,
-            Stage = backgroundKey == null && launching ? "准备启动" : "Processing…",
-            Launch = backgroundKey == null && launching,
+            Stage = (isLaunch || backgroundKey == null && launching) ? "准备启动" : "Processing…",
+            Launch = (isLaunch || backgroundKey == null && launching),
         };
         if (backgroundKey == null)
         {

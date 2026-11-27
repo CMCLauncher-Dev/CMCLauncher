@@ -15,7 +15,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
     string status = "",
         toast = "";
     double? progress;
-    Process? game;
+    public RunningGames RunningGames { get; } = new();
     public Store Store { get; }
     public LauncherCore Core { get; }
     public ModrinthService Modrinth { get; }
@@ -41,13 +41,20 @@ public sealed class LauncherSession : ObservableState, IDisposable
     readonly Dictionary<string, (OperationState Item, CancellationTokenSource Cancellation)> backgroundWork = new();
     public OperationState? Active { get; private set; }
     public bool Busy => task != null;
-    public bool GameRunning => game is { HasExited: false };
+    public bool GameRunning => RunningGames.Any;
+    static string LaunchKey(Instance instance) => "game-launch:" + instance.Id;
     public bool Launching { get; private set; }
+
+    public OperationState? LaunchOperation(Instance? instance) =>
+        instance == null ? null : backgroundWork.GetValueOrDefault(LaunchKey(instance)).Item;
+
     public Instance? Selected
     {
         get => selected;
         set
         {
+            if (Launching)
+                return;
             Set(ref selected, value);
             Store.Config.SelectedInstanceId = value?.Id;
         }
@@ -76,6 +83,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
         get => progress;
         private set => Set(ref progress, value);
     }
+    public event Action? GameStarted;
     public event Action? GameExited;
 
     public LauncherSession(
@@ -306,15 +314,30 @@ public sealed class LauncherSession : ObservableState, IDisposable
         await Save();
     }
 
-    public async Task LaunchSelected(CancellationToken ct)
+    public async Task LaunchInstance(Instance instance)
     {
+        var identity = Account ?? throw new IOException(Ui("Select an instance and account."));
         if (Launching)
-            throw new IOException(Ui("The game is already running."));
+            throw new IOException(Ui("Wait for the current game to finish starting."));
+        string key = LaunchKey(instance);
         Launching = true;
         Changed(nameof(Launching));
         try
         {
-            await LaunchSelectedCore(ct);
+            await Run("Launch game" + " · " + instance.Name, ct =>
+            {
+                var item = backgroundWork[key].Item;
+                Changed(nameof(Launching));
+                var progress = new Progress<(double Value, string Stage)>(update =>
+                {
+                    if (!item.IsRunning)
+                        return;
+                    item.Progress = Math.Max(item.Progress ?? 0, update.Value);
+                    item.Stage = Ui(update.Stage);
+                    Changed(nameof(Launching));
+                });
+                return LaunchInstanceCore(instance, identity, progress, ct);
+            }, backgroundKey: key);
         }
         finally
         {
@@ -323,31 +346,35 @@ public sealed class LauncherSession : ObservableState, IDisposable
         }
     }
 
-    async Task LaunchSelectedCore(CancellationToken ct)
+    async Task LaunchInstanceCore(Instance instance, Account identity,
+        IProgress<(double Value, string Stage)> progress, CancellationToken ct)
     {
-        if (Selected is not { } instance || Account is not { } identity)
-            throw new IOException(Ui("Select an instance and account."));
-        if (GameRunning)
-            throw new IOException(Ui("The game is already running."));
+        identity = Store.Config.Accounts.FirstOrDefault(account => account.Key == identity.Key)
+            ?? throw new IOException(Ui("Select an instance and account."));
         MicrosoftAuth.EnsureAccountAllowed(Store.Config.Accounts, identity);
         var auth = new MicrosoftAuth(Core);
         if (identity.Type == "microsoft")
         {
             var refreshed = await auth.Refresh(identity, MicrosoftAuth.ConfiguredClientId, ct);
             Store.Config.Accounts[Store.Config.Accounts.IndexOf(identity)] = refreshed;
-            Account = identity = refreshed;
+            if (Account?.Key == identity.Key)
+                Account = refreshed;
+            identity = refreshed;
         }
         else if (identity.Type == "yggdrasil")
         {
             using var external = new ExternalAuth(Store.Config.Settings);
             var refreshed = await external.Refresh(Store.Config.Accounts, identity, ct);
             Store.Config.Accounts[Store.Config.Accounts.IndexOf(identity)] = refreshed;
-            Account = identity = refreshed;
+            if (Account?.Key == identity.Key)
+                Account = refreshed;
+            identity = refreshed;
         }
         await Save();
-        game = await Core.Launch(instance, identity, CredentialVault.Read(identity), ct);
+        var launched = await Core.Launch(instance, identity, CredentialVault.Read(identity), ct, progress);
+        var running = RunningGames.Add(instance, Store.GameDirectory(instance), launched);
         instance.LastPlayed = DateTime.Now;
-        Log("INFO", $"Game JVM started (PID {game.Id})");
+        Log("INFO", $"Game JVM started (PID {launched.Id})");
         Action? acknowledgeExit = null;
         // Linux tracks the JVM directly. A separate launcher process must not
         // reopen the UI after a renderer failure or a visibility change.
@@ -358,7 +385,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
                 ? typeof(Program).Assembly.Location : null;
             try
             {
-                acknowledgeExit = CMCLauncher.Platform.GameExitWatchdog.Start(game, host, assembly);
+                acknowledgeExit = CMCLauncher.Platform.GameExitWatchdog.Start(launched, host, assembly);
             }
             catch (Exception ex)
             {
@@ -366,7 +393,6 @@ public sealed class LauncherSession : ObservableState, IDisposable
             }
         }
 
-        var launched = game;
         _ = Task.Run(async () =>
         {
             // Observe the kernel exit independently of redirected output pipes.
@@ -382,8 +408,7 @@ public sealed class LauncherSession : ObservableState, IDisposable
             Log("INFO", "Game exited with code " + launched.ExitCode);
             dispatch(() =>
             {
-                if (ReferenceEquals(game, launched))
-                    game = null;
+                RunningGames.Remove(running);
                 launched.Dispose();
                 Changed(nameof(GameRunning));
                 try
@@ -394,10 +419,12 @@ public sealed class LauncherSession : ObservableState, IDisposable
                 {
                     Log("WARN", "Game-exit acknowledgment failed: " + ex.Message);
                 }
-                GameExited?.Invoke();
+                if (!GameRunning)
+                    GameExited?.Invoke();
             });
         });
         Changed(nameof(GameRunning));
+        GameStarted?.Invoke();
         await Save();
     }
 

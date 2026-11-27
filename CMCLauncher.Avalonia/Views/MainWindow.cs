@@ -202,24 +202,24 @@ public sealed partial class MainWindow : Window
         shell.Children.Add(toast);
         scaling.Child = shell;
         Content = scaling;
+        session.GameStarted += () =>
+        {
+            switch (session.Store.Config.Settings.LauncherVisibility)
+            {
+                case "minimize":
+                    WindowState = WindowState.Minimized;
+                    break;
+                case "hide_reopen":
+                case "hide_close":
+                    Hide();
+                    break;
+                case "close":
+                    Close();
+                    break;
+            }
+        };
         session.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(session.GameRunning) && session.GameRunning)
-            {
-                switch (session.Store.Config.Settings.LauncherVisibility)
-                {
-                    case "minimize":
-                        WindowState = WindowState.Minimized;
-                        break;
-                    case "hide_reopen":
-                    case "hide_close":
-                        Hide();
-                        break;
-                    case "close":
-                        Close();
-                        break;
-                }
-            }
             if (e.PropertyName == nameof(session.Toast))
                 ShowToast(session.Toast);
         };

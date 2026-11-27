@@ -509,7 +509,10 @@ public sealed partial class MainWindow
             footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             footer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             footer.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var tools = Buttons(Action("切换版本", async (_, _) => await ChooseInstance()));
+            var switchVersion = Action("切换版本", async (_, _) => await ChooseInstance());
+            switchVersion.Tag = "home-switch-instance";
+            switchVersion.IsEnabled = task == null && HomeButtonAvailable(switchVersion);
+            var tools = Buttons(switchVersion);
             if (current != null)
                 tools.Children.Add(Action("版本设置", async (_, _) => await ConfigureInstance()));
             else
@@ -564,7 +567,13 @@ public sealed partial class MainWindow
             };
             ToolTipService.SetToolTip(launchCardCancel, "取消启动");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(launchCardCancel, "取消启动");
-            launchCardCancel.Click += Cancel_Click;
+            launchCardCancel.Click += (_, _) =>
+            {
+                if (selected != null && backgroundWork.TryGetValue(LaunchKey(selected), out var work))
+                    work.Cancellation.Cancel();
+                else if (launching)
+                    task?.Cancel();
+            };
             launchCardProgressRow.Children.Add(launchCardProgress);
             Grid.SetColumn(launchCardPercent, 1);
             launchCardProgressRow.Children.Add(launchCardPercent);
@@ -588,12 +597,44 @@ public sealed partial class MainWindow
                 },
                 true
             );
+            launch.Tag = "home-launch";
+            launch.IsEnabled = task == null && HomeButtonAvailable(launch);
             launch.MinWidth = 172;
             launch.Height = 44;
             launch.Padding = new Thickness(22, 8, 22, 8);
-            Grid.SetRow(launch, 1);
-            Grid.SetColumn(launch, 1);
-            footer.Children.Add(launch);
+            var stop = new Button
+            {
+                Content = new FontIcon { Glyph = "\uE71A", FontSize = 14 },
+                Width = 48,
+                Height = 44,
+                Padding = new Thickness(0),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            launchCardStop = stop;
+            ToolTipService.SetToolTip(stop, Ui("Stop running games"));
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(stop, Ui("Stop running games"));
+            stop.Click += (_, _) =>
+            {
+                var menu = new MenuFlyout();
+                foreach (var running in runningGames.Active)
+                {
+                    var item = new MenuFlyoutItem { Text = running.Label };
+                    item.Click += async (_, _) =>
+                    {
+                        try { runningGames.Stop(running); }
+                        catch (Exception ex) { await Error(ex, reportStatus: false); }
+                    };
+                    menu.Items.Add(item);
+                }
+                if (menu.Items.Count > 0)
+                    menu.ShowAt(stop);
+            };
+            var launchActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            launchActions.Children.Add(launch);
+            launchActions.Children.Add(stop);
+            Grid.SetRow(launchActions, 1);
+            Grid.SetColumn(launchActions, 1);
+            footer.Children.Add(launchActions);
             stack.Children.Add(footer);
             RefreshLaunchCard();
         }
@@ -711,6 +752,8 @@ public sealed partial class MainWindow
 
     Task ChooseInstance()
     {
+        if (AnyGameLaunching)
+            return Task.CompletedTask;
         page = "instances";
         expandedNavigation = "home";
         instanceFilter = "全部实例";

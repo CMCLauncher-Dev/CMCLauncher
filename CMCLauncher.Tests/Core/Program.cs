@@ -597,6 +597,7 @@ try
     await ModpackExportTests.Run(root);
     await DeviceCodePollingTests.Run(Path.Combine(root, "device-code-polling"));
     await JsonRecoveryTests.Run(Path.Combine(root, "json-recovery"));
+    await RunningGameTests.Run(root);
     await InstanceTransferTests.Run(Path.Combine(root, "instance-transfer"));
     Console.WriteLine(
         "PASS modpack export metadata, selected content, traversal and cancellation protection"

@@ -190,7 +190,7 @@ public sealed partial class MainWindow
 
     void EnsureMinecraftDirectoriesIdle()
     {
-        if (task != null || launching || game is { HasExited: false })
+        if (task != null || AnyGameLaunching || runningGames.Any)
             throw new InvalidOperationException(
                 Ui("Close the game and finish active tasks before changing Minecraft directories.")
             );

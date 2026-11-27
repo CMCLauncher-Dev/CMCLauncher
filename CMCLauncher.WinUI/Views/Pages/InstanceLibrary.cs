@@ -353,7 +353,7 @@ public sealed partial class MainWindow
                 }
                 if (store.Config.Instances.Count(i => i.Name == instance.Name) > 1)
                     identity.Children.Add(Text(store.StorageDirectory(instance), 11));
-                if (runningInstanceId == instance.Id && game is { HasExited: false })
+                if (runningGames.Active.Any(running => running.Instance.Id == instance.Id))
                     identity.Children.Add(Text("Running", 11));
                 if (!Directory.Exists(store.GameDirectory(instance)))
                     identity.Children.Add(Text("Directory unavailable", 11));
@@ -525,7 +525,7 @@ public sealed partial class MainWindow
 
     async Task ConfirmDeleteInstance(Instance instance, FrameworkElement anchor)
     {
-        if (task != null)
+        if (task != null || AnyGameLaunching || runningGames.Contains(instance, store.GameDirectory(instance)))
             throw new InvalidOperationException(
                 Ui(
                     "context.instancelibrary.wait_for_the_current_task_to_finish_or_cancel_it_before_deleting"
@@ -632,7 +632,7 @@ public sealed partial class MainWindow
         }
         if (result != ContentDialogResult.Primary)
             return;
-        if (task != null)
+        if (task != null || AnyGameLaunching || runningGames.Contains(instance, store.GameDirectory(instance)))
             throw new InvalidOperationException(
                 Ui(
                     "context.instancelibrary.wait_for_the_current_task_to_finish_or_cancel_it_before_deleting"

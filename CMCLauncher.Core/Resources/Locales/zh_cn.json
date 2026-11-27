@@ -2,6 +2,8 @@
   "code": "zh_cn",
   "displayName": "简体中文",
   "strings": {
+    "Stop running games": "结束运行中的游戏",
+    "Wait for the current game to finish starting.": "请等待当前游戏启动完成。",
     "Select all transferable instances": "全选可转移实例",
     "Clear instance selection": "取消全选",
     "{0} instances selected": "已选择 {0} 个实例",

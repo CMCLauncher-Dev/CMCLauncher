@@ -8,7 +8,7 @@ public sealed partial class MainWindow
 {
     internal void EnsureGameFilesIdle()
     {
-        if (game is { HasExited: false } || launching)
+        if (runningGames.Any || AnyGameLaunching)
             throw new InvalidOperationException(
                 Ui("Close the game before updating mods or restoring worlds.")
             );
