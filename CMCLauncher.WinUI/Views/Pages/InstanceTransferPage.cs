@@ -170,20 +170,20 @@ public sealed partial class MainWindow
             }
             Stage(
                 "Connection method",
-                "Connect both devices to the same LAN or join the same hotspot in system Wi-Fi settings.",
+                "Choose how the receiving device will connect.",
                 Roles
             );
             content.Children.Add(
                 Choice(
                     "Local network",
-                    "Find the sending device on the local network.",
+                    "Both devices must be connected to the same local network.",
                     () => Next(true)
                 )
             );
             content.Children.Add(
                 Choice(
                     "Wi-Fi hotspot",
-                    "Connect using the address shown on the sending device.",
+                    "The launcher creates a temporary Wi-Fi hotspot on this device.",
                     () => Next(false)
                 )
             );
@@ -205,6 +205,8 @@ public sealed partial class MainWindow
             {
                 Content = Ui("Include Minecraft and dependencies for offline play"),
             };
+            var countLabel = Text("");
+            content.Children.Add(countLabel);
             content.Children.Add(fullMigration);
             var selections =
                 new List<(
@@ -219,6 +221,7 @@ public sealed partial class MainWindow
                 {
                     VerticalAlignment = VerticalAlignment.Center,
                     IsEnabled = error == null,
+                    Content = Text(instance.ToString()),
                 };
                 Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(include, instance.Name);
                 var options = new StackPanel { Spacing = 6 };
@@ -234,127 +237,187 @@ public sealed partial class MainWindow
                     options.Children.Add(choice.Check);
                 var expander = new Expander
                 {
-                    Header = instance.ToString(),
+                    Header = Ui("Choose content to include"),
                     Content = options,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 };
-                var row = new Grid { ColumnSpacing = 8 };
-                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                row.ColumnDefinitions.Add(
-                    new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
-                );
-                row.Children.Add(include);
-                Grid.SetColumn(expander, 1);
-                row.Children.Add(expander);
-                if (error != null)
-                {
-                    row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    var warning = Text(error);
-                    Grid.SetRow(warning, 1);
-                    Grid.SetColumn(warning, 1);
-                    row.Children.Add(warning);
-                }
-                content.Children.Add(PanelCard(row));
+                var instanceCard = new StackPanel { Spacing = 6 };
+                instanceCard.Children.Add(include);
+                if (error == null)
+                    instanceCard.Children.Add(expander);
+                else
+                    instanceCard.Children.Add(Text(error));
+                content.Children.Add(PanelCard(instanceCard));
                 selections.Add((instance, include, choices));
             }
-            if (selections.Count == 0)
+            var available = selections.Where(x => x.Include.IsEnabled).Select(x => x.Include).ToArray();
+            if (available.Length == 0)
                 content.Children.Add(Text("No instances available to transfer."));
 
-            content.Children.Add(
-                Button(
-                    "Start sending",
-                    async () =>
+            var bulkSelect = Button("Select all transferable instances", () =>
+            {
+                var select = available.Any(check => check.IsChecked != true);
+                foreach (var check in available)
+                    check.IsChecked = select;
+                return Task.CompletedTask;
+            });
+            content.Children.Insert(0, bulkSelect);
+            bulkSelect.IsEnabled = available.Length > 0;
+
+            var send = Button(
+                "Start sending",
+                async () =>
+                {
+                    var selected = selections
+                        .Where(x => x.Include.IsChecked == true)
+                        .Select(x => new InstanceTransfer.Selection(
+                            x.Instance,
+                            x.Content.Where(y => y.Check.IsChecked == true)
+                                .SelectMany(y => y.Paths)
+                                .ToArray()
+                        ))
+                        .ToArray();
+                    if (selected.Length == 0)
                     {
-                        var selected = selections
-                            .Where(x => x.Include.IsChecked == true)
-                            .Select(x => new InstanceTransfer.Selection(
-                                x.Instance,
-                                x.Content.Where(y => y.Check.IsChecked == true)
-                                    .SelectMany(y => y.Paths)
-                                    .ToArray()
-                            ))
-                            .ToArray();
-                        if (selected.Length == 0)
-                        {
-                            status.Text = Ui("No instance selected.");
-                            return;
-                        }
-                        var runtime = fullMigration.IsChecked == true ? Core : null;
-                        Stage(
-                            "Pair the devices",
-                            "Select this device on the receiving device to send a connection request.",
-                            () => SendSelection(local)
-                        );
-                        var pending = Text(runtime == null
-                            ? "Preparing instance transfer…"
-                            : "Preparing Minecraft and dependencies on this device…");
-                        content.Children.Add(pending);
-                        await Run(async ct =>
-                        {
-                            await Task.Run(
-                                () =>
-                                    InstanceTransfer.Send(
-                                        store,
-                                        selected,
-                                        local,
-                                        (address, _) =>
+                        status.Text = Ui("No instance selected.");
+                        return;
+                    }
+                    var runtime = fullMigration.IsChecked == true ? Core : null;
+                    Stage(
+                        "Pair the devices",
+                        local
+                            ? "Select this device on the receiving device to send a connection request."
+                            : "Join the hotspot on the receiving device, then request a connection.",
+                        () => SendSelection(local)
+                    );
+                    var pending = Text(runtime == null
+                        ? "Preparing instance transfer…"
+                        : "Preparing Minecraft and dependencies on this device…");
+                    content.Children.Add(pending);
+                    await Run(async ct =>
+                    {
+                        TransferHotspot? hotspot = null;
+                        byte[]? qrCode = null;
+                        await Task.Run(
+                            () =>
+                                InstanceTransfer.Send(
+                                    store,
+                                    selected,
+                                    local,
+                                    (address, _) =>
+                                    {
+                                        DispatcherQueue.TryEnqueue(async () =>
                                         {
-                                            DispatcherQueue.TryEnqueue(() =>
+                                            if (ct.IsCancellationRequested)
+                                                return;
+                                            content.Children.Clear();
+                                            if (hotspot != null && qrCode != null)
                                             {
-                                                if (ct.IsCancellationRequested)
-                                                    return;
-                                                content.Children.Clear();
-                                                content.Children.Add(
-                                                    Text("Sender address (IPv4:port)")
+                                                var details = new StackPanel { Spacing = 8 };
+                                                details.Children.Add(Text("Wi-Fi hotspot", 16, true));
+                                                details.Children.Add(Text("Scan this QR code or join the hotspot in Wi-Fi settings."));
+                                                details.Children.Add(Text("Wi-Fi network name"));
+                                                details.Children.Add(new TextBox { Text = hotspot.Name, IsReadOnly = true });
+                                                details.Children.Add(Text("Wi-Fi password"));
+                                                details.Children.Add(new TextBox { Text = hotspot.Password, IsReadOnly = true });
+                                                content.Children.Add(PanelCard(details));
+                                                using var stream = new MemoryStream(qrCode).AsRandomAccessStream();
+                                                var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                                                await bitmap.SetSourceAsync(stream);
+                                                if (!ct.IsCancellationRequested)
+                                                    details.Children.Add(new Image { Source = bitmap, Width = 170, Height = 170 });
+                                            }
+                                            content.Children.Add(
+                                                Text("Sender address (IPv4:port)")
+                                            );
+                                            content.Children.Add(
+                                                new TextBox
+                                                {
+                                                    Text = address,
+                                                    IsReadOnly = true,
+                                                }
+                                            );
+                                            status.Text = Ui(
+                                                "Waiting for the receiving device…"
+                                            );
+                                        });
+                                    },
+                                    ct,
+                                    ConfirmConnection,
+                                    (transferred, total) =>
+                                        DispatcherQueue.TryEnqueue(() =>
+                                        {
+                                            if (
+                                                active?.Token == ct
+                                                && !ct.IsCancellationRequested
+                                            )
+                                                UpdateTransferProgress(
+                                                    transferred == total
+                                                        ? "Waiting for the receiving device to finish importing…"
+                                                        : "Sending instance data…",
+                                                    transferred,
+                                                    total
                                                 );
-                                                content.Children.Add(
-                                                    new TextBox
-                                                    {
-                                                        Text = address,
-                                                        IsReadOnly = true,
-                                                    }
-                                                );
-                                                status.Text = Ui(
-                                                    "Waiting for the receiving device…"
-                                                );
-                                            });
-                                        },
-                                        ct,
-                                        ConfirmConnection,
-                                        (transferred, total) =>
-                                            DispatcherQueue.TryEnqueue(() =>
-                                            {
-                                                if (
-                                                    active?.Token == ct
-                                                    && !ct.IsCancellationRequested
-                                                )
-                                                    UpdateTransferProgress(
-                                                        transferred == total
-                                                            ? "Waiting for the receiving device to finish importing…"
-                                                            : "Sending instance data…",
-                                                        transferred,
-                                                        total
-                                                    );
-                                            }),
-                                        fullRuntime: runtime
-                                    ),
-                                ct
-                            );
-                            Complete(
-                                "Instance data sent.",
-                                string.Join(
-                                    Environment.NewLine,
-                                    selected.Select(x => x.Instance.Name)
-                                )
-                            );
-                        });
-                        content.Children.Remove(pending);
-                    },
-                    primary: true
-                )
+                                        }),
+                                    fullRuntime: runtime,
+                                    startHotspot: local ? null : async token =>
+                                    {
+                                        DispatcherQueue.TryEnqueue(() =>
+                                        {
+                                            if (!token.IsCancellationRequested)
+                                                status.Text = Ui("Creating a temporary Wi-Fi hotspot…");
+                                        });
+                                        var lease = await WindowsTransferHotspot.Start(token);
+                                        try
+                                        {
+                                            qrCode = lease.ConnectionQrCode();
+                                            hotspot = lease;
+                                            return lease;
+                                        }
+                                        catch
+                                        {
+                                            await lease.DisposeAsync();
+                                            throw;
+                                        }
+                                    }
+                                ),
+                            ct
+                        );
+                        Complete(
+                            selected.Length == 1
+                                ? Ui("Instance data sent.")
+                                : string.Format(Ui("Sent {0} instances."), selected.Length),
+                            string.Join(
+                                Environment.NewLine,
+                                selected.Select(x => x.Instance.Name)
+                            )
+                        );
+                    });
+                    content.Children.Remove(pending);
+                },
+                primary: true
             );
+            content.Children.Insert(2, send);
+            foreach (var check in available)
+            {
+                check.Checked += (_, _) => UpdateSelection();
+                check.Unchecked += (_, _) => UpdateSelection();
+            }
+            UpdateSelection();
+
+            void UpdateSelection()
+            {
+                var count = available.Count(check => check.IsChecked == true);
+                countLabel.Text = string.Format(Ui("{0} instances selected"), count);
+                bulkSelect.Content = Ui(count > 0 && count == available.Length
+                    ? "Clear instance selection"
+                    : "Select all transferable instances");
+                send.Content = count > 1
+                    ? string.Format(Ui("Send {0} instances together"), count)
+                    : Ui("Start sending");
+                send.IsEnabled = count > 0;
+            }
         }
 
         void FindDevice()
@@ -394,9 +457,9 @@ public sealed partial class MainWindow
 
             hotspot.Children.Add(Text("Hotspot connection", 16, true));
             hotspot.Children.Add(
-                Text("Connect both devices to the same hotspot in system Wi-Fi settings.")
+                Text("Join the hotspot created by the sending device in system Wi-Fi settings.")
             );
-            hotspot.Children.Add(Text("Use the address shown on the sending device."));
+            hotspot.Children.Add(Text("After joining, search for the sender again or enter its displayed address."));
             hotspot.Children.Add(
                 Button(
                     "Enter sender address",
@@ -578,7 +641,9 @@ public sealed partial class MainWindow
                                     )
                             );
                             Complete(
-                                "Instance received.",
+                                imported.Count == 1
+                                    ? Ui("Instance received.")
+                                    : string.Format(Ui("Received {0} instances."), imported.Count),
                                 string.Join(Environment.NewLine, imported.Select(x => x.Name))
                             );
                         },

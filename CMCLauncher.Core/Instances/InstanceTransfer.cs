@@ -55,7 +55,8 @@ public static class InstanceTransfer
         CancellationToken ct,
         Func<string, string, CancellationToken, Task<bool>>? confirm = null,
         Action<long, long>? progress = null,
-        LauncherCore? fullRuntime = null
+        LauncherCore? fullRuntime = null,
+        Func<CancellationToken, Task<TransferHotspot>>? startHotspot = null
     )
     {
         if (selections.Count == 0)
@@ -119,6 +120,23 @@ public static class InstanceTransfer
             if (payload.Length > MaxArchiveBytes)
                 throw new IOException("Transfer archive is too large.");
 
+            var previousAddresses = startHotspot == null
+                ? null
+                : Addresses().Select(x => x.Address).ToHashSet();
+            await using var hotspot = startHotspot == null ? null : await startHotspot(ct);
+            var hotspotAddresses = Array.Empty<IPAddress>();
+            if (previousAddresses != null)
+            {
+                for (var attempt = 0; attempt < 20; attempt++)
+                {
+                    hotspotAddresses = Addresses().Select(x => x.Address)
+                        .Where(address => !previousAddresses.Contains(address)).ToArray();
+                    if (hotspotAddresses.Length > 0)
+                        break;
+                    await Task.Delay(250, ct);
+                }
+            }
+            ct.ThrowIfCancellationRequested();
             using var key = RSA.Create(2048);
             var request = new CertificateRequest(
                 "CN=CMCLauncher Instance Transfer",
@@ -146,13 +164,12 @@ public static class InstanceTransfer
             try
             {
                 var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-                if (discoverable)
+                if (discoverable || hotspot != null)
                     discovery = Advertise(port, lifetime.Token);
                 ready(
                     string.Join(
                         "  ",
-                        Addresses()
-                            .Select(x => x.Address)
+                        (hotspotAddresses.Length > 0 ? hotspotAddresses : Addresses().Select(x => x.Address))
                             .DefaultIfEmpty(IPAddress.Loopback)
                             .Select(x => new IPEndPoint(x, port))
                     ),

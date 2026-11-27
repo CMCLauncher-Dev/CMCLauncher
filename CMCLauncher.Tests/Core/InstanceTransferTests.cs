@@ -224,6 +224,37 @@ static class InstanceTransferTests
         Console.WriteLine("PASS transferred Forge build normalization");
         await VerifyFailedImportReceipt(sender, receiver, instance);
         await VerifyCompleteTransfer(temporary);
+        await VerifyHotspotCancellation(sender, instance);
+    }
+
+    static async Task VerifyHotspotCancellation(Store sender, Instance instance)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopped = 0;
+        var sending = InstanceTransfer.Send(sender, [new(instance, [])], false,
+            (_, _) => throw new InvalidOperationException("Cancelled hotspot transfer became ready."),
+            cancellation.Token, startHotspot: _ =>
+            {
+                var (name, password) = TransferHotspot.CreateCredentials();
+                var hotspot = new TransferHotspot(name, password, () =>
+                {
+                    Interlocked.Increment(ref stopped);
+                    return Task.CompletedTask;
+                });
+                if (!hotspot.ConnectionQrCode().AsSpan().StartsWith(new byte[] { 137, 80, 78, 71 }))
+                    throw new IOException("Wi-Fi credentials did not produce a PNG QR code.");
+                started.SetResult();
+                cancellation.Cancel();
+                return Task.FromResult(hotspot);
+            });
+        try
+        {
+            await sending;
+            throw new IOException("Hotspot transfer ignored cancellation.");
+        }
+        catch (OperationCanceledException) when (started.Task.IsCompletedSuccessfully && stopped == 1) { }
+        Console.WriteLine("PASS Wi-Fi credentials produce a QR code and cancelling a transfer releases its hotspot");
     }
 
     static async Task VerifyCompleteTransfer(string temporary)
@@ -277,8 +308,17 @@ static class InstanceTransferTests
         await File.WriteAllTextAsync(Path.Combine(sender.Library, "assets", "objects", "a9", hash), "abc", timeout.Token);
         await File.WriteAllTextAsync(Path.Combine(sender.Library, "assets", "log_configs", "fixture.xml"), "log", timeout.Token);
         var ready = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = new Instance
+        {
+            Name = "Second offline transfer",
+            GameVersion = instance.GameVersion,
+            Loader = instance.Loader,
+            LoaderVersion = instance.LoaderVersion,
+            VersionId = instance.VersionId,
+            ImportRoot = sender.Library,
+        };
         var sending = InstanceTransfer.Send(
-            sender, [new(instance, [])], false, (addresses, _) => ready.TrySetResult(addresses),
+            sender, [new(instance, []), new(second, [])], false, (addresses, _) => ready.TrySetResult(addresses),
             timeout.Token, (_, _, _) => Task.FromResult(true), fullRuntime: sourceCore
         );
         try
@@ -288,17 +328,21 @@ static class InstanceTransferTests
             await InstanceTransfer.RequestReceive(receiver, "127.0.0.1:" + port,
                 _ => { }, () => { }, timeout.Token);
             var reopened = new Store(receiver.Root);
-            var imported = reopened.Config.Instances.Single();
-            var runtime = Path.Combine(reopened.GameDirectory(imported), InstanceTransfer.RuntimeFolder);
-            if (!imported.HasTransferredRuntime || imported.PendingTransferredLoaderSetup
-                || !File.Exists(Path.Combine(runtime, "libraries", "windows-test.jar"))
-                || !File.Exists(Path.Combine(runtime, "libraries", "linux-test.jar"))
-                || File.Exists(Path.Combine(runtime, "libraries", "unrelated.jar")))
-                throw new Exception("Complete migration did not preserve its private cross-platform runtime.");
+            if (reopened.Config.Instances.Count != 2)
+                throw new Exception("One complete migration must import both selected instances.");
             using var reopenedCore = new LauncherCore(reopened, new NoNetwork());
-            await reopenedCore.DownloadGame(imported, timeout.Token);
+            foreach (var imported in reopened.Config.Instances)
+            {
+                var runtime = Path.Combine(reopened.GameDirectory(imported), InstanceTransfer.RuntimeFolder);
+                if (!imported.HasTransferredRuntime || imported.PendingTransferredLoaderSetup
+                    || !File.Exists(Path.Combine(runtime, "libraries", "windows-test.jar"))
+                    || !File.Exists(Path.Combine(runtime, "libraries", "linux-test.jar"))
+                    || File.Exists(Path.Combine(runtime, "libraries", "unrelated.jar")))
+                    throw new Exception("Complete migration did not preserve its private cross-platform runtime.");
+                await reopenedCore.DownloadGame(imported, timeout.Token);
+            }
             await sending;
-            Console.WriteLine("PASS complete migration prepares the imported game with all network requests denied");
+            Console.WriteLine("PASS complete migration prepares both imported games with all network requests denied");
         }
         finally
         {

@@ -21,6 +21,9 @@ public class LauncherPlatform : CMCLauncher.Platform.PlatformEnvironment
 
     public virtual Task<Action?> PreventIdleSleep(CancellationToken ct) => Task.FromResult<Action?>(null);
 
+    public virtual Task<TransferHotspot> StartTransferHotspot(CancellationToken ct) =>
+        throw new PlatformNotSupportedException("Automatic hotspot creation is unavailable on this system.");
+
     public virtual bool SupportsMemoryOptimization => false;
 
     public virtual MemoryOptimizationResult OptimizeMemory(CancellationToken ct) => default;

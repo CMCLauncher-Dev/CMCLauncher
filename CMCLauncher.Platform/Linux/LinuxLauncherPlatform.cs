@@ -10,6 +10,62 @@ public sealed class LinuxLauncherPlatform : LauncherPlatform
     public static void Initialize() => Current = new LinuxLauncherPlatform();
 
     public override string MinecraftOsName => "linux";
+
+    public override async Task<TransferHotspot> StartTransferHotspot(CancellationToken ct)
+    {
+        var (name, password) = TransferHotspot.CreateCredentials();
+        async Task Remove()
+        {
+            try { await Nmcli(CancellationToken.None, "connection", "delete", "id", name); }
+            catch (Exception ex) when (ex is Win32Exception or IOException or TimeoutException) { }
+        }
+
+        try
+        {
+            await Nmcli(ct, "connection", "add", "type", "wifi", "ifname", "*", "con-name", name,
+                "ssid", name, "connection.autoconnect", "no", "802-11-wireless.mode", "ap",
+                "802-11-wireless-security.key-mgmt", "wpa-psk",
+                "802-11-wireless-security.psk", password, "ipv4.method", "shared", "ipv6.method", "disabled");
+            await Nmcli(ct, "connection", "up", "id", name);
+            return new TransferHotspot(name, password, Remove);
+        }
+        catch (Exception ex) when (ex is Win32Exception or IOException or TimeoutException or OperationCanceledException)
+        {
+            await Remove();
+            ct.ThrowIfCancellationRequested();
+            throw new IOException("Could not create a Wi-Fi hotspot. Check NetworkManager permissions and Wi-Fi adapter support.", ex);
+        }
+    }
+
+    static async Task Nmcli(CancellationToken ct, params string[] arguments)
+    {
+        var start = new ProcessStartInfo("/usr/bin/nmcli") { UseShellExecute = false };
+        start.RedirectStandardOutput = start.RedirectStandardError = true;
+        start.ArgumentList.Add("--wait");
+        start.ArgumentList.Add("12");
+        foreach (var argument in arguments)
+            start.ArgumentList.Add(argument);
+        ct.ThrowIfCancellationRequested();
+        using var process = Process.Start(PlatformCommand.SystemEnvironment(start))
+            ?? throw new IOException("Could not start NetworkManager.");
+        var output = process.StandardOutput.ReadToEndAsync();
+        var errors = process.StandardError.ReadToEndAsync();
+        try
+        {
+            await process.WaitForExitAsync(ct).WaitAsync(TimeSpan.FromSeconds(15), ct);
+        }
+        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+        {
+            try { process.Kill(); }
+            catch (InvalidOperationException) { }
+            await process.WaitForExitAsync();
+            throw;
+        }
+        await Task.WhenAll(output, errors);
+        if (process.ExitCode != 0)
+            throw new IOException($"NetworkManager exited with code {process.ExitCode}.");
+    }
+
     public override async Task<Action?> PreventIdleSleep(CancellationToken ct)
     {
         var start = new ProcessStartInfo("/usr/bin/systemd-inhibit")
