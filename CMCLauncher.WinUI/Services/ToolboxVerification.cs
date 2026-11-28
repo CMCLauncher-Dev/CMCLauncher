@@ -7,6 +7,28 @@ namespace CMCLauncher.WinUI;
 
 public sealed partial class MainWindow
 {
+    async Task VerifyToolboxFilters(Action<bool, string> check, bool canOptimize)
+    {
+        var search = Descendants(PageBody).OfType<TextBox>().Single(box => Equals(box.Tag, "toolbox-search"));
+        var category = Descendants(PageBody).OfType<ComboBox>().Single(box => Equals(box.Tag, "toolbox-category"));
+        check(ReferenceEquals(PageBody.Children[canOptimize ? 1 : 0], search.Parent),
+            "toolbox search and category sit directly below the small tools card");
+        var toolGrid = PageBody.Children.OfType<Grid>().Last();
+        int VisibleTools() => toolGrid.Children.OfType<Border>().Count(card => card.Visibility == Visibility.Visible);
+        var initialCount = VisibleTools();
+        category.SelectedIndex = ToolboxFilter.Category("frpc");
+        check(VisibleTools() == 2, "toolbox category filters the visible cards");
+        search.Text = "terracotta";
+        for (var attempt = 0; attempt < 40 && VisibleTools() != 1; attempt++)
+            await Task.Delay(25);
+        check(VisibleTools() == 1, "toolbox search combines with the category filter");
+        category.SelectedIndex = ToolboxFilter.Category("seed-map");
+        check(VisibleTools() == 0, "toolbox presents an empty result for conflicting filters");
+        search.Text = "";
+        category.SelectedIndex = 0;
+        check(VisibleTools() == initialCount, "clearing toolbox filters restores all cards");
+    }
+
     async Task VerifyToolboxUi(Action<bool, string> check, string directory)
     {
         page = "toolbox";
@@ -20,6 +42,7 @@ public sealed partial class MainWindow
             "minecraft-pfp",
             "datapack-generator",
             "instance-transfer",
+            "seed-map",
             "command-generator",
         ];
         check(
@@ -38,6 +61,7 @@ public sealed partial class MainWindow
                         ),
                 "memory optimization appears in the top small tools card"
             );
+        await VerifyToolboxFilters(check, canOptimize);
         check(
             navigationButtons.ContainsKey("page:toolbox")
                 && !navigationButtons.ContainsKey("page:frpc")

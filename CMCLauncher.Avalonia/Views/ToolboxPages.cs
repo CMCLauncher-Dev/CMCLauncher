@@ -11,6 +11,17 @@ public sealed partial class MainWindow
 {
     Control ToolboxPage()
     {
+        var search = Input("", "Search tools");
+        search.Tag = "toolbox-search";
+        global::Avalonia.Automation.AutomationProperties.SetName(search, Ui("Search tools"));
+        var category = new ComboBox { ItemsSource = ToolboxFilter.Categories.Select(Ui).ToArray(), SelectedIndex = 0, Tag = "toolbox-category" };
+        global::Avalonia.Automation.AutomationProperties.SetName(category, Ui("Category"));
+        var toolbar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 10 };
+        Grid.SetColumn(category, 1);
+        toolbar.Children.Add(search);
+        toolbar.Children.Add(category);
+        var empty = T("No tools match your search.", 13);
+        var entries = new List<(Border Card, int Category, string Keywords)>();
         var cards = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
         foreach (var (title, description, target, glyph) in new[]
         {
@@ -19,6 +30,7 @@ public sealed partial class MainWindow
             ("MinecraftPFP", "Create a profile picture from a Minecraft skin and export it as PNG.", "pfp", "M3,4 H21 V20 H3 Z M4,17 L9,12 L13,16 L16,13 L20,17 M7,8 H9"),
             ("Data pack generator", "Create recipes, loot tables, advancements and functions.", "datapack-generator", "M6,3 H14 L19,8 V21 H6 Z M14,3 V8 H19 M9,12 H16 M9,16 H16"),
             ("Instance transfer", "Transfer Minecraft instances between devices.", "instance-transfer", "M3,8 H21 M16,3 L21,8 L16,13 M21,16 H3 M8,11 L3,16 L8,21"),
+            ("Seed map", "Explore biomes and predicted structures in Java Edition.", "seed-map", "M3,6 L9,3 L15,6 L21,3 V18 L15,21 L9,18 L3,21 Z M9,3 V18 M15,6 V21"),
             ("Command generator", "Build Minecraft Java Edition commands with a live preview.", "command-generator", "M3,5 H21 V19 H3 Z M7,9 L10,12 L7,15 M12,15 H17"),
         })
         {
@@ -57,32 +69,47 @@ public sealed partial class MainWindow
             var card = Card(open);
             card.Padding = new Thickness(0);
             cards.Children.Add(card);
+            entries.Add((card, ToolboxFilter.Category(target), $"{title} {description} {Ui(title)} {Ui(description)} {target}"));
         }
 
-        var columns = 0;
         void ArrangeCards(double width)
         {
-            var count = width < 480 ? 1 : width < 820 ? 2 : 3;
-            if (columns == count)
-                return;
-            columns = count;
+            var columns = width < 480 ? 1 : width < 820 ? 2 : 3;
+            var terms = ToolboxFilter.SearchTerms(search.Text);
             cards.ColumnDefinitions.Clear();
             cards.RowDefinitions.Clear();
-            for (var i = 0; i < columns; i++)
+            for (var column = 0; column < columns; column++)
                 cards.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-            for (var i = 0; i < cards.Children.Count; i++)
+            var index = 0;
+            foreach (var (card, group, keywords) in entries)
             {
-                if (i % columns == 0)
+                var visible = ToolboxFilter.Matches(category.SelectedIndex, group, terms, keywords);
+                card.IsVisible = visible;
+                if (!visible)
+                    continue;
+                if (index % columns == 0)
                     cards.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-                Grid.SetColumn(cards.Children[i], i % columns);
-                Grid.SetRow(cards.Children[i], i / columns);
+                Grid.SetColumn(card, index % columns);
+                Grid.SetRow(card, index / columns);
+                index++;
             }
+            empty.IsVisible = index == 0;
         }
-        ArrangeCards(double.PositiveInfinity);
-        cards.SizeChanged += (_, e) => ArrangeCards(e.NewSize.Width);
+        double availableWidth = double.PositiveInfinity;
+        toolbar.SizeChanged += (_, e) =>
+        {
+            if (availableWidth == e.NewSize.Width)
+                return;
+            availableWidth = e.NewSize.Width;
+            ArrangeCards(availableWidth);
+        };
+        search.TextChanged += (_, _) => ArrangeCards(availableWidth);
+        category.SelectionChanged += (_, _) => ArrangeCards(availableWidth);
+        ArrangeCards(availableWidth);
+        var body = Stack(toolbar, cards, empty);
 
         if (!LauncherPlatform.Current.SupportsMemoryOptimization)
-            return cards;
+            return body;
 
         var utilities = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12 };
         var heading = T("Small tools", 16, true);
@@ -105,7 +132,8 @@ public sealed partial class MainWindow
         var utilitiesCard = Card(utilities);
         utilitiesCard.Padding = new Thickness(16, 8, 12, 8);
         utilitiesCard.CornerRadius = new CornerRadius(8);
-        return Stack(utilitiesCard, cards);
+        body.Children.Insert(0, utilitiesCard);
+        return body;
     }
 
     async Task OptimizeMemoryNow()

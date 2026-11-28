@@ -499,7 +499,7 @@ global::Avalonia.Controls.Shapes.Path NavigationIcon(string path) =>
 
     void SyncNavigation(bool animate = true, bool expandForRoute = false)
     {
-        var selected = route is "frpc" or "pfp" or "terracotta" or "datapack-generator" or "command-generator" or "instance-transfer" ? "toolbox" : route;
+        var selected = route is "frpc" or "pfp" or "terracotta" or "datapack-generator" or "command-generator" or "instance-transfer" or "seed-map" ? "toolbox" : route;
         var group = selected is "home" or "instances" or "instance-settings" or "modpack-export"
             ? "home"
             : navigationParents.GetValueOrDefault(selected, selected == "logs" ? "" : "more");

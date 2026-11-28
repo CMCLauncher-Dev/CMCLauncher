@@ -445,7 +445,7 @@ public sealed partial class MainWindow : Window
         SetPageBack(target switch
         {
             "instances" => () => Navigate("home"),
-            "frpc" or "pfp" or "terracotta" or "datapack-generator" or "command-generator" or "instance-transfer" =>
+            "frpc" or "pfp" or "terracotta" or "datapack-generator" or "command-generator" or "instance-transfer" or "seed-map" =>
                 () => Navigate("toolbox"),
             _ => null,
         });
@@ -472,6 +472,7 @@ public sealed partial class MainWindow : Window
                 "logs" => "Runtime logs",
                 "datapack-generator" => "Data pack generator",
                 "instance-transfer" => "Instance transfer",
+                "seed-map" => "Seed map",
                 "command-generator" => "Command generator",
                 "toolbox" => "Toolbox",
                 "terracotta" => "Terracotta",
@@ -506,6 +507,7 @@ public sealed partial class MainWindow : Window
                 "logs" => LogsPage(),
                 "datapack-generator" => DataPackGeneratorPage(),
                 "instance-transfer" => InstanceTransferPage(),
+                "seed-map" => SeedMapPage(),
                 "command-generator" => CommandGeneratorPage(),
                 "toolbox" => ToolboxPage(),
                 "terracotta" => TerracottaPage(),

@@ -265,4 +265,5 @@
       CopyToOutputDirectory="PreserveNewest"
     />
   </ItemGroup>
+  <Import Project="../native/seed-map/SeedMap.targets" />
 </Project>

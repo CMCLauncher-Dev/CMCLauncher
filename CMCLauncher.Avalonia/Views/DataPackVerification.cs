@@ -14,6 +14,7 @@ public sealed partial class MainWindow
             await VerifyWindowModePersistence(checks);
             session.Store.Config.Settings.LauncherLanguage = "zh_cn";
             await VerifyOptionsBackupCard(checks);
+            await VerifySeedMapParity(checks);
             foreach (var theme in new[] { "light", "dark" })
             {
                 session.Store.Config.Settings.Theme = theme;
@@ -40,6 +41,25 @@ public sealed partial class MainWindow
             Environment.ExitCode = 1;
         }
         Close();
+    }
+
+    async Task VerifySeedMapParity(List<string> checks)
+    {
+        await Navigate("seed-map");
+        T Find<T>(string tag) where T : Control =>
+            pageContent.GetVisualDescendants().OfType<T>().Single(control => Equals(control.Tag, tag));
+        Find<TextBox>("seed-map-seed").Text = "42";
+        Find<Button>("seed-map-show").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var image = Find<Image>("seed-map-image");
+        for (var attempt = 0; attempt < 100 && image.Source == null; attempt++)
+            await Task.Delay(50);
+        var locations = Find<ComboBox>("seed-map-structures");
+        if (image.Source == null || locations.ItemCount == 0)
+            throw new IOException("Seed map did not render its biomes and village positions.");
+        locations.SelectedIndex = 0;
+        if (locations.SelectedItem?.ToString() is not { } location || !location.Contains(" · X ") || !location.Contains(" · Z "))
+            throw new IOException("Seed map structure details did not display the X and Z coordinates.");
+        checks.Add("PASS seed map biomes and selectable structure coordinates");
     }
 
     async Task VerifyOptionsBackupCard(List<string> checks)

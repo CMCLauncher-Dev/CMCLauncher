@@ -1,0 +1,30 @@
+<Project>
+  <PropertyGroup>
+    <SeedMapSource>$(MSBuildThisFileDirectory)</SeedMapSource>
+    <SeedMapBuildDir>$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/$(RuntimeIdentifier)/seed-map</SeedMapBuildDir>
+    <SeedMapLibrary Condition="$([MSBuild]::IsOSPlatform('Windows'))">cmc_seed_map.dll</SeedMapLibrary>
+    <SeedMapLibrary Condition="$([MSBuild]::IsOSPlatform('Linux'))">libcmc_seed_map.so</SeedMapLibrary>
+    <SeedMapLibrary Condition="$([MSBuild]::IsOSPlatform('OSX'))">libcmc_seed_map.dylib</SeedMapLibrary>
+    <SeedMapLinkFlags Condition="$([MSBuild]::IsOSPlatform('Linux'))">-shared</SeedMapLinkFlags>
+    <SeedMapLinkFlags Condition="$([MSBuild]::IsOSPlatform('OSX'))">-dynamiclib</SeedMapLinkFlags>
+    <SeedMapLinkFlags Condition="'$(RuntimeIdentifier)' == 'osx-x64'">$(SeedMapLinkFlags) -arch x86_64</SeedMapLinkFlags>
+    <SeedMapLinkFlags Condition="'$(RuntimeIdentifier)' == 'osx-arm64'">$(SeedMapLinkFlags) -arch arm64</SeedMapLinkFlags>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(SeedMapLibrary)' != ''">
+    <SeedMapSourceFile Include="$(SeedMapSource)seed_map.c;$(SeedMapSource)cubiomes/**/*;$(SeedMapSource)build-windows.cmd" />
+    <None Include="$(SeedMapBuildDir)/$(SeedMapLibrary)" Link="$(SeedMapLibrary)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(SeedMapSource)cubiomes/LICENSE" Link="licenses/cubiomes.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildSeedMap" BeforeTargets="PrepareForBuild"
+          Inputs="@(SeedMapSourceFile);$(SeedMapSource)SeedMap.targets" Outputs="$(SeedMapBuildDir)/$(SeedMapLibrary)"
+          Condition="'$(SeedMapLibrary)' != '' And '$(DesignTimeBuild)' != 'true'">
+    <MakeDir Directories="$(SeedMapBuildDir)" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('Windows'))" WorkingDirectory="$(SeedMapBuildDir)"
+          Command="&quot;$(SeedMapSource)build-windows.cmd&quot;" />
+    <Exec Condition="!$([MSBuild]::IsOSPlatform('Windows'))" WorkingDirectory="$(SeedMapBuildDir)"
+          Command="cc -std=c11 -O2 -fPIC -fwrapv -fvisibility=hidden $(SeedMapLinkFlags) &quot;$(SeedMapSource)seed_map.c&quot; &quot;$(SeedMapSource)cubiomes/&quot;*.c -lm -o &quot;$(SeedMapLibrary)&quot;" />
+    <ItemGroup>
+      <FileWrites Include="$(SeedMapBuildDir)/*" />
+    </ItemGroup>
+  </Target>
+</Project>
