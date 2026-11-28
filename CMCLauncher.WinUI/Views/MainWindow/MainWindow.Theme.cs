@@ -76,8 +76,14 @@ public sealed partial class MainWindow
             RefreshFrpcPalette();
         var micaEnabled = GlassActive;
         // 底部仍由 TransparentBackdrop + WS_EX_LAYERED 保持纯透明，透出桌面内容。
-        Color Backdrop(Color c) =>
-            micaEnabled ? GlassSurface(c) : c;
+        Color Backdrop(Color c)
+        {
+            if (!micaEnabled)
+                return c;
+            // Keep the foreground readable over a bright or dark desktop.
+            c.A = Math.Max(GlassSurface(c).A, lightTheme ? (byte)224 : (byte)232);
+            return c;
+        }
         // Win7 Aero 风格：在透明玻璃之上叠加顶部弧形高光，模拟 Aero 的窗框反光。
         // 仅当液态玻璃开启且 GlassStyle=="aero" 时显示；深色主题反光更明显。
         var aeroGlass = micaEnabled && store.Config.Settings.GlassStyle == "aero";
@@ -137,11 +143,7 @@ public sealed partial class MainWindow
                 ? Color.FromArgb(0x33, c.R, c.G, c.B)
                 : Backdrop(c);
         var bgBrush = Brush(bg);
-        WindowBackground.Color = hasCustomBackground
-            ? Color.FromArgb(0x00, bgBrush.Color.R, bgBrush.Color.G, bgBrush.Color.B)
-            : Backdrop(bgBrush.Color);
-        if (Sidebar.Parent is Panel contentGrid)
-            contentGrid.Background = new SolidColorBrush(ContentBackdrop(bgBrush.Color));
+        WindowBackground.Color = ContentBackdrop(bgBrush.Color);
         Sidebar.Background = new SolidColorBrush(ContentBackdrop(Brush(sidebar).Color));
         // 液态玻璃下各层底色都是半透明，不透明的分隔线会显成一条黑线，直接隐藏。
         Sidebar.BorderBrush = micaEnabled

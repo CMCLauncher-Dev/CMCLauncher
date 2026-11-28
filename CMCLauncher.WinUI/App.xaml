@@ -58,6 +58,10 @@
           />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
+      <FontFamily x:Key="LauncherIconFont">ms-appx:///assets/CMCLauncherIcons.ttf#CMC Launcher Icons</FontFamily>
+      <Style TargetType="FontIcon">
+        <Setter Property="FontFamily" Value="{StaticResource LauncherIconFont}" />
+      </Style>
       <Style TargetType="ScrollViewer" BasedOn="{StaticResource DefaultScrollViewerStyle}">
         <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
         <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />

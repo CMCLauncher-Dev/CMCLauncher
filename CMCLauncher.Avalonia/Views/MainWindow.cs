@@ -482,7 +482,12 @@ public sealed partial class MainWindow : Window
                 _ => "Community resources",
             }
         );
-        if (pageContent.Content == null)
+        if (target == "downloads" && gameCatalog == null)
+            pageContent.Content = Card(Stack(
+                T("Fetching official version list…"),
+                new ProgressBar { IsIndeterminate = true, Height = 6 }
+            ));
+        else if (pageContent.Content == null)
             pageContent.Content = T("Loading…");
         try
         {

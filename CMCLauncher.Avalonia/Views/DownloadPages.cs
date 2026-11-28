@@ -28,7 +28,7 @@ public sealed partial class MainWindow
             MaxHeight = 400,
             Name = "GameVersionList",
         };
-        var status = T("Fetching official version list…", 12);
+        var status = T("", 12);
         var empty = T("No matching versions. Try a different version number or release type.", 12);
         empty.IsVisible = false;
         void Draw()

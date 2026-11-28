@@ -301,10 +301,10 @@ public sealed class JavaSettingsPage : CMCPage
                 }
             );
             var delete = Action(Ui("Delete Java folder"), async (_, _) => await DeleteJava(java));
-            SetJavaActionIcon(update, Symbol.Refresh);
-            SetJavaActionIcon(migrate, Symbol.MoveToFolder);
-            SetJavaActionIcon(remove, Symbol.Remove);
-            SetJavaActionIcon(delete, Symbol.Delete);
+            SetJavaActionIcon(update, "\uE72C");
+            SetJavaActionIcon(migrate, "\uEA2A");
+            SetJavaActionIcon(remove, "\uE738");
+            SetJavaActionIcon(delete, "\uE74D");
             var actions = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -328,14 +328,14 @@ public sealed class JavaSettingsPage : CMCPage
         }
     }
 
-    static void SetJavaActionIcon(Button button, Symbol symbol)
+    static void SetJavaActionIcon(Button button, string glyph)
     {
         var label = button.Content?.ToString() ?? "";
         button.Content = new Viewbox
         {
             Width = 16,
             Height = 16,
-            Child = new SymbolIcon(symbol),
+            Child = new FontIcon { Glyph = glyph },
         };
         button.MinWidth = 28;
         button.MinHeight = 28;

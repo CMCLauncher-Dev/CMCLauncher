@@ -341,7 +341,6 @@ public sealed partial class MainWindow
             Content = new FontIcon
             {
                 Glyph = glyph,
-                FontFamily = new FontFamily("Segoe Fluent Icons"),
                 FontSize = 13,
             },
             Width = 32,

@@ -667,6 +667,20 @@ public sealed partial class MainWindow
         var query = gameVersionQuery;
         try
         {
+            await Navigate("home");
+            gameCatalog = null;
+            var loading = Navigate("downloads");
+            if (loading.IsCompleted
+                || pageContent.Content is not Border { Child: StackPanel loadingPanel }
+                || !loadingPanel.Children.OfType<TextBlock>().Any(
+                    label => label.Text == Ui("Fetching official version list…")))
+                throw new IOException("Cold download navigation must immediately display catalog loading.");
+            await loading;
+            if (gameCatalog is not [{ Id: "1.21.1" }]
+                || !pageContent.GetVisualDescendants().OfType<ListBox>().Any(
+                    list => list.Name == "GameVersionList"))
+                throw new IOException("The loaded game catalog did not replace the loading state.");
+            checks.Add("PASS cold game download navigation replaces the previous page while loading");
             gameCatalog = Enumerable
                 .Range(0, 151)
                 .Select(i => new GameRelease("1.22." + i, "release"))
@@ -991,6 +1005,14 @@ public sealed partial class MainWindow
             CancellationToken cancellationToken
         )
         {
+            if (request.RequestUri?.AbsolutePath == "/mc/game/version_manifest_v2.json")
+            {
+                await Task.Delay(100, cancellationToken);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{"versions":[{"id":"1.21.1","type":"release"}]}"""),
+                };
+            }
             Interlocked.Increment(ref Requests);
             await Task.Delay(100, cancellationToken);
             const string version =

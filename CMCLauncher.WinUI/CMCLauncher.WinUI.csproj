@@ -104,6 +104,11 @@
       CopyToOutputDirectory="PreserveNewest"
       CopyToPublishDirectory="PreserveNewest"
     />
+    <Content
+      Update="Assets/CMCLauncherIcons.ttf;Assets/CMCLauncherIcons.LICENSE.txt"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+    />
     <None
       Update="assets/cmc-logo.ico"
       CopyToOutputDirectory="PreserveNewest"

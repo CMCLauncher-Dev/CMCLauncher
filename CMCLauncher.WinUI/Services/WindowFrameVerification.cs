@@ -117,9 +117,11 @@ public sealed partial class MainWindow
                 stableBackdrop = SystemBackdrop;
                 if (glass)
                     check(
-                        WindowBackground.Color.A == 0x33
+                        WindowBackground.Color.A >= (lightTheme ? 224 : 232)
+                            && Sidebar.Parent is Microsoft.UI.Xaml.Controls.Panel contentGrid
+                            && ReferenceEquals(contentGrid.Background, WindowBackground)
                             && CaptionClose.Visibility == Microsoft.UI.Xaml.Visibility.Visible,
-                        "glass retains its translucent surface and custom caption buttons"
+                        "glass keeps its theme tint on the visible content background and retains custom caption buttons"
                     );
                 CustomTitleBar.UpdateLayout();
                 var closeEdge = CaptionClose.TransformToVisual(CustomTitleBar).TransformPoint(
