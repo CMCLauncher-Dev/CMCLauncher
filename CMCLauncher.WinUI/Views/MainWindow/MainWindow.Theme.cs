@@ -141,7 +141,11 @@ public sealed partial class MainWindow
             ? Color.FromArgb(0x00, bgBrush.Color.R, bgBrush.Color.G, bgBrush.Color.B)
             : Backdrop(bgBrush.Color);
         if (Sidebar.Parent is Panel contentGrid)
-            contentGrid.Background = new SolidColorBrush(ContentBackdrop(bgBrush.Color));
+            contentGrid.Background = new SolidColorBrush(
+                micaEnabled && !hasCustomBackground
+                    ? Colors.Transparent
+                    : ContentBackdrop(bgBrush.Color)
+            );
         Sidebar.Background = new SolidColorBrush(ContentBackdrop(Brush(sidebar).Color));
         // 液态玻璃下各层底色都是半透明，不透明的分隔线会显成一条黑线，直接隐藏。
         Sidebar.BorderBrush = micaEnabled
@@ -188,6 +192,8 @@ public sealed partial class MainWindow
         TitleLabel.Foreground = Brush(text);
         foreach (var card in themeCards.Concat(taskCards))
             ApplyCardTheme(card);
+        if (!Verifying)
+            ApplyWindowBlur(micaEnabled && store.Config.Settings.GlassBackgroundBlur);
         // 标题栏按钮由系统绘制，不会跟随 XAML 画刷刷新，需要单独赋色。
         if (AppWindowTitleBar.IsCustomizationSupported())
         {
@@ -279,8 +285,14 @@ public sealed partial class MainWindow
         if (GlassActive)
             surface = GlassSurface(surface);
         card.Background = new SolidColorBrush(surface);
-        card.BorderBrush = GlassActive && !settings.ShowGlassCardBorders
-            ? new SolidColorBrush(Colors.Transparent)
+        card.BorderBrush = GlassActive
+            ? settings.ShowGlassCardBorders
+                ? new SolidColorBrush(
+                    lightTheme
+                        ? Color.FromArgb(0x2E, 0x00, 0x00, 0x00)
+                        : Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)
+                )
+                : new SolidColorBrush(Colors.Transparent)
             : Brush(lightTheme ? ThemeTokens.LightBorder : ThemeTokens.DarkBorder);
     }
 

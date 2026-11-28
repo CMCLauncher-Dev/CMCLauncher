@@ -160,9 +160,11 @@ public sealed partial class MainWindow
         var hWnd = WindowNative.GetWindowHandle(this);
         var policy = new AccentPolicy
         {
-            AccentState = blur ? AccentState.ACCENT_ENABLE_BLURBEHIND : AccentState.ACCENT_DISABLED,
-            AccentFlags = 0,
-            GradientColor = 0,
+            AccentState = blur
+                ? AccentState.ACCENT_ENABLE_ACRYLICBLURBEHIND
+                : AccentState.ACCENT_DISABLED,
+            AccentFlags = blur ? 2u : 0u,
+            GradientColor = blur ? BlurAccentTint() : 0u,
             AnimationId = 0,
         };
         var size = Marshal.SizeOf<AccentPolicy>();
@@ -182,6 +184,16 @@ public sealed partial class MainWindow
         {
             Marshal.FreeHGlobal(pointer);
         }
+    }
+
+    uint BlurAccentTint()
+    {
+        var bg = Brush(lightTheme ? ThemeTokens.LightBg : ThemeTokens.DarkBg).Color;
+        var opacity = Math.Clamp(store.Config.Settings.GlassOpacityPercent, 0, 100);
+        var minAlpha = lightTheme ? 156 : 148;
+        var maxAlpha = lightTheme ? 228 : 216;
+        var alpha = (byte)Math.Round(minAlpha + (maxAlpha - minAlpha) * (opacity / 100.0));
+        return ((uint)alpha << 24) | ((uint)bg.B << 16) | ((uint)bg.G << 8) | bg.R;
     }
 
     enum AccentState
